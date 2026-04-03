@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs'),p='.guardian_last_run';const now=Date.now();try{const last=parseInt(fs.readFileSync(p,'utf8'));if(now-last<3600000){process.exit(0);}}catch(e){}fs.writeFileSync(p,String(now));console.log('\\n[system-guardian] Recordatorio: ejecuta /system-guardian para evaluar el estado del sistema (última evaluación hace más de 1h)');\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm audit*)",
+      "Bash(curl http://localhost:3001/*)",
+      "Bash(curl -s http://localhost:3001/*)",
+      "Bash(cd backend && npm*)",
+      "Bash(cd frontend && npm*)",
+      "Bash(git ls-files*)",
+      "Bash(git log*)"
+    ]
+  }
+}

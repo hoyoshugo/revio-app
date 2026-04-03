@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-950 text-gray-100 font-sans antialiased;
+  }
+  * {
+    @apply box-border;
+  }
+  ::-webkit-scrollbar { @apply w-1.5; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-gray-700 rounded-full; }
+}
+
+@layer components {
+  .card {
+    @apply bg-gray-900 border border-gray-800 rounded-xl p-4;
+  }
+  .btn-primary {
+    @apply bg-mystica-blue hover:bg-mystica-blue/90 text-white font-medium px-4 py-2 rounded-lg transition-colors text-sm;
+  }
+  .btn-ghost {
+    @apply text-gray-400 hover:text-white hover:bg-gray-800 px-3 py-2 rounded-lg transition-colors text-sm;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+  .badge-prospect { @apply bg-gray-800 text-gray-300; }
+  .badge-quoted { @apply bg-blue-900/50 text-blue-300; }
+  .badge-reserved { @apply bg-purple-900/50 text-purple-300; }
+  .badge-paid { @apply bg-green-900/50 text-green-300; }
+  .badge-checked_in { @apply bg-teal-900/50 text-teal-300; }
+  .badge-checked_out { @apply bg-gray-700 text-gray-400; }
+  .badge-cancelled { @apply bg-red-900/50 text-red-300; }
+}

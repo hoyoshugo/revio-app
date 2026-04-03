@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+.npm
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime
+.guardian_last_run
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
