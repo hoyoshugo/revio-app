@@ -6,6 +6,17 @@
 
 Si el usuario ya dio una instrucción específica al abrir la sesión, ejecuta primero esa instrucción y luego `/system-guardian` en segundo plano (o menciona que lo correrás después de completar la tarea).
 
+## Enjambre de Desarrollo
+
+Para cualquier tarea de desarrollo en este proyecto, usa el enjambre de skills especializados:
+- **Feature completa / multi-capa** → `skill-creator:dev-swarm` (orquestador)
+- **Endpoints, rutas, lógica** → `skill-creator:dev-backend`
+- **UI, React, Vite, componentes** → `skill-creator:dev-frontend`
+- **Supabase, SQL, migraciones** → `skill-creator:dev-database`
+- **Claude API, agente IA, prompts** → `skill-creator:dev-ai-agent`
+- **Railway, deploy, infra** → `skill-creator:dev-devops`
+- **Auth, Wompi, permisos** → `skill-creator:dev-security`
+
 ## Contexto del proyecto
 
 **Mística AI Agent** es un SaaS multi-tenant de agente IA para hostels y hoteles en Colombia.
