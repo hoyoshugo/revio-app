@@ -331,7 +331,7 @@ function Step5Done({ data }) {
         ))}
       </div>
 
-      <button onClick={() => navigate('/dashboard')}
+      <button onClick={() => navigate('/panel')}
         className="rv-btn-primary w-full py-3 text-sm font-semibold flex items-center justify-center gap-2">
         Ir a mi panel <ArrowRight className="w-4 h-4" />
       </button>

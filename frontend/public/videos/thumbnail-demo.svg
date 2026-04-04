@@ -1,0 +1,46 @@
+<svg width="400" height="225" viewBox="0 0 400 225" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg-d" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#0ea5e9" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="overlay-d" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0.65"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="225" fill="#0d1424"/>
+  <!-- Grid -->
+  <line x1="0" y1="45" x2="400" y2="45" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <line x1="0" y1="90" x2="400" y2="90" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <line x1="0" y1="135" x2="400" y2="135" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <line x1="0" y1="180" x2="400" y2="180" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <line x1="100" y1="0" x2="100" y2="225" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <line x1="200" y1="0" x2="200" y2="225" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <line x1="300" y1="0" x2="300" y2="225" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <!-- Decorative -->
+  <circle cx="350" cy="50" r="55" fill="url(#bg-d)" opacity="0.1"/>
+  <circle cx="60" cy="175" r="40" fill="#0ea5e9" opacity="0.07"/>
+  <!-- WhatsApp chat bubbles mockup -->
+  <rect x="30" y="50" width="160" height="26" rx="12" fill="rgba(16,185,129,0.18)" stroke="rgba(16,185,129,0.35)" stroke-width="1"/>
+  <text x="110" y="68" text-anchor="middle" fill="#10b981" font-size="10" font-family="Inter,sans-serif">¿Tienen habitación doble?</text>
+  <rect x="60" y="84" width="180" height="26" rx="12" fill="rgba(14,165,233,0.18)" stroke="rgba(14,165,233,0.35)" stroke-width="1"/>
+  <text x="150" y="102" text-anchor="middle" fill="#0ea5e9" font-size="10" font-family="Inter,sans-serif">¡Sí! $180K/noche. ¿La reservo? 🏡</text>
+  <rect x="30" y="118" width="100" height="22" rx="10" fill="rgba(16,185,129,0.18)" stroke="rgba(16,185,129,0.35)" stroke-width="1"/>
+  <text x="80" y="133" text-anchor="middle" fill="#10b981" font-size="10" font-family="Inter,sans-serif">Perfecto 👍</text>
+  <!-- Timer badge -->
+  <rect x="260" y="55" width="110" height="36" rx="8" fill="rgba(14,165,233,0.12)" stroke="rgba(14,165,233,0.3)" stroke-width="1"/>
+  <text x="315" y="72" text-anchor="middle" fill="#0ea5e9" font-size="18" font-family="Inter,sans-serif" font-weight="900">&lt;2s</text>
+  <text x="315" y="84" text-anchor="middle" fill="rgba(14,165,233,0.6)" font-size="9" font-family="Inter,sans-serif">respuesta</text>
+  <!-- Play button -->
+  <circle cx="200" cy="155" r="24" fill="url(#bg-d)" opacity="0.92"/>
+  <polygon points="193,144 193,166 213,155" fill="white" opacity="0.95"/>
+  <!-- Gradient overlay -->
+  <rect width="400" height="225" fill="url(#overlay-d)"/>
+  <!-- Duration badge -->
+  <rect x="14" y="14" width="68" height="20" rx="4" fill="rgba(0,0,0,0.65)"/>
+  <text x="48" y="28" text-anchor="middle" fill="white" font-size="10" font-family="Inter,sans-serif" font-weight="700">40–45 seg</text>
+  <!-- Title -->
+  <text x="20" y="196" fill="white" font-size="13" font-family="Inter,sans-serif" font-weight="700">Demo en Vivo</text>
+  <text x="20" y="213" fill="rgba(255,255,255,0.55)" font-size="10" font-family="Inter,sans-serif">Flujo real de reserva</text>
+</svg>

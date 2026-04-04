@@ -17,6 +17,7 @@ import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { supabase } from '../models/supabase.js';
 import { requireAuth, requireSuperAdmin } from '../middleware/auth.js';
+import { encryptAiConfig, decryptAiConfig } from '../services/encryption.js';
 
 const router = Router();
 
@@ -53,7 +54,14 @@ router.get('/', requireAuth, async (req, res) => {
     const { data: rows } = await query;
 
     const saved = {};
-    for (const row of rows || []) saved[row.key] = row.value;
+    for (const row of rows || []) {
+      // Descifrar claves AI antes de enviar al frontend
+      if (row.key === 'ai_provider') {
+        saved[row.key] = decryptAiConfig(row.value);
+      } else {
+        saved[row.key] = row.value;
+      }
+    }
 
     // Datos de la propiedad
     let property = null;
@@ -76,7 +84,9 @@ router.put('/', requireAuth, async (req, res) => {
   if (!key) return res.status(400).json({ error: 'Falta key' });
 
   try {
-    await upsertSetting(property_id || null, key, value, req.user?.email);
+    // Cifrar claves AI antes de guardar en Supabase
+    const storedValue = key === 'ai_provider' ? encryptAiConfig(value) : value;
+    await upsertSetting(property_id || null, key, storedValue, req.user?.email);
 
     // Si es config general, actualizar también la tabla properties
     if (key === 'general' && property_id) {

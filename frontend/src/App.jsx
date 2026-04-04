@@ -12,6 +12,7 @@ const SuperAdminLayout   = React.lazy(() => import('./components/SuperAdmin/Supe
 const LandingPage        = React.lazy(() => import('./pages/Landing/LandingPage.jsx'));
 const RegisterPage       = React.lazy(() => import('./pages/Register/RegisterPage.jsx'));
 const OnboardingWizard   = React.lazy(() => import('./pages/Onboarding/OnboardingWizard.jsx'));
+const LegalPage          = React.lazy(() => import('./pages/Legal/LegalPage.jsx'));
 
 function PageLoader() {
   return (
@@ -35,7 +36,7 @@ function SuperAdminRoute({ children }) {
 // Redirect authenticated users away from landing/login/register
 function PublicOnlyRoute({ children }) {
   const { token } = useAuth();
-  return token ? <Navigate to="/dashboard" replace /> : children;
+  return token ? <Navigate to="/panel" replace /> : children;
 }
 
 export default function App() {
@@ -49,7 +50,9 @@ export default function App() {
               path="/"
               element={
                 <AuthProvider>
-                  <LandingPage />
+                  <PublicOnlyRoute>
+                    <LandingPage />
+                  </PublicOnlyRoute>
                 </AuthProvider>
               }
             />
@@ -68,6 +71,10 @@ export default function App() {
                 <OnboardingWizard />
               </AuthProvider>
             } />
+
+            {/* ── Legal docs (public) ── */}
+            <Route path="/legal/:slug" element={<LegalPage />} />
+            <Route path="/legal" element={<Navigate to="/legal/terminos" replace />} />
 
             {/* ── Superadmin (auth separada) ── */}
             <Route

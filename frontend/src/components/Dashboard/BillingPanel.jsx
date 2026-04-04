@@ -81,6 +81,9 @@ export default function BillingPanel() {
   const [loading, setLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [annual, setAnnual] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   useEffect(() => {
     fetch(`${API}/api/dashboard/billing`, {
@@ -90,6 +93,41 @@ export default function BillingPanel() {
       .then(d => { setBilling(d); setLoading(false); })
       .catch(() => setLoading(false));
   }, [token]);
+
+  async function handleSubscribe() {
+    setSubscribing(true);
+    try {
+      const res = await fetch(`${API}/api/payments/subscription/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ plan, billing_cycle: annual ? 'annual' : 'monthly' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al generar link de pago');
+      // Redirigir a Wompi
+      window.open(data.payment_link_url, '_blank');
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSubscribing(false);
+    }
+  }
+
+  async function handleCancel() {
+    try {
+      const res = await fetch(`${API}/api/payments/subscription/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reason: cancelReason }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setShowCancelModal(false);
+      alert(data.message);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
 
   if (loading) {
     return (
@@ -336,6 +374,49 @@ export default function BillingPanel() {
         )}
       </div>
 
+      {/* Cancel button for active subscriptions */}
+      {status === 'active' && (
+        <div className="text-center">
+          <button onClick={() => setShowCancelModal(true)}
+            className="text-xs underline"
+            style={{ color: 'var(--text-3)' }}>
+            Cancelar suscripción
+          </button>
+        </div>
+      )}
+
+      {/* Cancel modal */}
+      {showCancelModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={() => setShowCancelModal(false)}>
+          <div style={{ width: '100%', maxWidth: 400, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 24 }}
+            onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-semibold mb-2" style={{ color: 'var(--text-1)' }}>¿Cancelar suscripción?</h3>
+            <p className="text-sm mb-4" style={{ color: 'var(--text-2)' }}>
+              Tu acceso continúa activo hasta el fin del periodo pagado. No se realizarán cargos futuros.
+            </p>
+            <div className="mb-4">
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>
+                ¿Por qué cancelas? (opcional)
+              </label>
+              <textarea className="rv-input resize-none" rows={3}
+                value={cancelReason} onChange={e => setCancelReason(e.target.value)}
+                placeholder="Cuéntanos qué podemos mejorar..." />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowCancelModal(false)} className="rv-btn-ghost px-4 py-2 text-sm">
+                Mantener plan
+              </button>
+              <button onClick={handleCancel}
+                className="rv-btn px-4 py-2 text-sm font-medium text-white"
+                style={{ background: 'var(--danger)' }}>
+                Confirmar cancelación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Activate CTA */}
       {(status === 'trial' || status === 'suspended') && (
         <div className="rv-card px-5 py-5 text-center space-y-3"
@@ -349,8 +430,9 @@ export default function BillingPanel() {
               {COP(annual ? bill.total * 10 : bill.total)} {annual ? 'anuales' : 'al mes'} · Sin contratos · Cancela cuando quieras
             </p>
           </div>
-          <button className="rv-btn-primary text-sm px-6 py-2.5">
-            Suscribirse con Wompi
+          <button onClick={handleSubscribe} disabled={subscribing}
+            className="rv-btn-primary text-sm px-6 py-2.5">
+            {subscribing ? 'Generando link...' : 'Suscribirse con Wompi →'}
           </button>
           <p className="text-[10px]" style={{ color: 'var(--text-3)' }}>
             Pago seguro procesado por Wompi · TRES HACHE ENTERPRISE SAS · NIT 901696556-6

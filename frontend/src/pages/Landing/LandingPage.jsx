@@ -72,7 +72,7 @@ function Navbar({ dark, toggleTheme, navigate }) {
       transition: 'background .3s, border .3s',
     }}>
       <div style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer' }} onClick={() => navigate('/')}>
-        <div style={{ width:32, height:32, borderRadius:8, background:'linear-gradient(135deg,#0ea5e9,#6366f1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15 }}>⚡</div>
+        <svg width="32" height="32" viewBox="0 0 44 44" fill="none" aria-label="Revio"><rect width="44" height="44" rx="10" fill="#0ea5e9"/><circle cx="22" cy="22" r="7" stroke="white" strokeWidth="2.5" fill="none"/><path d="M22 15 L22 22 L27 22" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/><circle cx="22" cy="22" r="2" fill="white"/><path d="M22 8 L22 36" stroke="white" strokeWidth="2.5" strokeLinecap="round" opacity="0.2"/><path d="M14 22 L30 22" stroke="white" strokeWidth="2.5" strokeLinecap="round" opacity="0.2"/></svg>
         <span style={{ fontSize:18, fontWeight:900, color: dark ? '#f1f5f9' : '#0f172a' }}>rev<span className="lp-grad">io</span></span>
       </div>
       <div style={{ display:'flex', alignItems:'center', gap:24 }}>
@@ -96,7 +96,7 @@ function Navbar({ dark, toggleTheme, navigate }) {
 }
 
 // ─── Hero ─────────────────────────────────────────────────────
-function Hero({ dark, navigate }) {
+function Hero({ dark, navigate, onOpenVideo }) {
   return (
     <section style={{
       minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center',
@@ -140,14 +140,14 @@ function Hero({ dark, navigate }) {
               style={{ padding:'15px 30px', borderRadius:12, fontSize:16, fontWeight:800, cursor:'pointer' }}>
               Empieza gratis 14 días →
             </button>
-            <button onClick={() => document.getElementById('lp-demo')?.scrollIntoView({ behavior:'smooth' })}
+            <button onClick={onOpenVideo}
               style={{
                 padding:'15px 28px', borderRadius:12, fontSize:16, fontWeight:600, cursor:'pointer',
                 background:'transparent', color: dark ? '#94a3b8' : '#475569',
                 border:`1.5px solid ${dark ? 'rgba(255,255,255,.14)' : 'rgba(0,0,0,.12)'}`,
                 transition:'all .2s',
               }}>
-              Ver demo en vivo
+              ▶ Ver demo en vivo
             </button>
           </div>
 
@@ -558,7 +558,7 @@ function Footer({ dark, toggleTheme }) {
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px,1fr))', gap:40, marginBottom:48 }}>
           <div>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-              <div style={{ width:28, height:28, borderRadius:6, background:'linear-gradient(135deg,#0ea5e9,#6366f1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14 }}>⚡</div>
+              <svg width="28" height="28" viewBox="0 0 44 44" fill="none" aria-label="Revio"><rect width="44" height="44" rx="10" fill="#0ea5e9"/><circle cx="22" cy="22" r="7" stroke="white" strokeWidth="2.5" fill="none"/><path d="M22 15 L22 22 L27 22" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/><circle cx="22" cy="22" r="2" fill="white"/><path d="M22 8 L22 36" stroke="white" strokeWidth="2.5" strokeLinecap="round" opacity="0.2"/><path d="M14 22 L30 22" stroke="white" strokeWidth="2.5" strokeLinecap="round" opacity="0.2"/></svg>
               <span style={{ fontSize:16, fontWeight:900, color:'#f1f5f9' }}>rev<span className="lp-grad">io</span></span>
             </div>
             <p style={{ fontSize:13, lineHeight:1.7, color:'#475569' }}>El agente de ventas IA para hoteles de Latinoamérica.</p>
@@ -569,19 +569,19 @@ function Footer({ dark, toggleTheme }) {
             </div>
           </div>
           {[
-            { t:'Producto', l:['Funciones','Precios','Docs','Blog'] },
-            { t:'Soporte', l:['Contacto','Status','Changelog'] },
-            { t:'Legal', l:['Términos','Privacidad','Cookies'] },
+            { t:'Producto', l:[{n:'Funciones',h:'#lp-features'},{n:'Precios',h:'#lp-pricing'},{n:'Integraciones',h:'#lp-integrations'}] },
+            { t:'Soporte', l:[{n:'Contacto',h:'mailto:info@treshache.co'},{n:'Estado del sistema',h:'/panel'}] },
+            { t:'Legal', l:[{n:'Términos',h:'/legal/terminos'},{n:'Privacidad',h:'/legal/privacidad'},{n:'Cookies',h:'/legal/cookies'},{n:'Datos',h:'/legal/datos'},{n:'SLA',h:'/legal/sla'}] },
           ].map(col => (
             <div key={col.t}>
               <h4 style={{ fontSize:11, fontWeight:800, textTransform:'uppercase', letterSpacing:1.5, color:'#94a3b8', marginBottom:14 }}>{col.t}</h4>
               <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
-                {col.l.map(l => (
-                  <span key={l} style={{ fontSize:13, cursor:'pointer', transition:'color .2s' }}
+                {col.l.map(item => (
+                  <a key={item.n} href={item.h} style={{ fontSize:13, color:'#475569', textDecoration:'none', cursor:'pointer', transition:'color .2s' }}
                     onMouseEnter={e => e.currentTarget.style.color='#94a3b8'}
                     onMouseLeave={e => e.currentTarget.style.color='#475569'}>
-                    {l}
-                  </span>
+                    {item.n}
+                  </a>
                 ))}
               </div>
             </div>
@@ -603,30 +603,273 @@ function Footer({ dark, toggleTheme }) {
   );
 }
 
+// ─── Video thumbnails SVG ─────────────────────────────────────
+const VIDEO_DATA = [
+  {
+    id: 'promo-general',
+    title: 'Presentación General',
+    subtitle: '30–45 segundos · Problema → Solución → CTA',
+    file: 'promo-general.mp4',
+    color: '#0ea5e9',
+    accent: '#6366f1',
+    script: [
+      { t: '0–5s', screen: 'Logo Revio con animación de entrada. Fondo oscuro con partículas.', voice: '¿Cuántas reservas estás perdiendo por responder tarde?' },
+      { t: '5–12s', screen: 'Animación de mensajes de WhatsApp llegando. Algunos sin respuesta.', voice: 'Los viajeros deciden en minutos. Si no respondes a tiempo, reservan en otro hostal.' },
+      { t: '12–22s', screen: 'Demo del agente respondiendo automáticamente en WhatsApp. Pantalla dividida: agente + conversión en reserva.', voice: 'Revio es tu agente de ventas con inteligencia artificial. Responde al instante, consulta disponibilidad en tiempo real, y cierra reservas — mientras tú duermes.' },
+      { t: '22–32s', screen: 'Dashboard con métricas: conversaciones, reservas, pagos.', voice: 'Panel de control completo. Gestiona todas tus propiedades, canales OTA y análisis de revenue desde un solo lugar.' },
+      { t: '32–40s', screen: 'Logo Revio. URL: app.revio.co', voice: 'Revio. Revenue intelligence para hoteles de Latinoamérica. Empieza gratis hoy.' },
+    ],
+  },
+  {
+    id: 'demo-live',
+    title: 'Demo en Vivo',
+    subtitle: '40–45 segundos · Flujo real de reserva',
+    file: 'demo-live.mp4',
+    color: '#10b981',
+    accent: '#0ea5e9',
+    script: [
+      { t: '0–5s', screen: 'Inicio en dashboard Revio, modo oscuro.', voice: 'Así funciona Revio en la práctica.' },
+      { t: '5–15s', screen: 'Llega un mensaje de WhatsApp. El agente responde en <2 segundos con disponibilidad real de LobbyPMS.', voice: 'Un huésped pregunta por disponibilidad. En menos de 2 segundos, el agente consulta tu PMS y responde con precios reales.' },
+      { t: '15–25s', screen: 'El agente guía al huésped: fechas, tipo de habitación, datos de contacto. Conversación fluida.', voice: 'Lleva al cliente de forma natural desde la primera pregunta hasta completar los datos de reserva.' },
+      { t: '25–35s', screen: 'El agente envía un link de pago Wompi. El cliente paga. El dashboard se actualiza.', voice: 'Genera el link de pago y confirma la reserva. Todo automático. Sin intervención manual.' },
+      { t: '35–42s', screen: 'Vista del panel de métricas. Gráfico de conversaciones → reservas.', voice: 'Tú solo revisas el panel. El agente se encarga del resto. Pruébalo 14 días gratis.' },
+    ],
+  },
+  {
+    id: 'testimonial-mystica',
+    title: 'Caso Mística Hostels',
+    subtitle: '35–40 segundos · Historia de éxito real',
+    file: 'testimonial-mystica.mp4',
+    color: '#f59e0b',
+    accent: '#ef4444',
+    script: [
+      { t: '0–8s', screen: 'B-Roll: Imágenes de Mística Isla Palma / Tayrona. Playas, cabañas, huéspedes.', voice: 'Mística Hostels opera en algunos de los destinos más espectaculares de Colombia: Isla Palma y el Parque Tayrona.' },
+      { t: '8–18s', screen: 'Estadísticas antes/después. Reservas directas +38%. Tiempo de respuesta de 4h a 30s.', voice: 'Con Revio, redujeron el tiempo de respuesta de 4 horas a 30 segundos, y aumentaron las reservas directas un 38% en los primeros 60 días.' },
+      { t: '18–28s', screen: 'Conversación real del agente. Huésped satisfecho reservando desde WhatsApp.', voice: 'El agente responde en español e inglés, conoce cada propiedad al detalle, y convierte consultas en pagos confirmados — las 24 horas.' },
+      { t: '28–36s', screen: 'URL app.revio.co/register', voice: '¿Tu hostal también quiere estos resultados? Empieza hoy en app.revio.co — 14 días sin costo, sin tarjeta de crédito.' },
+    ],
+  },
+];
+
+function VideoThumbnailSVG({ video, dark, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        borderRadius: 16, overflow: 'hidden', cursor: 'pointer', position: 'relative',
+        border: `1px solid ${dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)'}`,
+        transition: 'transform .25s ease, box-shadow .25s ease',
+        boxShadow: dark ? '0 8px 32px rgba(0,0,0,.4)' : '0 8px 32px rgba(0,0,0,.08)',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-6px)'; e.currentTarget.style.boxShadow = `0 24px 64px ${video.color}33`; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = dark ? '0 8px 32px rgba(0,0,0,.4)' : '0 8px 32px rgba(0,0,0,.08)'; }}
+    >
+      {/* Thumbnail SVG */}
+      <svg width="100%" viewBox="0 0 400 225" xmlns="http://www.w3.org/2000/svg">
+        {/* Background */}
+        <defs>
+          <linearGradient id={`g-${video.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={video.color} stopOpacity="0.9" />
+            <stop offset="100%" stopColor={video.accent} stopOpacity="0.9" />
+          </linearGradient>
+          <linearGradient id={`gd-${video.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#000" stopOpacity="0" />
+            <stop offset="100%" stopColor="#000" stopOpacity="0.65" />
+          </linearGradient>
+        </defs>
+        <rect width="400" height="225" fill={dark ? '#0d1424' : '#1e293b'} />
+        {/* Grid lines */}
+        {[40,80,120,160,200].map(y => <line key={y} x1="0" y1={y} x2="400" y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />)}
+        {[80,160,240,320].map(x => <line key={x} x1={x} y1="0" x2={x} y2="225" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />)}
+        {/* Decorative circles */}
+        <circle cx="330" cy="45" r="60" fill={`url(#g-${video.id})`} opacity="0.12" />
+        <circle cx="70" cy="180" r="45" fill={video.accent} opacity="0.08" />
+        {/* Center play button */}
+        <circle cx="200" cy="112" r="36" fill={`url(#g-${video.id})`} opacity="0.92" />
+        <polygon points="190,98 190,126 218,112" fill="white" opacity="0.95" />
+        {/* Gradient overlay bottom */}
+        <rect width="400" height="225" fill={`url(#gd-${video.id})`} />
+        {/* Duration badge */}
+        <rect x="14" y="14" width="48" height="20" rx="4" fill="rgba(0,0,0,0.65)" />
+        <text x="38" y="28" textAnchor="middle" fill="white" fontSize="11" fontFamily="Inter,sans-serif" fontWeight="600">VIDEO</text>
+        {/* Title */}
+        <text x="20" y="195" fill="white" fontSize="13" fontFamily="Inter,sans-serif" fontWeight="700" opacity="0.95">{video.title}</text>
+        <text x="20" y="212" fill="rgba(255,255,255,0.6)" fontSize="10" fontFamily="Inter,sans-serif">{video.subtitle}</text>
+      </svg>
+    </div>
+  );
+}
+
+function Videos({ dark, onOpenVideo }) {
+  return (
+    <section style={{
+      padding: '96px 32px',
+      background: dark ? '#0a0f1e' : '#f8fafc',
+    }}>
+      <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+        <div style={{ textAlign:'center', marginBottom:52 }}>
+          <div style={{
+            display:'inline-flex', alignItems:'center', gap:8, marginBottom:16,
+            padding:'5px 14px', borderRadius:999,
+            background: dark ? 'rgba(99,102,241,.12)' : 'rgba(14,165,233,.08)',
+            border: `1px solid ${dark ? 'rgba(99,102,241,.3)' : 'rgba(14,165,233,.2)'}`,
+          }}>
+            <span style={{ fontSize:12, fontWeight:700, color: dark ? '#a5b4fc' : '#0ea5e9' }}>▶ Videos</span>
+          </div>
+          <h2 style={{ fontSize:'clamp(28px,4vw,44px)', fontWeight:900, color: dark ? '#f1f5f9' : '#0f172a', marginBottom:12 }}>
+            Mira Revio en <span className="lp-grad">acción</span>
+          </h2>
+          <p style={{ fontSize:16, color: dark ? '#64748b' : '#94a3b8', maxWidth:480, margin:'0 auto' }}>
+            3 videos que muestran cómo Revio transforma las conversaciones en reservas confirmadas.
+          </p>
+        </div>
+
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:24 }}>
+          {VIDEO_DATA.map(v => (
+            <VideoThumbnailSVG key={v.id} video={v} dark={dark} onClick={() => onOpenVideo(v)} />
+          ))}
+        </div>
+
+        <div style={{ textAlign:'center', marginTop:36 }}>
+          <p style={{ fontSize:13, color: dark ? '#334155' : '#94a3b8' }}>
+            Videos en producción — scripts disponibles · <span style={{ color:'#0ea5e9', cursor:'pointer' }} onClick={() => onOpenVideo(VIDEO_DATA[0])}>Ver guión completo →</span>
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function VideoModal({ video, dark, onClose }) {
+  if (!video) return null;
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position:'fixed', inset:0, zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center',
+        background:'rgba(0,0,0,0.78)', backdropFilter:'blur(10px)', padding:20,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width:'100%', maxWidth:720, maxHeight:'88vh', overflowY:'auto', borderRadius:20,
+          background: dark ? '#0d1424' : '#fff',
+          border:`1px solid ${dark ? 'rgba(255,255,255,.1)' : 'rgba(0,0,0,.08)'}`,
+          boxShadow:'0 40px 120px rgba(0,0,0,.6)',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between',
+          borderBottom:`1px solid ${dark ? 'rgba(255,255,255,.07)' : 'rgba(0,0,0,.07)'}`,
+          position:'sticky', top:0, background: dark ? '#0d1424' : '#fff', zIndex:1,
+          borderRadius:'20px 20px 0 0',
+        }}>
+          <div>
+            <div style={{ fontSize:11, fontWeight:700, color: video.color, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:4 }}>
+              Guión de Producción · {video.file}
+            </div>
+            <div style={{ fontSize:18, fontWeight:800, color: dark ? '#f1f5f9' : '#0f172a' }}>{video.title}</div>
+            <div style={{ fontSize:12, color: dark ? '#64748b' : '#94a3b8', marginTop:2 }}>{video.subtitle}</div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              width:34, height:34, borderRadius:8, border:'none', cursor:'pointer', fontSize:16,
+              background: dark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.05)',
+              color: dark ? '#94a3b8' : '#64748b', display:'flex', alignItems:'center', justifyContent:'center',
+            }}
+          >✕</button>
+        </div>
+
+        {/* Thumbnail preview */}
+        <div style={{ padding:'20px 24px 0' }}>
+          <VideoThumbnailSVG video={video} dark={dark} onClick={() => {}} />
+        </div>
+
+        {/* Script */}
+        <div style={{ padding:'20px 24px 28px' }}>
+          <div style={{
+            fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em',
+            color: dark ? '#475569' : '#94a3b8', marginBottom:14,
+          }}>Guión escena por escena</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            {video.script.map((s, i) => (
+              <div key={i} style={{
+                borderRadius:12, overflow:'hidden',
+                border:`1px solid ${dark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)'}`,
+              }}>
+                {/* Time badge */}
+                <div style={{
+                  padding:'7px 14px', display:'flex', alignItems:'center', gap:8,
+                  background: dark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)',
+                  borderBottom:`1px solid ${dark ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.04)'}`,
+                }}>
+                  <span style={{
+                    padding:'2px 8px', borderRadius:6, fontSize:10, fontWeight:800,
+                    background:`${video.color}22`, color: video.color,
+                  }}>{s.t}</span>
+                </div>
+                <div style={{ padding:'12px 14px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                  <div>
+                    <div style={{ fontSize:10, fontWeight:700, color: dark ? '#475569' : '#94a3b8', marginBottom:5, textTransform:'uppercase', letterSpacing:'0.06em' }}>🎬 Pantalla</div>
+                    <div style={{ fontSize:12, lineHeight:1.6, color: dark ? '#94a3b8' : '#64748b' }}>{s.screen}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:10, fontWeight:700, color: dark ? '#475569' : '#94a3b8', marginBottom:5, textTransform:'uppercase', letterSpacing:'0.06em' }}>🎙️ Voz en off</div>
+                    <div style={{ fontSize:12, lineHeight:1.6, color: dark ? '#e2e8f0' : '#1e293b', fontStyle:'italic' }}>"{s.voice}"</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* CTA */}
+          <div style={{
+            marginTop:20, padding:'14px 18px', borderRadius:12,
+            background: `linear-gradient(135deg, ${video.color}18, ${video.accent}12)`,
+            border:`1px solid ${video.color}33`,
+          }}>
+            <div style={{ fontSize:11, fontWeight:700, color: video.color, marginBottom:4 }}>Archivo de producción</div>
+            <div style={{ fontSize:12, color: dark ? '#94a3b8' : '#64748b' }}>
+              Guardar en <code style={{ background: dark ? 'rgba(255,255,255,.07)' : 'rgba(0,0,0,.05)', padding:'2px 6px', borderRadius:4, fontSize:11 }}>frontend/public/videos/{video.file}</code> · Duración estimada: {video.subtitle.split(' · ')[0]}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Root export ─────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
   const { dark, toggle: toggleTheme } = useTheme();
+  const [activeVideo, setActiveVideo] = useState(null);
 
   return (
     <div className="lp-root" style={{ background: dark ? '#0a0f1e' : '#f8fafc' }}>
       <style>{GLOBAL_STYLE}</style>
       <Navbar dark={dark} toggleTheme={toggleTheme} navigate={navigate} />
-      <Hero dark={dark} navigate={navigate} />
+      <Hero dark={dark} navigate={navigate} onOpenVideo={() => setActiveVideo(VIDEO_DATA[0])} />
       <Wave dark={!dark} flip />
       <Problem dark={dark} />
       <Wave dark={dark} />
       <HowItWorks dark={dark} />
       <Wave dark={!dark} flip />
+      <Videos dark={dark} onOpenVideo={setActiveVideo} />
+      <Wave dark={dark} />
       <Features dark={dark} />
-      <Wave dark={dark} />
-      <Integrations dark={dark} />
       <Wave dark={!dark} flip />
-      <Pricing dark={dark} navigate={navigate} />
+      <Integrations dark={dark} />
       <Wave dark={dark} />
+      <Pricing dark={dark} navigate={navigate} />
+      <Wave dark={!dark} flip />
       <Testimonials dark={dark} />
       <CTAFinal navigate={navigate} />
       <Footer dark={dark} toggleTheme={toggleTheme} />
+      <VideoModal video={activeVideo} dark={dark} onClose={() => setActiveVideo(null)} />
     </div>
   );
 }

@@ -216,8 +216,8 @@ export default function RegisterPage() {
 
           <p className="text-center text-xs" style={{ color: 'var(--text-3)' }}>
             Al registrarte aceptas los{' '}
-            <a href="#" style={{ color: 'var(--accent)' }}>Términos de uso</a> y la{' '}
-            <a href="#" style={{ color: 'var(--accent)' }}>Política de privacidad</a>.
+            <Link to="/legal/terminos" style={{ color: 'var(--accent)' }}>Términos de uso</Link> y la{' '}
+            <Link to="/legal/privacidad" style={{ color: 'var(--accent)' }}>Política de privacidad</Link>.
           </p>
         </div>
       </div>

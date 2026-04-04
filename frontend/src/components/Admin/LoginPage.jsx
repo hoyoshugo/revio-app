@@ -22,7 +22,7 @@ export default function LoginPage() {
     try {
       const { data } = await axios.post('/api/dashboard/login', { email, password });
       login(data.token, data.user);
-      navigate('/');
+      navigate('/panel');
     } catch (err) {
       setError(err.response?.data?.error || 'Error de conexión');
     } finally {
@@ -67,7 +67,7 @@ export default function LoginPage() {
           </div>
 
           {/* Form */}
-          <div className="rv-surface p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="rv-surface p-6 space-y-4">
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>
                 Email
@@ -118,8 +118,7 @@ export default function LoginPage() {
             )}
 
             <button
-              type="button"
-              onClick={handleSubmit}
+              type="submit"
               disabled={loading}
               className="rv-btn-primary w-full py-2.5 text-sm font-semibold"
             >
@@ -138,7 +137,7 @@ export default function LoginPage() {
             >
               Empieza gratis 14 días
             </Link>
-          </div>
+          </form>
 
           <p className="text-center text-xs mt-6" style={{ color: 'var(--text-3)' }}>
             TRES HACHE ENTERPRISE SAS · NIT 901696556-6

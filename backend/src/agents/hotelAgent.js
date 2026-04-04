@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { db } from '../models/supabase.js';
+import { db, supabase } from '../models/supabase.js';
 import lobby from '../integrations/lobbyPMS.js';
 import { calculateDiscount } from '../integrations/lobbyPMS.js';
 import {
@@ -12,9 +12,94 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = 'claude-sonnet-4-6';
 
 // ============================================================
+// Cargar base de conocimiento dinámica desde Supabase
+// ============================================================
+async function loadPropertyKnowledge(propertyId) {
+  try {
+    const { data, error } = await supabase
+      .from('property_knowledge')
+      .select('category, key, value')
+      .eq('property_id', propertyId)
+      .eq('is_active', true)
+      .order('category')
+      .order('sort_order');
+    if (error || !data || data.length === 0) return '';
+
+    // Agrupar por categoría
+    const grouped = {};
+    for (const row of data) {
+      if (!grouped[row.category]) grouped[row.category] = [];
+      grouped[row.category].push(`- ${row.key}: ${row.value}`);
+    }
+
+    const CATEGORY_LABELS = {
+      general: 'Información General',
+      rooms: 'Habitaciones y Tipos',
+      policies: 'Políticas (Check-in/out, cancelación)',
+      activities: 'Actividades y Experiencias',
+      transport: 'Cómo Llegar y Transporte',
+      faq: 'Preguntas Frecuentes',
+      restrictions: 'Restricciones Importantes',
+      menu: 'Menú y Restaurante',
+      contact: 'Contacto y Emergencias',
+    };
+
+    let sections = ['\n## BASE DE CONOCIMIENTO DE LA PROPIEDAD (dinámico, prioridad alta)'];
+    for (const [cat, items] of Object.entries(grouped)) {
+      sections.push(`\n### ${CATEGORY_LABELS[cat] || cat}`);
+      sections.push(items.join('\n'));
+    }
+    return sections.join('\n');
+  } catch {
+    return '';
+  }
+}
+
+// ============================================================
+// Cargar intensidad de ventas desde settings
+// ============================================================
+const SALES_INTENSITY_PROMPTS = {
+  soft: `
+## INTENSIDAD DE VENTAS: SUAVE
+- Sé informativo y servicial. No presiones.
+- Máximo 1 seguimiento automático (a las 24 horas).
+- Nunca uses frases de urgencia como "¡Últimas habitaciones!" a menos que sea verdad confirmada.
+- Ofrece descuentos solo si el cliente lo solicita explícitamente.`,
+
+  moderate: `
+## INTENSIDAD DE VENTAS: MODERADA (por defecto)
+- Vende con entusiasmo pero respeta el ritmo del cliente.
+- Hasta 2-3 seguimientos: 6h → 24h → 72h.
+- Puedes mencionar disponibilidad limitada si es real.
+- Ofrece descuento como último recurso (solo si ocupación < umbral).`,
+
+  intense: `
+## INTENSIDAD DE VENTAS: INTENSA
+- Prioriza cerrar la reserva en cada interacción.
+- 3 seguimientos: 2h → 6h → 24h.
+- Usa urgencia con base en datos reales: "Solo quedan X habitaciones".
+- Escala descuentos gradualmente: empieza con 5%, sube a 10%, luego 15% máximo.
+- Cierre proactivo: después de mostrar disponibilidad, pregunta directamente "¿Te confirmo estas fechas?"`,
+};
+
+async function loadSalesIntensity(propertyId) {
+  try {
+    const { data } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('property_id', propertyId)
+      .eq('key', 'agent')
+      .single();
+    return data?.value?.sales_intensity || 'moderate';
+  } catch {
+    return 'moderate';
+  }
+}
+
+// ============================================================
 // SYSTEM PROMPT base del agente
 // ============================================================
-function buildSystemPrompt(property) {
+function buildSystemPrompt(property, dynamicKnowledge = '', salesIntensity = 'moderate') {
   return `Eres el agente de ventas virtual de ${property.name || 'Mística Hostels'}, una cadena de hostales de lujo en Colombia. Tu nombre es "Mística AI".
 
 ## TU PERSONALIDAD
@@ -78,7 +163,8 @@ WhatsApp ambas propiedades: +573234392420
 6. Recopilar datos del huésped
 7. Confirmar reserva → enviar link de pago
 
-Recuerda: eres la primera impresión de Mística. Cada conversación es una oportunidad de crear un huésped de por vida.`;
+Recuerda: eres la primera impresión de Mística. Cada conversación es una oportunidad de crear un huésped de por vida.
+${SALES_INTENSITY_PROMPTS[salesIntensity] || SALES_INTENSITY_PROMPTS.moderate}${dynamicKnowledge}`;
 }
 
 // ============================================================
@@ -358,6 +444,18 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
     }
   } catch { /* silencioso */ }
 
+  // Cargar base de conocimiento dinámica de la propiedad
+  let dynamicKnowledge = '';
+  try {
+    dynamicKnowledge = await loadPropertyKnowledge(propertyId);
+  } catch { /* silencioso */ }
+
+  // Cargar intensidad de ventas configurada
+  let salesIntensity = 'moderate';
+  try {
+    salesIntensity = await loadSalesIntensity(propertyId);
+  } catch { /* silencioso */ }
+
   // Construir mensajes para Claude (excluye el que acabo de guardar)
   const claudeMessages = buildClaudeMessages(messages, userMessage);
 
@@ -371,7 +469,7 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
     let response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 1024,
-      system: buildSystemPrompt(property) + knowledgeContext,
+      system: buildSystemPrompt(property, dynamicKnowledge, salesIntensity) + knowledgeContext,
       messages: claudeMessages,
       tools: TOOLS
     });
@@ -409,7 +507,7 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
       response = await anthropic.messages.create({
         model: MODEL,
         max_tokens: 1024,
-        system: buildSystemPrompt(property) + knowledgeContext,
+        system: buildSystemPrompt(property, dynamicKnowledge, salesIntensity) + knowledgeContext,
         messages: updatedMessages,
         tools: TOOLS
       });

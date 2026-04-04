@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import AiProviderSelector from './AiProviderSelector.jsx';
+import { useIntegrationGuide } from './IntegrationGuide.jsx';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -549,7 +550,7 @@ function TabUsers({ properties, token }) {
 // ============================================================
 // TAB 4: CONEXIONES Y APIs
 // ============================================================
-function ConnBlock({ title, icon, children, defaultOpen = false }) {
+function ConnBlock({ title, icon, children, defaultOpen = false, guideId, onGuide }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="bg-gray-900 rounded-xl border border-gray-800">
@@ -560,7 +561,19 @@ function ConnBlock({ title, icon, children, defaultOpen = false }) {
         <span className="flex items-center gap-2 text-sm font-medium text-gray-300">
           <span className="text-base">{icon}</span> {title}
         </span>
-        {open ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+        <div className="flex items-center gap-2">
+          {guideId && onGuide && (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); onGuide(guideId); }}
+              className="text-xs px-2 py-0.5 rounded-lg"
+              style={{ color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)' }}
+            >
+              Instrucciones
+            </button>
+          )}
+          {open ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+        </div>
       </button>
       {open && <div className="px-4 pb-4 space-y-4 border-t border-gray-800 pt-4">{children}</div>}
     </div>
@@ -571,6 +584,7 @@ function TabConnections({ properties, token }) {
   const [slug, setSlug] = useState(properties[0]?.slug || 'isla-palma');
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const { openGuide, GuideModal } = useIntegrationGuide();
 
   useEffect(() => {
     // Cargar settings de conexiones para esta propiedad
@@ -606,6 +620,7 @@ function TabConnections({ properties, token }) {
 
   return (
     <div className="space-y-4">
+      {GuideModal}
       {properties.length > 1 && (
         <Field label="Propiedad">
           <Select value={slug} onChange={setSlug}
@@ -613,7 +628,8 @@ function TabConnections({ properties, token }) {
         </Field>
       )}
 
-      <ConnBlock title="Sistema de gestión (PMS)" icon="🏨" defaultOpen>
+      <ConnBlock title="Sistema de gestión (PMS)" icon="🏨" defaultOpen
+        guideId={(g('pms', 'type') || 'lobbypms')} onGuide={openGuide}>
         <Field label="Tipo de PMS" hint="Elige el software de gestión de tu propiedad">
           <Select
             value={g('pms', 'type') || 'lobbypms'}
@@ -678,7 +694,7 @@ function TabConnections({ properties, token }) {
         </div>
       </ConnBlock>
 
-      <ConnBlock title="Wompi (pagos)" icon="💳">
+      <ConnBlock title="Wompi (pagos)" icon="💳" guideId="wompi" onGuide={openGuide}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Field label="Llave pública">
             <Input value={g('wompi', 'public_key')} onChange={f('wompi', 'public_key')} placeholder="pub_prod_..." />
@@ -693,7 +709,7 @@ function TabConnections({ properties, token }) {
         </div>
       </ConnBlock>
 
-      <ConnBlock title="WhatsApp Business" icon="💬">
+      <ConnBlock title="WhatsApp Business" icon="💬" guideId="whatsapp" onGuide={openGuide}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Field label="Access Token">
             <SecretInput value={g('whatsapp', 'token')} onChange={f('whatsapp', 'token')} placeholder="EAA..." />
@@ -708,7 +724,7 @@ function TabConnections({ properties, token }) {
         </div>
       </ConnBlock>
 
-      <ConnBlock title="OTAs" icon="🌐">
+      <ConnBlock title="OTAs" icon="🌐" guideId="booking" onGuide={openGuide}>
         <div className="space-y-5">
           {[
             { key: 'booking', label: 'Booking.com', fields: [{ k: 'username', l: 'Usuario' }, { k: 'password', l: 'Contraseña', secret: true }, { k: 'hotel_id', l: 'Hotel ID' }] },
@@ -737,7 +753,7 @@ function TabConnections({ properties, token }) {
         <SaveBtn onClick={() => save('OTAs')} saving={saving === 'OTAs'} label="Guardar OTAs" />
       </ConnBlock>
 
-      <ConnBlock title="Redes Sociales" icon="📱">
+      <ConnBlock title="Redes Sociales" icon="📱" guideId="instagram" onGuide={openGuide}>
         <div className="space-y-5">
           {[
             { key: 'instagram', label: 'Instagram', icon: '📸', fields: [{ k: 'access_token', l: 'Access Token', secret: true }, { k: 'business_id', l: 'Business Account ID' }] },
@@ -765,7 +781,7 @@ function TabConnections({ properties, token }) {
         <SaveBtn onClick={() => save('Redes sociales')} saving={saving === 'Redes sociales'} label="Guardar redes sociales" />
       </ConnBlock>
 
-      <ConnBlock title="Motor IA (Revio AI)" icon="🤖">
+      <ConnBlock title="Motor IA (Revio AI)" icon="🤖" guideId="claude" onGuide={openGuide}>
         <Field label="API Key" hint="Clave interna del motor de inteligencia artificial de Revio">
           <SecretInput value={g('anthropic', 'api_key')} onChange={f('anthropic', 'api_key')} placeholder="sk-ant-api03-..." />
         </Field>
@@ -1076,6 +1092,56 @@ function TabAgent({ properties, token }) {
             />
           </Field>
         ))}
+      </SectionCard>
+
+      <SectionCard title="Intensidad de Ventas">
+        <p className="text-xs mb-4" style={{ color: 'var(--text-3)' }}>
+          Controla qué tan proactivo es el agente para generar reservas. Afecta la frecuencia y urgencia de los seguimientos.
+        </p>
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            {
+              value: 'soft',
+              label: 'Suave',
+              icon: '🌿',
+              desc: '1 seguimiento en 24h · Informativo · Sin urgencia',
+              color: 'var(--success)',
+            },
+            {
+              value: 'moderate',
+              label: 'Moderado',
+              icon: '⚖️',
+              desc: '2-3 seguimientos · 6h / 24h / 72h · Balance ventas-servicio',
+              color: 'var(--accent)',
+              default: true,
+            },
+            {
+              value: 'intense',
+              label: 'Intenso',
+              icon: '🔥',
+              desc: '3 seguimientos · 2h / 6h / 24h · Urgencia + descuento escalado',
+              color: 'var(--warning)',
+            },
+          ].map(mode => {
+            const active = (form.sales_intensity || 'moderate') === mode.value;
+            return (
+              <button key={mode.value}
+                onClick={() => f('sales_intensity')(mode.value)}
+                className="p-3 rounded-xl text-left transition-all"
+                style={{
+                  border: active ? `2px solid ${mode.color}` : '1px solid var(--border)',
+                  background: active ? `color-mix(in srgb, ${mode.color} 8%, var(--card))` : 'var(--card)',
+                }}>
+                <div className="text-xl mb-1">{mode.icon}</div>
+                <div className="text-xs font-semibold mb-1" style={{ color: active ? mode.color : 'var(--text-1)' }}>
+                  {mode.label}
+                  {mode.default && <span className="ml-1 text-[9px] px-1 rounded" style={{ background: 'var(--surface)', color: 'var(--text-3)' }}>por defecto</span>}
+                </div>
+                <div className="text-[10px]" style={{ color: 'var(--text-3)' }}>{mode.desc}</div>
+              </button>
+            );
+          })}
+        </div>
       </SectionCard>
 
       <SectionCard title="Proveedor de Inteligencia Artificial">

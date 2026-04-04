@@ -4,7 +4,7 @@ import {
   LayoutDashboard, MessageSquare, Calendar, CreditCard,
   BarChart2, Inbox, XCircle, LogOut, Menu, X,
   Activity, BookOpen, AlertTriangle, Settings, ChevronDown,
-  Beaker, Bot, Receipt
+  Beaker, Bot, Receipt, TrendingUp
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { RevioIsotipo, RevioWordmark } from '../ui/Logo.jsx';
@@ -20,6 +20,8 @@ import CancellationsPanel from './CancellationsPanel.jsx';
 import WeeklyReport from '../Reports/WeeklyReport.jsx';
 import HealthMonitor from './HealthMonitor.jsx';
 import KnowledgeBase from './KnowledgeBase.jsx';
+import PropertyKnowledgePanel from './PropertyKnowledgePanel.jsx';
+import RevenueIntelligence from './RevenueIntelligence.jsx';
 import EscalationsPanel from './EscalationsPanel.jsx';
 import ConfigPanel from './ConfigPanel.jsx';
 import SandboxPanel from './SandboxPanel.jsx';
@@ -39,6 +41,7 @@ const navGroups = [
     items: [
       { to: '/bookings', label: 'Reservas', icon: Calendar },
       { to: '/payments', label: 'Pagos', icon: CreditCard },
+      { to: '/revenue', label: 'Revenue Intel', icon: TrendingUp },
       { to: '/occupancy', label: 'Ocupación', icon: BarChart2 },
       { to: '/cancellations', label: 'Cancelaciones', icon: XCircle },
       { to: '/reports', label: 'Reportes', icon: BarChart2 },
@@ -48,7 +51,8 @@ const navGroups = [
     label: 'Agente IA',
     items: [
       { to: '/sandbox', label: 'Ensayo', icon: Beaker },
-      { to: '/knowledge', label: 'Conocimiento', icon: BookOpen },
+      { to: '/knowledge', label: 'Aprendizaje IA', icon: BookOpen },
+      { to: '/property-knowledge', label: 'Info Propiedad', icon: Bot },
       { to: '/escalations', label: 'Escalaciones', icon: AlertTriangle },
     ]
   },
@@ -238,6 +242,8 @@ export default function Dashboard() {
             <Route path="/reports" element={<WeeklyReport property={property} />} />
             <Route path="/health" element={<HealthMonitor />} />
             <Route path="/knowledge" element={<KnowledgeBase property={property} />} />
+            <Route path="/property-knowledge" element={<PropertyKnowledgePanel propertyId={property?.id} />} />
+            <Route path="/revenue" element={<RevenueIntelligence property={property} />} />
             <Route path="/escalations" element={<EscalationsPanel property={property} />} />
             <Route path="/sandbox" element={<SandboxPanel property={property} />} />
             <Route path="/billing" element={<BillingPage />} />

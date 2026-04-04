@@ -278,13 +278,21 @@ export default function AiProviderSelector({ propertyId, token }) {
         })}
       </div>
 
+      {/* No-key banner */}
+      {current.requiresKey && !apiKeys[current.id] && (
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs"
+          style={{ background: 'color-mix(in srgb, var(--warning) 10%, transparent)', color: 'var(--warning)', border: '1px solid color-mix(in srgb, var(--warning) 25%, transparent)' }}>
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>
+            <strong>API key requerida</strong> — El agente no puede responder conversaciones con {current.name} hasta que ingreses tu clave. Expande la tarjeta para configurarla.
+          </span>
+        </div>
+      )}
+
       {/* Save */}
       <div className="flex items-center justify-between">
         <p className="text-xs" style={{ color: 'var(--text-3)' }}>
           Proveedor activo: <strong style={{ color: 'var(--text-1)' }}>{current.name}</strong>
-          {current.requiresKey && !apiKeys[current.id] && (
-            <span style={{ color: 'var(--warning)' }}> — Ingresa tu API key para activar</span>
-          )}
         </p>
         <button
           onClick={handleSave}

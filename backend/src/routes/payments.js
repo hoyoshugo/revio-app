@@ -105,6 +105,88 @@ router.post('/generate', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/payments/subscription/create — Crear link de pago para activar suscripción SaaS
+router.post('/subscription/create', requireAuth, async (req, res) => {
+  try {
+    const { plan, billing_cycle = 'monthly' } = req.body;
+    const { supabase } = await import('../models/supabase.js');
+
+    // Obtener datos del tenant
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('id, name, email, plan')
+      .eq('id', req.user.tenant_id)
+      .single();
+
+    if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+
+    const PRICES = {
+      basico:     { monthly: 299000, annual: 2990000 },
+      pro:        { monthly: 599000, annual: 5990000 },
+      enterprise: { monthly: 1199000, annual: 11990000 },
+    };
+
+    const planKey = plan || tenant.plan || 'basico';
+    const amount = PRICES[planKey]?.[billing_cycle] || PRICES.basico.monthly;
+    const reference = `SUB-${tenant.id.slice(0, 8).toUpperCase()}-${Date.now()}`;
+
+    // Generar link de pago Wompi (usando la propiedad principal del tenant)
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('slug')
+      .eq('tenant_id', tenant.id)
+      .limit(1);
+
+    const slug = properties?.[0]?.slug || 'isla-palma';
+
+    const paymentData = await wompi.createPaymentLink(slug, {
+      amount,
+      currency: 'COP',
+      reference,
+      guest_name: tenant.name,
+      guest_email: tenant.email,
+      description: `Suscripción Revio Plan ${planKey} (${billing_cycle === 'annual' ? 'anual' : 'mensual'})`,
+      redirect_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/panel?subscription=activated`,
+    });
+
+    // Registrar intento de suscripción
+    await supabase.from('settings').upsert({
+      property_id: null,
+      key: `subscription_intent_${tenant.id}`,
+      value: { plan: planKey, billing_cycle, reference, amount, created_at: new Date().toISOString() }
+    }, { onConflict: 'property_id,key' });
+
+    res.json({
+      success: true,
+      payment_link_url: paymentData.payment_link_url,
+      reference,
+      amount,
+      plan: planKey,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/payments/subscription/cancel — Cancelar suscripción
+router.post('/subscription/cancel', requireAuth, async (req, res) => {
+  try {
+    const { supabase } = await import('../models/supabase.js');
+    const { reason } = req.body;
+
+    await supabase.from('tenants')
+      .update({ status: 'cancelling', cancellation_reason: reason, cancellation_requested_at: new Date().toISOString() })
+      .eq('id', req.user.tenant_id);
+
+    res.json({
+      success: true,
+      message: 'Solicitud de cancelación recibida. Tu acceso continúa hasta el fin del periodo pagado.',
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/payments/success — Página de éxito post-pago (redireccionada por Wompi)
 router.get('/success', (req, res) => {
   const { id: transactionId } = req.query;

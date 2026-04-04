@@ -13,6 +13,7 @@ import socialRoutes from './routes/social.js';
 import settingsRoutes from './routes/settings.js';
 import saRoutes from './routes/superadmin.js';
 import registerRoutes from './routes/register.js';
+import knowledgeRoutes from './routes/knowledge.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { startScheduler } from './services/scheduler.js';
 
@@ -74,6 +75,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/sa', saRoutes);
 app.use('/api/register', registerRoutes);
 app.use('/api/onboarding', registerRoutes);
+app.use('/api/knowledge', knowledgeRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
