@@ -32,10 +32,13 @@
 
 ## Acciones manuales pendientes (prioridad)
 ```
-1. railway login && .\update-railway-vars.ps1       ← SUPABASE_SERVICE_KEY
-2. Supabase SQL Editor → migration_009_property_knowledge.sql  ← property_knowledge tabla
-3. console.anthropic.com/settings/billing → $20 USD ← agente IA activo
-4. LobbyPMS dashboard → whitelist IP 200.189.27.14  ← bookings en tiempo real
+1. ✅ Railway SUPABASE_SERVICE_KEY actualizado (2026-04-04)
+2. ✅ LobbyPMS IP whitelist resuelta (2026-04-04) — 14 categorías disponibles
+3. Supabase SQL Editor → migration_009_property_knowledge.sql  ← property_knowledge tabla
+4. console.anthropic.com/settings/billing → verificar organización correcta ← agente IA
+   IMPORTANTE: El key sk-ant-api03-aCImmVu... reporta 0 créditos.
+   Si cargaste créditos, verifica que sean en la misma organización del key.
+   Alternativa: generar nuevo key desde la org donde cargaste créditos.
 ```
 
 ## Tests rápidos
