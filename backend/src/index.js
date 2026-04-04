@@ -3,6 +3,11 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { existsSync } from 'fs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 import chatRoutes from './routes/chat.js';
 import bookingsRoutes from './routes/bookings.js';
@@ -96,10 +101,20 @@ app.get('/embed.js', (req, res) => {
   res.send(generateEmbedScript(apiUrl));
 });
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Ruta no encontrada' });
-});
+// ── Servir frontend compilado (producción Railway) ───────────
+const frontendDist = join(__dirname, '../../frontend/dist');
+if (existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  // SPA fallback: todas las rutas no-API van al index.html
+  app.get('*', (req, res) => {
+    res.sendFile(join(frontendDist, 'index.html'));
+  });
+} else {
+  // 404 handler solo en dev (sin frontend compilado)
+  app.use((req, res) => {
+    res.status(404).json({ error: 'Ruta no encontrada' });
+  });
+}
 
 // Error handler global
 app.use((err, req, res, next) => {
