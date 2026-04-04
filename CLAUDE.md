@@ -10,17 +10,34 @@
 
 ## Estado de producción (2026-04-04)
 ```
-✅ Backend (uptime OK) ✅ Auth ✅ Dashboard ✅ Wompi ✅ WhatsApp token
-❌ Agente IA → recargar créditos: console.anthropic.com/settings/billing ($20)
-❌ LobbyPMS  → whitelist IP 200.189.27.14 en dashboard LobbyPMS
-❌ WhatsApp  → phone DISCONNECTED → Meta Business Manager → reconectar
-❌ Supabase  → service_role key faltante → settings/api → Reveal → actualizar Railway
+✅ Backend (uptime OK)  ✅ Auth (superadmin + cliente)  ✅ Dashboard  ✅ Wompi x2
+✅ WhatsApp token válido (vence ~2026-06-03)  ✅ Meta webhook
+⚠️  Agente IA → fallback activo (sin créditos Anthropic) → recargar $20 USD
+❌  LobbyPMS  → IP 200.189.27.14 no está en whitelist → dashboard LobbyPMS
+❌  WhatsApp  → phone DISCONNECTED → Meta Business Manager → reconectar
+⚠️  Supabase  → service_role key correcto en backend/.env LOCAL
+              → Railway aún tiene key antigua → actualizar SUPABASE_SERVICE_KEY en Railway dashboard
+              → Fallback a anon key funciona (backend operativo)
+❌  property_knowledge tabla → pendiente ejecutar migration_009 en Supabase SQL Editor
+              → Agente funciona con base hardcoded (sin impacto inmediato)
+```
+
+## Tests (12/15 pasando) — 2026-04-04
+```
+✅ Health Check   ✅ SA Login   ✅ Client Login  ✅ Dashboard Metrics
+✅ Meta Webhook   ✅ Agent ES   ✅ Agent Tayrona ✅ Agent EN
+✅ Wompi Isla     ✅ Wompi Tayrona  ✅ WA Token
+✅ WA Phone (DISCONNECTED pero responde)
+❌ LobbyPMS Isla  ❌ LobbyPMS Tayrona  ❌ Anthropic (sin créditos)
 ```
 
 ## Tests rápidos
 ```bash
-# Suite completa de integración (12/15 pasando)
+# Suite completa de integración
 node backend/src/tests/integration-tests.js
+
+# Solo local
+cd backend && npm run test:local
 
 # Health check producción
 curl https://revio-app-production.up.railway.app/health
