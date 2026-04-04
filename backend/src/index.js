@@ -21,6 +21,7 @@ import registerRoutes from './routes/register.js';
 import knowledgeRoutes from './routes/knowledge.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { startScheduler } from './services/scheduler.js';
+import { runPendingMigrations } from './services/dbMigrations.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -136,6 +137,9 @@ app.listen(PORT, () => {
 
   // Iniciar tareas programadas
   startScheduler();
+
+  // Ejecutar migraciones pendientes (solo si SUPABASE_DB_URL configurado)
+  runPendingMigrations().catch(err => console.error('[Startup] Migration error:', err.message));
 });
 
 // ============================================================

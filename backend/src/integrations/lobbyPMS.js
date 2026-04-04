@@ -4,6 +4,22 @@ import { db } from '../models/supabase.js';
 const LOBBY_API_URL = process.env.LOBBY_API_URL || 'https://api.lobbypms.com';
 const MAX_RETRIES = 3;
 
+// In-memory cache: { [slug_endpoint]: { data, ts } }
+const _cache = new Map();
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function cacheKey(slug, endpoint) { return `${slug}:${endpoint}`; }
+
+function fromCache(slug, endpoint) {
+  const hit = _cache.get(cacheKey(slug, endpoint));
+  if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.data;
+  return null;
+}
+
+function toCache(slug, endpoint, data) {
+  _cache.set(cacheKey(slug, endpoint), { data, ts: Date.now() });
+}
+
 // Tokens por propiedad, leídos desde env
 const TOKENS = {
   'isla-palma': process.env.LOBBY_TOKEN_ISLA_PALMA,
@@ -76,6 +92,13 @@ async function withRetry(fn, propertySlug, context = {}) {
     }
   }
 
+  // Return cached data as fallback when all retries fail
+  const cached = fromCache(propertySlug, context.endpoint || 'unknown');
+  if (cached) {
+    console.warn(`[LobbyPMS] Using cached data for ${propertySlug}:${context.endpoint} (IP whitelist issue?)`);
+    return cached;
+  }
+
   throw lastError;
 }
 
@@ -86,16 +109,27 @@ export async function getAvailableRooms(propertySlug, { checkin, checkout, adult
   const client = lobbyClient(propertySlug);
   const endpoint = '/api/v2/available-rooms';
 
-  return withRetry(
-    async () => {
-      const { data } = await client.get(endpoint, {
-        params: { checkin, checkout, adults, children }
-      });
-      return data;
-    },
-    propertySlug,
-    { ...context, method: 'GET', endpoint, requestData: { checkin, checkout, adults, children } }
-  );
+  try {
+    const result = await withRetry(
+      async () => {
+        const { data } = await client.get(endpoint, {
+          params: { checkin, checkout, adults, children }
+        });
+        return data;
+      },
+      propertySlug,
+      { ...context, method: 'GET', endpoint, requestData: { checkin, checkout, adults, children } }
+    );
+    toCache(propertySlug, endpoint, result);
+    return result;
+  } catch (err) {
+    const cached = fromCache(propertySlug, endpoint);
+    if (cached) {
+      console.warn(`[LobbyPMS] getAvailableRooms fallback to cache for ${propertySlug}`);
+      return cached;
+    }
+    throw err;
+  }
 }
 
 // ============================================================

@@ -11,24 +11,31 @@
 ## Estado de producción (2026-04-04)
 ```
 ✅ Backend (uptime OK)  ✅ Auth (superadmin + cliente)  ✅ Dashboard  ✅ Wompi x2
-✅ WhatsApp token válido (vence ~2026-06-03)  ✅ Meta webhook
+✅ WhatsApp CONNECTED + GREEN quality  ✅ Meta webhook  ✅ WA token (vence ~2026-06-03)
 ⚠️  Agente IA → fallback activo (sin créditos Anthropic) → recargar $20 USD
 ❌  LobbyPMS  → IP 200.189.27.14 no está en whitelist → dashboard LobbyPMS
-❌  WhatsApp  → phone DISCONNECTED → Meta Business Manager → reconectar
+              → Cache fallback activo (agente no falla, usa último dato conocido)
 ⚠️  Supabase  → service_role key correcto en backend/.env LOCAL
-              → Railway aún tiene key antigua → actualizar SUPABASE_SERVICE_KEY en Railway dashboard
+              → Railway aún tiene key antigua → ejecutar .\update-railway-vars.ps1
               → Fallback a anon key funciona (backend operativo)
-❌  property_knowledge tabla → pendiente ejecutar migration_009 en Supabase SQL Editor
-              → Agente funciona con base hardcoded (sin impacto inmediato)
+⚠️  property_knowledge tabla → pendiente crear en Supabase SQL Editor
+              → Auto-creará en Railway si se agrega SUPABASE_DB_URL (ver update-railway-vars.ps1)
 ```
 
 ## Tests (12/15 pasando) — 2026-04-04
 ```
 ✅ Health Check   ✅ SA Login   ✅ Client Login  ✅ Dashboard Metrics
 ✅ Meta Webhook   ✅ Agent ES   ✅ Agent Tayrona ✅ Agent EN
-✅ Wompi Isla     ✅ Wompi Tayrona  ✅ WA Token
-✅ WA Phone (DISCONNECTED pero responde)
+✅ Wompi Isla     ✅ Wompi Tayrona  ✅ WA Token  ✅ WA Phone CONNECTED
 ❌ LobbyPMS Isla  ❌ LobbyPMS Tayrona  ❌ Anthropic (sin créditos)
+```
+
+## Acciones manuales pendientes (prioridad)
+```
+1. railway login && .\update-railway-vars.ps1       ← SUPABASE_SERVICE_KEY
+2. Supabase SQL Editor → migration_009_property_knowledge.sql  ← property_knowledge tabla
+3. console.anthropic.com/settings/billing → $20 USD ← agente IA activo
+4. LobbyPMS dashboard → whitelist IP 200.189.27.14  ← bookings en tiempo real
 ```
 
 ## Tests rápidos
