@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { RevioIsotipo } from '../ui/Logo.jsx';
+import ThemeToggle from '../ui/ThemeToggle.jsx';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [showPw, setShowPw]     = useState(false);
+  const [error, setError]       = useState('');
+  const [loading, setLoading]   = useState(false);
   const { login } = useAuth();
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -27,62 +31,119 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-mystica-dark flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-mystica-dark to-mystica-blue mb-4 text-3xl shadow-lg shadow-mystica-blue/20">
-            🌊
-          </div>
-          <h1 className="text-2xl font-bold text-white">Mística AI Agent</h1>
-          <p className="text-gray-400 text-sm mt-1">Panel de gestión</p>
-        </div>
+    <div
+      className="min-h-screen flex flex-col"
+      style={{ background: 'var(--bg)' }}
+    >
+      {/* Header */}
+      <header className="px-6 py-4 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2.5 group">
+          <RevioIsotipo size={28} />
+          <span className="text-base font-normal tracking-tight" style={{ color: 'var(--text-1)' }}>
+            rev<span className="font-bold" style={{ color: 'var(--accent)' }}>io</span>
+          </span>
+        </Link>
+        <ThemeToggle />
+      </header>
 
-        {/* Formulario */}
-        <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800 shadow-xl">
-          <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Main */}
+      <div className="flex-1 flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-sm rv-animate-up">
+
+          {/* Icon */}
+          <div className="text-center mb-8">
+            <div
+              className="inline-flex w-14 h-14 rounded-2xl items-center justify-center mb-4 rv-glow"
+              style={{ background: 'color-mix(in srgb, var(--accent) 12%, var(--card))' }}
+            >
+              <RevioIsotipo size={32} />
+            </div>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--text-1)' }}>
+              Accede a tu panel
+            </h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-2)' }}>
+              Revenue intelligence · by 3H Enterprise
+            </p>
+          </div>
+
+          {/* Form */}
+          <div className="rv-surface p-6 space-y-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Email</label>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>
+                Email
+              </label>
               <input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-mystica-blue transition-colors"
-                placeholder="admin@misticahostels.com"
+                className="rv-input"
+                placeholder="tu@empresa.com"
                 required
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Contraseña</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-mystica-blue transition-colors"
-                placeholder="••••••••"
-                required
+                autoComplete="email"
               />
             </div>
 
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>
+                Contraseña
+              </label>
+              <div className="relative">
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className="rv-input pr-10"
+                  placeholder="••••••••"
+                  required
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw(s => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  style={{ color: 'var(--text-3)' }}
+                >
+                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
             {error && (
-              <div className="bg-red-900/30 border border-red-800 text-red-300 text-sm rounded-lg px-3 py-2">
+              <div
+                className="text-sm rounded-xl px-3 py-2.5"
+                style={{ background: 'color-mix(in srgb, var(--danger) 12%, transparent)', color: 'var(--danger)', border: '1px solid color-mix(in srgb, var(--danger) 25%, transparent)' }}
+              >
                 {error}
               </div>
             )}
 
             <button
-              type="submit"
+              type="button"
+              onClick={handleSubmit}
               disabled={loading}
-              className="w-full bg-gradient-to-r from-mystica-dark to-mystica-blue text-white font-medium py-2.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 text-sm"
+              className="rv-btn-primary w-full py-2.5 text-sm font-semibold"
             >
-              {loading ? 'Iniciando sesión...' : 'Ingresar'}
+              {loading ? 'Ingresando...' : 'Ingresar al panel'}
             </button>
-          </form>
-        </div>
 
-        <p className="text-center text-xs text-gray-600 mt-6">
-          Mística Hostels © {new Date().getFullYear()}
-        </p>
+            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-3)' }}>
+              <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
+              ¿Nuevo en Revio?
+              <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
+            </div>
+
+            <Link
+              to="/register"
+              className="rv-btn-outline w-full py-2.5 text-sm font-medium"
+            >
+              Empieza gratis 14 días
+            </Link>
+          </div>
+
+          <p className="text-center text-xs mt-6" style={{ color: 'var(--text-3)' }}>
+            TRES HACHE ENTERPRISE SAS · NIT 901696556-6
+          </p>
+        </div>
       </div>
     </div>
   );

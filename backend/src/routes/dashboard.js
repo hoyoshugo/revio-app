@@ -213,4 +213,111 @@ router.get('/me', requireAuth, async (req, res) => {
   res.json({ user: req.user });
 });
 
+// ============================================================
+// GET /api/dashboard/billing
+// ============================================================
+router.get('/billing', requireAuth, async (req, res) => {
+  try {
+    const { data: user } = await supabase
+      .from('users')
+      .select('*, properties(id, is_active)')
+      .eq('id', req.user.id)
+      .single();
+
+    // Get tenant via user's property
+    const propId = user?.property_id || req.user.property_id;
+    const { data: property } = await supabase
+      .from('properties')
+      .select('tenant_id')
+      .eq('id', propId)
+      .single();
+
+    const tenantId = property?.tenant_id;
+    if (!tenantId) return res.json({ plan: 'basico', property_count: 1, status: 'trial', trial_days_left: 14, discount_pct: 0 });
+
+    // Try full join first; fall back to basic columns if extra_property_price doesn't exist (pre-migration_008)
+    let tenant = null;
+    const { data: tenantFull, error: tenantErr } = await supabase
+      .from('tenants')
+      .select('*, tenant_plans(name, price_monthly, extra_property_price)')
+      .eq('id', tenantId)
+      .single();
+    if (tenantErr && tenantErr.message?.includes('extra_property_price')) {
+      const { data: tenantBasic } = await supabase
+        .from('tenants')
+        .select('*, tenant_plans(name, price_monthly)')
+        .eq('id', tenantId)
+        .single();
+      tenant = tenantBasic;
+    } else {
+      tenant = tenantFull;
+    }
+
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true);
+
+    // tenant_discounts may not exist if migration_008 hasn't run yet
+    let discounts = [];
+    const { data: discountRows, error: discountErr } = await supabase
+      .from('tenant_discounts')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString());
+    if (!discountErr) {
+      discounts = discountRows || [];
+    } else {
+      // Fallback: read discount from settings table (stored per property)
+      const propIds = (properties || []).map(p => p.id);
+      if (propIds.length > 0) {
+        const { data: settingRows } = await supabase
+          .from('settings')
+          .select('value')
+          .in('property_id', propIds)
+          .eq('key', 'tenant_discount');
+        if (settingRows?.length > 0) {
+          // De-duplicate: take one entry per unique type+value (tenant-level discount stored per-property)
+          const seen = new Set();
+          discounts = settingRows.map(s => s.value).filter(d => {
+            if (!d) return false;
+            const key = d.type + ':' + d.value;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        }
+      }
+    }
+
+    const propCount = (properties || []).length || 1;
+    const trialEnd = tenant?.trial_ends_at ? new Date(tenant.trial_ends_at) : null;
+    const trialDaysLeft = trialEnd ? Math.max(0, Math.ceil((trialEnd - Date.now()) / 86400000)) : 0;
+
+    // Sum up active percent discounts
+    const activeDiscount = (discounts || [])
+      .filter(d => d.type === 'percent_permanent' || d.type === 'percent_temporary')
+      .reduce((sum, d) => sum + (Number(d.value) || 0), 0);
+
+    // Determine plan key
+    const planName = (tenant?.tenant_plans?.name || 'basico').toLowerCase();
+    const planKey = planName.includes('enterprise') ? 'enterprise'
+      : planName.includes('pro') ? 'pro' : 'basico';
+
+    res.json({
+      plan: planKey,
+      plan_name: tenant?.tenant_plans?.name || 'Básico',
+      property_count: propCount,
+      status: tenant?.status || 'trial',
+      trial_days_left: trialDaysLeft,
+      next_billing_date: tenant?.next_billing_date || null,
+      discount_pct: activeDiscount,
+      invoice_history: [],
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

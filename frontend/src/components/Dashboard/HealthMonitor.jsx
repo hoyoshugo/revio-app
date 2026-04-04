@@ -287,7 +287,7 @@ export default function HealthMonitor() {
               <Shield className="w-8 h-8 text-gray-600 mx-auto mb-3" />
               <p className="text-gray-400 text-sm font-medium">Sin reportes del guardian aún</p>
               <p className="text-gray-600 text-xs mt-2">
-                Ejecuta <code className="bg-gray-800 px-1.5 py-0.5 rounded text-cyan-400">/system-guardian</code> en Claude Code para generar el primer análisis completo.
+                El sistema generará el primer análisis automáticamente en la próxima revisión programada.
               </p>
             </div>
           ) : (

@@ -1,37 +1,262 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  body {
-    @apply bg-gray-950 text-gray-100 font-sans antialiased;
-  }
-  * {
-    @apply box-border;
-  }
-  ::-webkit-scrollbar { @apply w-1.5; }
-  ::-webkit-scrollbar-track { @apply bg-transparent; }
-  ::-webkit-scrollbar-thumb { @apply bg-gray-700 rounded-full; }
+/* ─── REVIO CSS VARIABLES ─── */
+:root {
+  /* Dark mode (default) */
+  --bg:        #0A0F1A;
+  --surface:   #131C2E;
+  --card:      #1E2D4A;
+  --accent:    #0ea5e9;
+  --cta:       #0284c7;
+  --success:   #22c55e;
+  --danger:    #ef4444;
+  --warning:   #f59e0b;
+  --text-1:    #E2E8F0;
+  --text-2:    #94A3B8;
+  --text-3:    #64748B;
+  --border:    #1E293B;
+  --shadow:    rgba(14,165,233,0.12);
+
+  color-scheme: dark;
 }
 
+html.light {
+  --bg:        #F8FAFC;
+  --surface:   #FFFFFF;
+  --card:      #EFF6FF;
+  --accent:    #0284c7;
+  --cta:       #0369a1;
+  --success:   #16a34a;
+  --danger:    #dc2626;
+  --warning:   #d97706;
+  --text-1:    #0F172A;
+  --text-2:    #475569;
+  --text-3:    #94A3B8;
+  --border:    #E2E8F0;
+  --shadow:    rgba(2,132,199,0.08);
+
+  color-scheme: light;
+}
+
+/* ─── BASE ─── */
+@layer base {
+  * { @apply box-border; }
+
+  html { font-family: 'Inter', system-ui, sans-serif; }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text-1);
+    @apply antialiased;
+    transition: background-color 0.2s, color 0.2s;
+  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+  ::selection { background: rgba(14,165,233,0.25); color: var(--text-1); }
+}
+
+/* ─── COMPONENTS ─── */
 @layer components {
-  .card {
-    @apply bg-gray-900 border border-gray-800 rounded-xl p-4;
+  /* Cards */
+  .rv-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
   }
-  .btn-primary {
-    @apply bg-mystica-blue hover:bg-mystica-blue/90 text-white font-medium px-4 py-2 rounded-lg transition-colors text-sm;
+  .rv-surface {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
   }
-  .btn-ghost {
-    @apply text-gray-400 hover:text-white hover:bg-gray-800 px-3 py-2 rounded-lg transition-colors text-sm;
+
+  /* Buttons */
+  .rv-btn {
+    @apply inline-flex items-center justify-center gap-2 font-medium rounded-xl transition-all duration-150 select-none;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
   }
-  .badge {
+  .rv-btn-primary {
+    @apply rv-btn text-white;
+    background: var(--cta);
+    box-shadow: 0 0 0 0 var(--shadow);
+  }
+  .rv-btn-primary:hover {
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--shadow);
+    transform: translateY(-1px);
+  }
+  .rv-btn-primary:active { transform: translateY(0); }
+
+  .rv-btn-ghost {
+    @apply rv-btn;
+    color: var(--text-2);
+    background: transparent;
+  }
+  .rv-btn-ghost:hover {
+    background: var(--card);
+    color: var(--text-1);
+  }
+
+  .rv-btn-outline {
+    @apply rv-btn;
+    color: var(--accent);
+    border: 1.5px solid var(--accent);
+    background: transparent;
+  }
+  .rv-btn-outline:hover {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+
+  /* Inputs */
+  .rv-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    color: var(--text-1);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+  }
+  .rv-input::placeholder { color: var(--text-3); }
+  .rv-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--shadow);
+  }
+
+  /* Select */
+  .rv-select {
+    @apply rv-input;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    padding-right: 2.5rem;
+  }
+
+  /* Badges */
+  .rv-badge {
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
   }
-  .badge-prospect { @apply bg-gray-800 text-gray-300; }
-  .badge-quoted { @apply bg-blue-900/50 text-blue-300; }
-  .badge-reserved { @apply bg-purple-900/50 text-purple-300; }
-  .badge-paid { @apply bg-green-900/50 text-green-300; }
-  .badge-checked_in { @apply bg-teal-900/50 text-teal-300; }
-  .badge-checked_out { @apply bg-gray-700 text-gray-400; }
-  .badge-cancelled { @apply bg-red-900/50 text-red-300; }
+  .rv-badge-green  { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
+  .rv-badge-blue   { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+  .rv-badge-yellow { background: color-mix(in srgb, var(--warning) 15%, transparent); color: var(--warning); }
+  .rv-badge-red    { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); }
+  .rv-badge-gray   { background: var(--card); color: var(--text-2); }
+
+  /* Booking status badges */
+  .badge-prospect    { @apply rv-badge rv-badge-gray; }
+  .badge-quoted      { @apply rv-badge rv-badge-blue; }
+  .badge-reserved    { @apply rv-badge; background: color-mix(in srgb, #8b5cf6 15%, transparent); color: #a78bfa; }
+  .badge-paid        { @apply rv-badge rv-badge-green; }
+  .badge-checked_in  { @apply rv-badge; background: color-mix(in srgb, #14b8a6 15%, transparent); color: #2dd4bf; }
+  .badge-checked_out { @apply rv-badge rv-badge-gray; }
+  .badge-cancelled   { @apply rv-badge rv-badge-red; }
+
+  /* Nav active state */
+  .rv-nav-active {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    font-weight: 500;
+  }
+
+  /* Table */
+  .rv-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  .rv-table th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-3);
+    border-bottom: 1px solid var(--border);
+  }
+  .rv-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+    color: var(--text-1);
+  }
+  .rv-table tr:hover td { background: color-mix(in srgb, var(--card) 50%, transparent); }
+  .rv-table tr:last-child td { border-bottom: none; }
+
+  /* Divider */
+  .rv-divider { border: none; border-top: 1px solid var(--border); }
+
+  /* Glow effect for accent elements */
+  .rv-glow {
+    box-shadow: 0 0 24px color-mix(in srgb, var(--accent) 20%, transparent);
+  }
+}
+
+/* ─── ANIMATIONS ─── */
+@keyframes rv-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes rv-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes rv-pulse-ring {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 40%, transparent); }
+  70%  { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes rv-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-6px); }
+}
+@keyframes rv-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.rv-animate-up   { animation: rv-fade-up 0.4s ease forwards; }
+.rv-animate-in   { animation: rv-fade-in 0.3s ease forwards; }
+.rv-animate-float { animation: rv-float 3s ease-in-out infinite; }
+
+/* Staggered children */
+.rv-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.rv-stagger > *:nth-child(2) { animation-delay: 60ms; }
+.rv-stagger > *:nth-child(3) { animation-delay: 120ms; }
+.rv-stagger > *:nth-child(4) { animation-delay: 180ms; }
+.rv-stagger > *:nth-child(5) { animation-delay: 240ms; }
+.rv-stagger > *:nth-child(6) { animation-delay: 300ms; }
+
+/* ─── LANDING SPECIFIC ─── */
+.rv-hero-gradient {
+  background: radial-gradient(ellipse 80% 60% at 50% -10%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%);
+}
+
+.rv-grid-bg {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--border) 60%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--border) 60%, transparent) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.rv-glass {
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+/* Shimmer skeleton */
+.rv-skeleton {
+  background: linear-gradient(90deg, var(--card) 25%, color-mix(in srgb, var(--card) 60%, var(--surface)) 50%, var(--card) 75%);
+  background-size: 200% 100%;
+  animation: rv-shimmer 1.5s infinite;
+  border-radius: 8px;
 }

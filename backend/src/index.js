@@ -12,6 +12,7 @@ import otaRoutes from './routes/ota.js';
 import socialRoutes from './routes/social.js';
 import settingsRoutes from './routes/settings.js';
 import saRoutes from './routes/superadmin.js';
+import registerRoutes from './routes/register.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { startScheduler } from './services/scheduler.js';
 
@@ -71,6 +72,8 @@ app.use('/api/ota', otaRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/sa', saRoutes);
+app.use('/api/register', registerRoutes);
+app.use('/api/onboarding', registerRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

@@ -9,6 +9,7 @@ import {
   Eye, EyeOff, ChevronDown, ChevronUp, AlertCircle, CheckCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import AiProviderSelector from './AiProviderSelector.jsx';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -612,13 +613,68 @@ function TabConnections({ properties, token }) {
         </Field>
       )}
 
-      <ConnBlock title="LobbyPMS" icon="🏨" defaultOpen>
-        <Field label="API Token" hint="Obtenlo en LobbyPMS → Configuración → Integraciones">
-          <SecretInput value={g('lobbypms', 'token')} onChange={f('lobbypms', 'token')} placeholder="Token de acceso..." />
+      <ConnBlock title="Sistema de gestión (PMS)" icon="🏨" defaultOpen>
+        <Field label="Tipo de PMS" hint="Elige el software de gestión de tu propiedad">
+          <Select
+            value={g('pms', 'type') || 'lobbypms'}
+            onChange={f('pms', 'type')}
+            options={[
+              { value: 'lobbypms',        label: '🏨 LobbyPMS — Integración completa (LATAM)' },
+              { value: 'cloudbeds',       label: '☁️ Cloudbeds — API REST v1.2' },
+              { value: 'mews',            label: '🌐 Mews — Open API' },
+              { value: 'little_hotelier', label: '🏡 Little Hotelier — Webhook' },
+              { value: 'clock',           label: '🕐 Clock PMS — Webhook' },
+              { value: 'custom',          label: '⚙️ Otro / Custom — Endpoint propio' },
+            ]}
+          />
         </Field>
-        <div className="flex items-center justify-between">
-          <TestBtn service="lobbypms" slug={slug} token={token} />
-          <SaveBtn onClick={() => save('LobbyPMS')} saving={saving === 'LobbyPMS'} label="Guardar" />
+
+        {/* LobbyPMS */}
+        {(g('pms', 'type') || 'lobbypms') === 'lobbypms' && (
+          <Field label="API Token" hint="LobbyPMS → Configuración → Integraciones">
+            <SecretInput value={g('lobbypms', 'token')} onChange={f('lobbypms', 'token')} placeholder="Token de acceso..." />
+          </Field>
+        )}
+
+        {/* Cloudbeds */}
+        {g('pms', 'type') === 'cloudbeds' && (<>
+          <Field label="Access Token OAuth2" hint="Cloudbeds → Account → API Keys">
+            <SecretInput value={g('pms', 'token')} onChange={f('pms', 'token')} placeholder="cb_oauth_..." />
+          </Field>
+          <Field label="Property ID" hint="ID de tu propiedad en Cloudbeds">
+            <Input value={g('pms', 'property_id')} onChange={f('pms', 'property_id')} placeholder="12345" />
+          </Field>
+        </>)}
+
+        {/* Mews */}
+        {g('pms', 'type') === 'mews' && (<>
+          <Field label="Access Token" hint="Mews → Settings → Marketplace → Revio Connector">
+            <SecretInput value={g('pms', 'token')} onChange={f('pms', 'token')} placeholder="AccessToken..." />
+          </Field>
+          <Field label="Client Token" hint="Token de cliente proporcionado por Mews">
+            <SecretInput value={g('pms', 'client_token')} onChange={f('pms', 'client_token')} placeholder="ClientToken..." />
+          </Field>
+          <Field label="Service ID" hint="ID del servicio de alojamiento en Mews">
+            <Input value={g('pms', 'service_id')} onChange={f('pms', 'service_id')} placeholder="UUID del servicio" />
+          </Field>
+        </>)}
+
+        {/* Little Hotelier / Clock / Custom */}
+        {['little_hotelier', 'clock', 'custom'].includes(g('pms', 'type')) && (<>
+          <Field label="Endpoint base" hint="URL base de tu API o webhook PMS">
+            <Input value={g('pms', 'endpoint')} onChange={f('pms', 'endpoint')} placeholder="https://tu-pms.com/api" />
+          </Field>
+          <Field label="API Token / Clave" hint="Bearer token o API key de autenticación">
+            <SecretInput value={g('pms', 'token')} onChange={f('pms', 'token')} placeholder="Token..." />
+          </Field>
+          <Field label="Header de autenticación (opcional)" hint='Por defecto: "Authorization"'>
+            <Input value={g('pms', 'auth_header')} onChange={f('pms', 'auth_header')} placeholder="Authorization" />
+          </Field>
+        </>)}
+
+        <div className="flex items-center justify-between pt-1">
+          <TestBtn service={(g('pms', 'type') || 'lobbypms') === 'lobbypms' ? 'lobbypms' : 'pms'} slug={slug} token={token} />
+          <SaveBtn onClick={() => save('PMS')} saving={saving === 'PMS'} label="Guardar PMS" />
         </div>
       </ConnBlock>
 
@@ -709,8 +765,8 @@ function TabConnections({ properties, token }) {
         <SaveBtn onClick={() => save('Redes sociales')} saving={saving === 'Redes sociales'} label="Guardar redes sociales" />
       </ConnBlock>
 
-      <ConnBlock title="Claude AI (Anthropic)" icon="🤖">
-        <Field label="API Key" hint="Obtén tu clave en console.anthropic.com">
+      <ConnBlock title="Motor IA (Revio AI)" icon="🤖">
+        <Field label="API Key" hint="Clave interna del motor de inteligencia artificial de Revio">
           <SecretInput value={g('anthropic', 'api_key')} onChange={f('anthropic', 'api_key')} placeholder="sk-ant-api03-..." />
         </Field>
         <div className="flex items-center justify-between">
@@ -1020,6 +1076,10 @@ function TabAgent({ properties, token }) {
             />
           </Field>
         ))}
+      </SectionCard>
+
+      <SectionCard title="Proveedor de Inteligencia Artificial">
+        <AiProviderSelector propertyId={propertyId} token={token} />
       </SectionCard>
 
       <SaveBtn onClick={save} saving={saving} />

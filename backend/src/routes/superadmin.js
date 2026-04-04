@@ -503,6 +503,68 @@ router.post('/onboarding', requireSuperadminAuth, async (req, res) => {
 });
 
 // ============================================================
+// MÓDULO 8: DESCUENTOS PERSONALIZADOS
+// ============================================================
+
+// GET /api/sa/discounts
+router.get('/discounts', requireSuperadminAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('tenant_discounts')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error && error.message.includes('does not exist')) {
+      return res.json([]); // Table not yet migrated — return empty
+    }
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/sa/discounts
+router.post('/discounts', requireSuperadminAuth, async (req, res) => {
+  const { tenant_id, type, value, expires_at, note, upgraded_plan_id } = req.body;
+  if (!tenant_id || !type) return res.status(400).json({ error: 'tenant_id y type requeridos' });
+  try {
+    const { data, error } = await supabase
+      .from('tenant_discounts')
+      .insert({
+        tenant_id, type,
+        value: value ? Number(value) : null,
+        expires_at: expires_at || null,
+        note: note || null,
+        upgraded_plan_id: upgraded_plan_id || null,
+        created_by: 'superadmin'
+      })
+      .select()
+      .single();
+    if (error && error.message.includes('does not exist')) {
+      return res.status(503).json({ error: 'Tabla tenant_discounts no existe. Ejecutar migration_008.' });
+    }
+    if (error) throw error;
+    res.status(201).json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/sa/discounts/:id
+router.delete('/discounts/:id', requireSuperadminAuth, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('tenant_discounts')
+      .delete()
+      .eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
 // SYSTEM GUARDIAN — Reportes de salud del sistema
 // ============================================================
 
