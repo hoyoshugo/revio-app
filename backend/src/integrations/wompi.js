@@ -1,31 +1,24 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import { db } from '../models/supabase.js';
+import { getWompiConfig } from '../services/connectionService.js';
 
 const WOMPI_API_URL = process.env.WOMPI_API_URL || 'https://production.wompi.co/v1';
 
-// Claves por propiedad
-const KEYS = {
-  'isla-palma': {
-    public: process.env.WOMPI_PUBLIC_KEY_ISLA,
-    private: process.env.WOMPI_PRIVATE_KEY_ISLA
-  },
-  tayrona: {
-    public: process.env.WOMPI_PUBLIC_KEY_TAYRONA,
-    private: process.env.WOMPI_PRIVATE_KEY_TAYRONA
+/**
+ * Resuelve las claves de Wompi desde la BD.
+ * Acepta (propertyId, propertySlug) para compatibilidad con código legacy.
+ * El propertyId (UUID) es preferido; el slug es fallback.
+ */
+async function resolveKeys(propertyId, propertySlug) {
+  const config = await getWompiConfig(propertyId, propertySlug);
+  if (!config?.public_key || !config?.private_key) {
+    throw new Error(`Claves Wompi no configuradas para: ${propertySlug || propertyId}`);
   }
-};
-
-function getKeys(propertySlug) {
-  const keys = KEYS[propertySlug];
-  if (!keys?.public || !keys?.private) {
-    throw new Error(`Claves Wompi no configuradas para: ${propertySlug}`);
-  }
-  return keys;
+  return config;
 }
 
-function wompiClient(propertySlug) {
-  const { private: privateKey } = getKeys(propertySlug);
+function wompiClientWith(privateKey) {
   return axios.create({
     baseURL: WOMPI_API_URL,
     headers: {
@@ -49,21 +42,21 @@ function generateReference(bookingId) {
 // Crear link de pago para una reserva
 // ============================================================
 export async function createPaymentLink(propertySlug, booking, options = {}) {
-  const { public: publicKey } = getKeys(propertySlug);
-  const client = wompiClient(propertySlug);
+  const keys = await resolveKeys(booking.property_id, propertySlug);
+  const client = wompiClientWith(keys.private_key);
 
   const reference = generateReference(booking.id);
   const amountInCents = Math.round(booking.total_amount * 100);
 
   // Datos del link de pago Wompi
   const payload = {
-    name: `Reserva ${booking.property_slug || 'Mística'} — ${booking.guest_name}`,
+    name: `Reserva ${booking.property_slug || propertySlug} — ${booking.guest_name}`,
     description: `Check-in: ${booking.checkin_date} | Check-out: ${booking.checkout_date} | ${booking.room_name || booking.room_type}`,
     single_use: true,
     collect_shipping: false,
     currency: 'COP',
     amount_in_cents: amountInCents,
-    redirect_url: options.redirect_url || process.env.FRONTEND_URL + '/payment/success',
+    redirect_url: options.redirect_url || (process.env.FRONTEND_URL + '/payment/success'),
     reference,
     customer_data: {
       email: booking.guest_email,
@@ -85,7 +78,7 @@ export async function createPaymentLink(propertySlug, booking, options = {}) {
       property_id: booking.property_id,
       wompi_reference: reference,
       payment_link_id: data.data?.id,
-      payment_link_url: data.data?.url || buildFallbackUrl(publicKey, reference, amountInCents),
+      payment_link_url: data.data?.url || buildFallbackUrl(keys.public_key, reference, amountInCents),
       amount: booking.total_amount,
       amount_in_cents: amountInCents,
       currency: 'COP',
@@ -134,25 +127,31 @@ function buildFallbackUrl(publicKey, reference, amountInCents) {
 // ============================================================
 // Verificar estado de un pago
 // ============================================================
-export async function getTransactionStatus(propertySlug, transactionId) {
-  const client = wompiClient(propertySlug);
+export async function getTransactionStatus(propertySlug, transactionId, propertyId = null) {
+  const keys = await resolveKeys(propertyId, propertySlug);
+  const client = wompiClientWith(keys.private_key);
   const { data } = await client.get(`/transactions/${transactionId}`);
   return data;
 }
 
 // ============================================================
-// Webhook: verificar firma y procesar pago
+// Webhook: verificar firma
+// Acepta propertyId directo o intenta resolver por slug
 // ============================================================
-export function verifyWebhookSignature(payload, signature, propertySlug) {
-  const { private: privateKey } = getKeys(propertySlug);
-  const expected = crypto
-    .createHmac('sha256', privateKey)
-    .update(JSON.stringify(payload))
-    .digest('hex');
-  return crypto.timingSafeEqual(
-    Buffer.from(expected),
-    Buffer.from(signature)
-  );
+export async function verifyWebhookSignature(payload, signature, propertySlug, propertyId = null) {
+  try {
+    const keys = await resolveKeys(propertyId, propertySlug);
+    const expected = crypto
+      .createHmac('sha256', keys.private_key)
+      .update(JSON.stringify(payload))
+      .digest('hex');
+    return crypto.timingSafeEqual(
+      Buffer.from(expected),
+      Buffer.from(signature)
+    );
+  } catch {
+    return false;
+  }
 }
 
 export async function processWebhook(webhookData) {

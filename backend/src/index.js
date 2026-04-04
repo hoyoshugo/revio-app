@@ -19,6 +19,7 @@ import settingsRoutes from './routes/settings.js';
 import saRoutes from './routes/superadmin.js';
 import registerRoutes from './routes/register.js';
 import knowledgeRoutes from './routes/knowledge.js';
+import connectionsRoutes from './routes/connections.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { startScheduler } from './services/scheduler.js';
 import { runPendingMigrations } from './services/dbMigrations.js';
@@ -82,6 +83,7 @@ app.use('/api/sa', saRoutes);
 app.use('/api/register', registerRoutes);
 app.use('/api/onboarding', registerRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
+app.use('/api/connections', connectionsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

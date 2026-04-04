@@ -12,18 +12,23 @@ router.post('/webhook', webhookLimiter, async (req, res) => {
   // Wompi envía la firma en el header
   const signature = req.headers['x-event-checksum'];
 
-  // Verificar firma (intentar con ambas propiedades)
+  // Verificar firma (intentar con todas las propiedades activas)
   let verified = false;
-  const slugs = ['isla-palma', 'tayrona'];
+  try {
+    // Obtener slugs activos desde BD
+    const { supabase } = await import('../models/supabase.js');
+    const { data: props } = await supabase.from('properties').select('id, slug').eq('is_active', true);
+    const slugs = props?.map(p => ({ slug: p.slug, id: p.id })) || [
+      { slug: 'isla-palma', id: null }, { slug: 'tayrona', id: null }
+    ];
 
-  for (const slug of slugs) {
-    try {
-      if (wompi.verifyWebhookSignature(req.body, signature, slug)) {
+    for (const { slug, id } of slugs) {
+      if (await wompi.verifyWebhookSignature(req.body, signature, slug, id)) {
         verified = true;
         break;
       }
-    } catch { /* intentar con la siguiente */ }
-  }
+    }
+  } catch { /* noop */ }
 
   if (!verified) {
     console.warn('[Webhook] Firma Wompi inválida');

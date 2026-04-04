@@ -198,10 +198,11 @@ async function processRefund(cancelLog, booking, propertySlug, refundAmount) {
       const axios = (await import('axios')).default;
       const WOMPI_API_URL = process.env.WOMPI_API_URL || 'https://production.wompi.co/v1';
 
-      // Determinar clave privada según propiedad
-      const privateKey = propertySlug === 'isla-palma'
-        ? process.env.WOMPI_PRIVATE_KEY_ISLA
-        : process.env.WOMPI_PRIVATE_KEY_TAYRONA;
+      // Determinar clave privada desde BD (con fallback a ENV)
+      const { getWompiConfig } = await import('./connectionService.js');
+      const wompiCfg = await getWompiConfig(booking.property_id, propertySlug);
+      const privateKey = wompiCfg?.private_key
+        || (propertySlug === 'isla-palma' ? process.env.WOMPI_PRIVATE_KEY_ISLA : process.env.WOMPI_PRIVATE_KEY_TAYRONA);
 
       const { data: refundData } = await axios.post(
         `${WOMPI_API_URL}/transactions/${payment.wompi_transaction_id}/refund`,

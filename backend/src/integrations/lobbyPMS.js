@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { db } from '../models/supabase.js';
+import { getLobbyPMSToken } from '../services/connectionService.js';
 
 const LOBBY_API_URL = process.env.LOBBY_API_URL || 'https://api.lobbypms.com';
 const MAX_RETRIES = 3;
@@ -20,23 +21,23 @@ function toCache(slug, endpoint, data) {
   _cache.set(cacheKey(slug, endpoint), { data, ts: Date.now() });
 }
 
-// Tokens por propiedad, leídos desde env
-const TOKENS = {
-  'isla-palma': process.env.LOBBY_TOKEN_ISLA_PALMA,
-  tayrona: process.env.LOBBY_TOKEN_TAYRONA
-};
-
-function getToken(propertySlug) {
-  const token = TOKENS[propertySlug];
+/**
+ * Resuelve el token de LobbyPMS desde la BD (settings table).
+ * Fallback a ENV var para compatibilidad durante migración.
+ * context.propertyId es el UUID de la propiedad (requerido para BD).
+ */
+async function resolveToken(propertySlug, propertyId) {
+  const token = await getLobbyPMSToken(propertyId, propertySlug);
   if (!token) throw new Error(`Token LobbyPMS no configurado para: ${propertySlug}`);
   return token;
 }
 
-function lobbyClient(propertySlug) {
+async function lobbyClientFor(propertySlug, propertyId) {
+  const token = await resolveToken(propertySlug, propertyId);
   return axios.create({
     baseURL: LOBBY_API_URL,
     headers: {
-      Authorization: `Bearer ${getToken(propertySlug)}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       Accept: 'application/json'
     },
@@ -104,9 +105,10 @@ async function withRetry(fn, propertySlug, context = {}) {
 
 // ============================================================
 // GET /api/v2/available-rooms — Disponibilidad con fechas
+// context debe incluir { propertyId } para resolver el token desde BD
 // ============================================================
 export async function getAvailableRooms(propertySlug, { checkin, checkout, adults = 1, children = 0 }, context = {}) {
-  const client = lobbyClient(propertySlug);
+  const client = await lobbyClientFor(propertySlug, context.propertyId);
   const endpoint = '/api/v2/available-rooms';
   // LobbyPMS API v2 uses start_date/end_date (not checkin/checkout)
   const params = { start_date: checkin, end_date: checkout, adults };
@@ -137,7 +139,7 @@ export async function getAvailableRooms(propertySlug, { checkin, checkout, adult
 // GET /api/v1/rate-plans — Tarifas vigentes
 // ============================================================
 export async function getRatePlans(propertySlug, context = {}) {
-  const client = lobbyClient(propertySlug);
+  const client = await lobbyClientFor(propertySlug, context.propertyId);
   const endpoint = '/api/v1/rate-plans';
 
   return withRetry(
@@ -154,7 +156,7 @@ export async function getRatePlans(propertySlug, context = {}) {
 // GET /api/v1/daily-occupancy — Ocupación para decisión de descuentos
 // ============================================================
 export async function getDailyOccupancy(propertySlug, { date, endDate } = {}, context = {}) {
-  const client = lobbyClient(propertySlug);
+  const client = await lobbyClientFor(propertySlug, context.propertyId);
   const endpoint = '/api/v1/daily-occupancy';
   const params = { date: date || new Date().toISOString().split('T')[0] };
   if (endDate) params.end_date = endDate;
@@ -170,9 +172,9 @@ export async function getDailyOccupancy(propertySlug, { date, endDate } = {}, co
 }
 
 // Calcula si aplica descuento (ocupación < 60% → máximo 15%)
-export async function calculateDiscount(propertySlug, checkinDate) {
+export async function calculateDiscount(propertySlug, checkinDate, context = {}) {
   try {
-    const occupancyData = await getDailyOccupancy(propertySlug, { date: checkinDate });
+    const occupancyData = await getDailyOccupancy(propertySlug, { date: checkinDate }, context);
     const occupancyPct = occupancyData?.occupancy_percentage
       || occupancyData?.data?.occupancy_percentage
       || 100;
@@ -190,7 +192,7 @@ export async function calculateDiscount(propertySlug, checkinDate) {
 // POST /api/v1/customer/{type} — Crear cliente
 // ============================================================
 export async function createCustomer(propertySlug, type = 'individual', customerData, context = {}) {
-  const client = lobbyClient(propertySlug);
+  const client = await lobbyClientFor(propertySlug, context.propertyId);
   const endpoint = `/api/v1/customer/${type}`;
 
   return withRetry(
@@ -207,7 +209,7 @@ export async function createCustomer(propertySlug, type = 'individual', customer
 // POST /api/v1/booking — Crear reserva confirmada
 // ============================================================
 export async function createBooking(propertySlug, bookingData, context = {}) {
-  const client = lobbyClient(propertySlug);
+  const client = await lobbyClientFor(propertySlug, context.propertyId);
   const endpoint = '/api/v1/booking';
 
   return withRetry(
@@ -224,7 +226,7 @@ export async function createBooking(propertySlug, bookingData, context = {}) {
 // GET /api/v1/bookings — Listar reservas
 // ============================================================
 export async function listBookings(propertySlug, params = {}, context = {}) {
-  const client = lobbyClient(propertySlug);
+  const client = await lobbyClientFor(propertySlug, context.propertyId);
   const endpoint = '/api/v1/bookings';
 
   return withRetry(
@@ -241,7 +243,7 @@ export async function listBookings(propertySlug, params = {}, context = {}) {
 // POST /api/v1/cancel-booking/{id} — Cancelar reserva
 // ============================================================
 export async function cancelBooking(propertySlug, bookingId, reason = '', context = {}) {
-  const client = lobbyClient(propertySlug);
+  const client = await lobbyClientFor(propertySlug, context.propertyId);
   const endpoint = `/api/v1/cancel-booking/${bookingId}`;
 
   return withRetry(

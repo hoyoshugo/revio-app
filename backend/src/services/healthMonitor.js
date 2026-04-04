@@ -71,8 +71,15 @@ async function checkLobbyPMS() {
 
 async function checkWompi() {
   const start = Date.now();
-  const pubKey = process.env.WOMPI_PUBLIC_KEY_ISLA;
-  if (!pubKey || pubKey.includes('pub_prod_')) {
+  // Leer public key desde BD (settings) con fallback a ENV
+  let pubKey = process.env.WOMPI_PUBLIC_KEY_ISLA;
+  try {
+    const { getWompiConfig } = await import('./connectionService.js');
+    const cfg = await getWompiConfig(null, 'isla-palma');
+    if (cfg?.public_key) pubKey = cfg.public_key;
+  } catch { /* usar ENV como fallback */ }
+
+  if (pubKey) {
     try {
       // Verificar que el API de Wompi está accesible
       await axios.get(`${WOMPI_API}/merchants/${pubKey}`, { timeout: 8000 });

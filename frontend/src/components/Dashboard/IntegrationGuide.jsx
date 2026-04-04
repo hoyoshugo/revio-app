@@ -1,16 +1,10 @@
 /**
- * IntegrationGuide — Modal con instrucciones paso a paso para cada integración
- * Actualizado con procesos reales verificados en producción (Mística Hostels)
+ * IntegrationGuide — Modal con instrucciones paso a paso para cada integración.
+ * Instrucciones genéricas: no contiene datos de ningún cliente específico.
+ * Las credenciales se configuran en el panel de Integraciones (/connections).
  */
 import React, { useState } from 'react';
 import { X, ExternalLink, Copy, Check, Play, AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp } from 'lucide-react';
-
-// ─── Datos reales verificados en producción ───────────────────
-// IP servidor Railway: dinámica — obtener con curl https://api.ipify.org
-// IP actual local (desarrollo): 148.222.199.10
-// Wompi Isla Palma NIT: 901329182 · empresa: MISTICA HOSTELS SAS
-// Wompi Tayrona NIT: 901818845-7 · empresa: INVERSIONES COLOMBIA TRAVEL S.A.S.
-// WhatsApp Phone ID: 101206379439613 · Meta Business ID: 764980183700550
 
 const STATUS = {
   connected:          { label: 'Conectado',          color: '#10b981', icon: '✅' },
@@ -35,9 +29,9 @@ const GUIDES = {
     description: 'PMS para hostels y hoteles LATAM. Revio consulta disponibilidad en tiempo real y crea reservas automáticamente.',
     docUrl: 'https://docs.lobbypms.com',
     videoUrl: null,
-    mysticaNote: 'Mística Isla Palma y Tayrona conectadas. Tokens válidos y retornando datos reales en producción.',
+    mysticaNote: null,
     credentials: [
-      { label: 'API Token (por propiedad)', envKey: 'LOBBY_TOKEN_ISLA_PALMA', example: 'DIhD1TKF0PX...' },
+      { label: 'API Token (por propiedad)', envKey: 'LOBBY_TOKEN', example: 'Tu token de LobbyPMS...' },
       { label: 'API URL', envKey: 'LOBBY_API_URL', example: 'https://api.lobbypms.com' },
     ],
     steps: [
@@ -166,10 +160,10 @@ const GUIDES = {
     description: 'Canal principal de ventas. El agente de IA responde consultas en tiempo real y cierra reservas por WhatsApp.',
     docUrl: 'https://developers.facebook.com/docs/whatsapp/cloud-api',
     videoUrl: null,
-    mysticaNote: 'Phone ID configurado (101206379439613). Falta el Access Token permanente. Meta Business ID: 764980183700550.',
+    mysticaNote: null,
     credentials: [
       { label: 'Access Token', envKey: 'WHATSAPP_TOKEN', example: 'EAABs...longtoken' },
-      { label: 'Phone Number ID', envKey: 'WHATSAPP_PHONE_ID', example: '101206379439613' },
+      { label: 'Phone Number ID', envKey: 'WHATSAPP_PHONE_ID', example: 'Tu Phone Number ID de Meta' },
     ],
     steps: [
       {
@@ -206,7 +200,7 @@ const GUIDES = {
         n: 6,
         title: 'Copia el token y el Phone Number ID',
         body: 'El token generado tiene el formato EAABs... (muy largo). Cópialo completo. El Phone Number ID está en WhatsApp → Getting Started o en la lista de números verificados.',
-        tip: 'Para Mística: Phone Number ID = 101206379439613',
+        tip: 'Encuentra tu Phone Number ID en Meta Business Suite → WhatsApp → Números',
       },
       {
         n: 7,
@@ -248,9 +242,9 @@ const GUIDES = {
     description: 'OTA más grande del mundo. Requiere aplicar como Connectivity Partner — proceso formal de 2-4 semanas.',
     docUrl: 'https://developers.booking.com',
     videoUrl: null,
-    mysticaNote: 'Mística tiene activas reservas de Booking.com en LobbyPMS (verificado en la API). El partnership para automatizar respuestas está pendiente.',
+    mysticaNote: null,
     credentials: [
-      { label: 'API Username', envKey: 'BOOKING_USERNAME', example: 'misticahostels' },
+      { label: 'API Username', envKey: 'BOOKING_USERNAME', example: 'tu_usuario_booking' },
       { label: 'API Password', envKey: 'BOOKING_PASSWORD', example: '...' },
       { label: 'Hotel ID', envKey: 'BOOKING_HOTEL_ID', example: '12345678' },
     ],
@@ -372,7 +366,7 @@ const GUIDES = {
     description: 'Pasarela de pagos colombiana. Acepta: tarjetas, PSE, Nequi, Daviplata, Bancolombia. Ambas propiedades de Mística están activas.',
     docUrl: 'https://docs.wompi.co',
     videoUrl: null,
-    mysticaNote: 'Isla Palma: MISTICA HOSTELS SAS (NIT 901329182) — ACTIVA. Tayrona: INVERSIONES COLOMBIA TRAVEL SAS (NIT 901818845-7) — ACTIVA. Métodos aceptados: Tarjeta, PSE, Nequi, Daviplata, Bancolombia.',
+    mysticaNote: null,
     credentials: [
       { label: 'Llave Pública Isla Palma', envKey: 'WOMPI_PUBLIC_KEY_ISLA', example: 'pub_prod_S0hgy...' },
       { label: 'Llave Privada Isla Palma', envKey: 'WOMPI_PRIVATE_KEY_ISLA', example: 'prv_prod_aXLd...' },
@@ -468,7 +462,7 @@ const GUIDES = {
     description: 'Responde DMs y comentarios de Instagram automáticamente. Requiere cuenta Instagram Business vinculada a Facebook Page.',
     docUrl: 'https://developers.facebook.com/docs/instagram-platform',
     videoUrl: null,
-    mysticaNote: 'Meta Business ID de Mística: 764980183700550. Usar el mismo token que WhatsApp con permisos adicionales de Instagram.',
+    mysticaNote: null,
     credentials: [
       { label: 'Instagram Access Token', envKey: 'INSTAGRAM_TOKEN', example: 'EAABs...' },
       { label: 'Instagram Account ID', envKey: 'INSTAGRAM_ACCOUNT_ID', example: '17841400...' },
@@ -538,7 +532,7 @@ const GUIDES = {
     description: 'Responde mensajes de Facebook Messenger automáticamente. Mismo App de Meta que WhatsApp/Instagram.',
     docUrl: 'https://developers.facebook.com/docs/messenger-platform',
     videoUrl: null,
-    mysticaNote: 'Meta Business ID de Mística: 764980183700550. Misma App que WhatsApp, agregar Messenger como producto adicional.',
+    mysticaNote: null,
     credentials: [
       { label: 'Page Access Token', envKey: 'FACEBOOK_PAGE_TOKEN', example: 'EAABs...' },
       { label: 'Page ID', envKey: 'FACEBOOK_PAGE_ID', example: '123456789' },
@@ -623,7 +617,7 @@ const GUIDES = {
       {
         n: 2,
         title: 'Crea un proyecto en Google Cloud Console',
-        body: 'Ve a console.cloud.google.com → "Nuevo proyecto" → nombre "Revio Mistica". Habilita facturación (necesario para la API aunque sea gratuita en este nivel).',
+        body: 'Ve a console.cloud.google.com → "Nuevo proyecto" → pon un nombre descriptivo. Habilita facturación (necesario para la API aunque sea gratuita en este nivel).',
         tip: null,
       },
       {
@@ -735,7 +729,7 @@ const GUIDES = {
     description: 'Motor de IA principal de Revio. Por defecto usa la llave compartida de Revio (incluida en el plan). Opcional: usa tu propia llave para control total del gasto.',
     docUrl: 'https://console.anthropic.com',
     videoUrl: null,
-    mysticaNote: 'Mística usa la llave de Revio. API key de Anthropic verificada y activa (HTTP 200).',
+    mysticaNote: null,
     credentials: [
       { label: 'Anthropic API Key (opcional)', envKey: 'ANTHROPIC_API_KEY', example: 'sk-ant-api03-...' },
     ],

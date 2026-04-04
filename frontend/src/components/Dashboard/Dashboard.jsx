@@ -26,6 +26,7 @@ import EscalationsPanel from './EscalationsPanel.jsx';
 import ConfigPanel from './ConfigPanel.jsx';
 import SandboxPanel from './SandboxPanel.jsx';
 import BillingPanel from './BillingPanel.jsx';
+import ConnectionsPanel from './ConnectionsPanel.jsx';
 
 const navGroups = [
   {
@@ -59,6 +60,7 @@ const navGroups = [
   {
     label: 'Sistema',
     items: [
+      { to: '/connections', label: 'Integraciones', icon: Settings },
       { to: '/health', label: 'Monitor', icon: Activity },
       { to: '/billing', label: 'Facturación', icon: Receipt },
       { to: '/config', label: 'Configuración', icon: Settings },
@@ -249,6 +251,7 @@ export default function Dashboard() {
             <Route path="/billing" element={<BillingPage />} />
             <Route path="/config" element={<ConfigPanel property={property} />} />
             <Route path="/config/*" element={<ConfigPanel property={property} />} />
+            <Route path="/connections" element={<ConnectionsPanel property={property} />} />
           </Routes>
         </div>
       </main>

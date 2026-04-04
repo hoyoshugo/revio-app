@@ -1,11 +1,11 @@
 /**
- * dbMigrations.js — Auto-migrations on startup
- * Uses SUPABASE_DB_URL (Postgres direct connection) if available.
- * Runs only when the env var is set; silently skips otherwise.
+ * dbMigrations.js — Auto-migrations on startup.
  *
- * Required Railway env var:
- *   SUPABASE_DB_URL=postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
- *   (Get from: Supabase dashboard → Settings → Database → Connection string → URI)
+ * Solo contiene migraciones de ESQUEMA (DDL). NUNCA datos de clientes.
+ * Los datos de cada tenant se gestionan desde la BD directamente.
+ *
+ * Requires: SUPABASE_DB_URL env var (Postgres direct connection)
+ *   Get from: Supabase → Settings → Database → Connection string → URI
  */
 
 const MIGRATIONS = [
@@ -36,44 +36,10 @@ const MIGRATIONS = [
   }
 ];
 
-const KNOWLEDGE_DATA = [
-  // Mística Isla Palma
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'general', key: 'nombre', value: 'Mistica Isla Palma Hostel', sort_order: 1 },
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'general', key: 'descripcion', value: 'Hostel ecologico en la Isla Palma, Bolivar, Colombia. Isla privada rodeada de arrecifes de coral y playa.', sort_order: 2 },
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'general', key: 'ubicacion', value: 'Isla Palma, Bahia de Barbacoas, Bolivar, Colombia. Solo acceso por lancha.', sort_order: 3 },
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'general', key: 'whatsapp', value: '+573234392420', sort_order: 4 },
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'rooms', key: 'tipos', value: 'Dormitorios mixtos (dorms), habitaciones privadas con bano, cabanas sobre el mar', sort_order: 1 },
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'rooms', key: 'restriccion_ninos', value: 'No se permiten ninos menores de 7 anos', sort_order: 2 },
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'policies', key: 'check_in', value: 'Check-in desde las 3:00 PM', sort_order: 1 },
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'policies', key: 'check_out', value: 'Check-out hasta las 11:00 AM', sort_order: 2 },
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'policies', key: 'cancelacion', value: 'Cancelacion gratuita hasta 7 dias antes. Cancelaciones tardias sin reembolso.', sort_order: 3 },
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'activities', key: 'incluidas', value: 'Snorkeling en arrecife de coral, kayak, paddleboard, senderismo por la isla, fogatas nocturnas', sort_order: 1 },
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'transport', key: 'como_llegar', value: 'Via Cartagena: lancha privada desde muelle Bazurto o La Bodeguita. Tambien desde Tolu y Covenas.', sort_order: 1 },
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'transport', key: 'tiempo_viaje', value: '45-90 minutos en lancha segun punto de partida', sort_order: 2 },
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'faq', key: 'wifi', value: 'WiFi limitado. Isla con conectividad reducida por ubicacion remota.', sort_order: 1 },
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'contact', key: 'whatsapp', value: '+573234392420', sort_order: 1 },
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'contact', key: 'horario_atencion', value: '7:00 AM - 10:00 PM', sort_order: 2 },
-  { property_id: '67fbce21-1b88-449f-93e2-1226cda2a7fb', category: 'restrictions', key: 'ninos', value: 'No se admiten menores de 7 anos', sort_order: 1 },
-  // Mística Tayrona
-  { property_id: '148f7836-6fcf-4d06-8570-bd65fcc2ccf0', category: 'general', key: 'nombre', value: 'Mistica Tayrona Hostel', sort_order: 1 },
-  { property_id: '148f7836-6fcf-4d06-8570-bd65fcc2ccf0', category: 'general', key: 'descripcion', value: 'Hostel boutique en las inmediaciones del Parque Nacional Natural Tayrona, Santa Marta, Colombia.', sort_order: 2 },
-  { property_id: '148f7836-6fcf-4d06-8570-bd65fcc2ccf0', category: 'general', key: 'ubicacion', value: 'Via al Tayrona, Santa Marta, Magdalena, Colombia.', sort_order: 3 },
-  { property_id: '148f7836-6fcf-4d06-8570-bd65fcc2ccf0', category: 'general', key: 'whatsapp', value: '+573234392420', sort_order: 4 },
-  { property_id: '148f7836-6fcf-4d06-8570-bd65fcc2ccf0', category: 'rooms', key: 'tipos', value: 'Dormitorios mixtos, habitaciones privadas, habitaciones con vista a la naturaleza', sort_order: 1 },
-  { property_id: '148f7836-6fcf-4d06-8570-bd65fcc2ccf0', category: 'policies', key: 'check_in', value: 'Check-in desde las 3:00 PM', sort_order: 1 },
-  { property_id: '148f7836-6fcf-4d06-8570-bd65fcc2ccf0', category: 'policies', key: 'check_out', value: 'Check-out hasta las 11:00 AM', sort_order: 2 },
-  { property_id: '148f7836-6fcf-4d06-8570-bd65fcc2ccf0', category: 'activities', key: 'incluidas', value: 'Acceso al sendero hacia el Parque Tayrona, zona social, hamacas', sort_order: 1 },
-  { property_id: '148f7836-6fcf-4d06-8570-bd65fcc2ccf0', category: 'transport', key: 'como_llegar', value: 'Desde Santa Marta: bus o taxi hacia el Parque Tayrona, aprox. 45 minutos.', sort_order: 1 },
-  { property_id: '148f7836-6fcf-4d06-8570-bd65fcc2ccf0', category: 'transport', key: 'desde_aeropuerto', value: 'Aeropuerto Simon Bolivar (SMR) a 1 hora en taxi.', sort_order: 2 },
-  { property_id: '148f7836-6fcf-4d06-8570-bd65fcc2ccf0', category: 'contact', key: 'whatsapp', value: '+573234392420', sort_order: 1 },
-  { property_id: '148f7836-6fcf-4d06-8570-bd65fcc2ccf0', category: 'restrictions', key: 'ninos', value: 'No se admiten menores de 7 anos', sort_order: 1 },
-  { property_id: '148f7836-6fcf-4d06-8570-bd65fcc2ccf0', category: 'restrictions', key: 'parque', value: 'El Parque Tayrona tiene restricciones de acceso y cupos diarios propios', sort_order: 2 },
-];
-
 export async function runPendingMigrations() {
   const dbUrl = process.env.SUPABASE_DB_URL;
   if (!dbUrl) {
-    // Silent skip — no DB URL configured
+    // Silent skip — no DB URL configured, no auto-migrations
     return;
   }
 
@@ -104,11 +70,6 @@ export async function runPendingMigrations() {
         console.log(`[Migrations] 🔄 Applying ${migration.name}...`);
         await client.query(migration.sql);
         console.log(`[Migrations] ✅ ${migration.name} — aplicada`);
-
-        // Insert knowledge base data after creating the table
-        if (migration.name === 'migration_009_property_knowledge') {
-          await seedKnowledgeBase(client);
-        }
       } catch (err) {
         console.error(`[Migrations] ❌ ${migration.name}:`, err.message);
       }
@@ -118,23 +79,4 @@ export async function runPendingMigrations() {
   } finally {
     await client.end().catch(() => {});
   }
-}
-
-async function seedKnowledgeBase(client) {
-  console.log('[Migrations] Seeding knowledge base...');
-  let inserted = 0;
-  for (const row of KNOWLEDGE_DATA) {
-    try {
-      await client.query(
-        `INSERT INTO property_knowledge (property_id, category, key, value, sort_order)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (property_id, category, key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`,
-        [row.property_id, row.category, row.key, row.value, row.sort_order]
-      );
-      inserted++;
-    } catch (err) {
-      console.error('[Migrations] Seed error:', err.message);
-    }
-  }
-  console.log(`[Migrations] ✅ Knowledge base: ${inserted}/${KNOWLEDGE_DATA.length} rows seeded`);
 }
