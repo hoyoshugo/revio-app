@@ -108,17 +108,18 @@ async function withRetry(fn, propertySlug, context = {}) {
 export async function getAvailableRooms(propertySlug, { checkin, checkout, adults = 1, children = 0 }, context = {}) {
   const client = lobbyClient(propertySlug);
   const endpoint = '/api/v2/available-rooms';
+  // LobbyPMS API v2 uses start_date/end_date (not checkin/checkout)
+  const params = { start_date: checkin, end_date: checkout, adults };
+  if (children > 0) params.children = children;
 
   try {
     const result = await withRetry(
       async () => {
-        const { data } = await client.get(endpoint, {
-          params: { checkin, checkout, adults, children }
-        });
+        const { data } = await client.get(endpoint, { params });
         return data;
       },
       propertySlug,
-      { ...context, method: 'GET', endpoint, requestData: { checkin, checkout, adults, children } }
+      { ...context, method: 'GET', endpoint, requestData: params }
     );
     toCache(propertySlug, endpoint, result);
     return result;
@@ -257,20 +258,45 @@ export async function cancelBooking(propertySlug, bookingId, reason = '', contex
 // Helper: Formatea disponibilidad para el agente IA
 // ============================================================
 export function formatRoomsForAgent(roomsData, language = 'es') {
-  const rooms = roomsData?.rooms || roomsData?.data || roomsData || [];
-  if (!Array.isArray(rooms) || rooms.length === 0) {
-    const msgs = {
-      es: 'No hay habitaciones disponibles para esas fechas.',
-      en: 'No rooms available for those dates.',
-      fr: 'Aucune chambre disponible pour ces dates.',
-      de: 'Keine Zimmer für diese Daten verfügbar.'
-    };
-    return msgs[language] || msgs.es;
+  const noRooms = {
+    es: 'No hay habitaciones disponibles para esas fechas.',
+    en: 'No rooms available for those dates.',
+    fr: 'Aucune chambre disponible pour ces dates.',
+    de: 'Keine Zimmer für diese Daten verfügbar.'
+  };
+
+  // LobbyPMS API v2: { data: [{ date, categories: [{ name, available_rooms, plans }] }] }
+  const days = roomsData?.data;
+  if (Array.isArray(days) && days.length > 0) {
+    // Aggregate room categories across all days (take first day as reference for categories)
+    const firstDay = days[0];
+    const categories = firstDay?.categories || [];
+    const available = categories.filter(c => c.available_rooms > 0);
+    if (available.length === 0) return noRooms[language] || noRooms.es;
+
+    const header = language === 'en'
+      ? `Available rooms (${days.length} night${days.length > 1 ? 's' : ''}):\n`
+      : `Habitaciones disponibles (${days.length} noche${days.length > 1 ? 's' : ''}):\n`;
+
+    return header + available.map(cat => {
+      const stdPlan = cat.plans?.find(p => p.name === 'STANDARD_RATE') || cat.plans?.[0];
+      const price2 = stdPlan?.prices?.find(p => p.people === 2)?.value || stdPlan?.prices?.[0]?.value;
+      const price1 = stdPlan?.prices?.find(p => p.people === 1)?.value;
+      const priceStr = price2
+        ? `COP ${Number(price2).toLocaleString('es-CO')} (2 personas)`
+        : price1
+          ? `COP ${Number(price1).toLocaleString('es-CO')} (1 persona)`
+          : 'precio a consultar';
+      return `• **${cat.name}**: ${priceStr} — ${cat.available_rooms} disponible${cat.available_rooms > 1 ? 's' : ''}`;
+    }).join('\n');
   }
 
+  // Legacy format fallback: flat array of rooms
+  const rooms = roomsData?.rooms || roomsData || [];
+  if (!Array.isArray(rooms) || rooms.length === 0) return noRooms[language] || noRooms.es;
   return rooms.map(r => {
     const price = r.price || r.rate || r.total_price;
-    return `• **${r.name || r.room_type}**: ${price ? `COP ${Number(price).toLocaleString('es-CO')}` : 'precio a consultar'} ${r.description ? `— ${r.description}` : ''}`;
+    return `• **${r.name || r.room_type}**: ${price ? `COP ${Number(price).toLocaleString('es-CO')}` : 'precio a consultar'}`;
   }).join('\n');
 }
 

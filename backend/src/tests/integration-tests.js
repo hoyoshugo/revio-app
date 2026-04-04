@@ -191,30 +191,42 @@ const TESTS = [
     name: '13. LobbyPMS Isla Palma',
     category: 'PMS',
     test: async () => {
-      const r = await fetch('https://api.lobbypms.com/api/v2/available-rooms', {
-        headers: { 'Authorization': `Bearer ${LOBBY_TOKEN_ISLA}` }
-      });
+      const today = new Date().toISOString().split('T')[0];
+      const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+      const r = await fetch(
+        `https://api.lobbypms.com/api/v2/available-rooms?start_date=${today}&end_date=${nextWeek}&adults=2`,
+        { headers: { 'Authorization': `Bearer ${LOBBY_TOKEN_ISLA}` } }
+      );
       const text = await r.text();
       if (r.status === 403 || text.includes('not set as a valid ip')) {
         throw new Error('IP 200.189.27.14 no está en whitelist');
       }
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return `${JSON.parse(text).length || '?'} habitaciones`;
+      if (!r.ok) throw new Error(`HTTP ${r.status}: ${text.substring(0, 100)}`);
+      const data = JSON.parse(text);
+      const days = data.data?.length || 0;
+      const cats = data.data?.[0]?.categories?.length || 0;
+      return `${days} días, ${cats} categorías de habitación`;
     }
   },
   {
     name: '14. LobbyPMS Tayrona',
     category: 'PMS',
     test: async () => {
-      const r = await fetch('https://api.lobbypms.com/api/v2/available-rooms', {
-        headers: { 'Authorization': `Bearer ${LOBBY_TOKEN_TAYRONA}` }
-      });
+      const today = new Date().toISOString().split('T')[0];
+      const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+      const r = await fetch(
+        `https://api.lobbypms.com/api/v2/available-rooms?start_date=${today}&end_date=${nextWeek}&adults=2`,
+        { headers: { 'Authorization': `Bearer ${LOBBY_TOKEN_TAYRONA}` } }
+      );
       const text = await r.text();
       if (r.status === 403 || text.includes('not set as a valid ip')) {
         throw new Error('IP 200.189.27.14 no está en whitelist');
       }
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return `${JSON.parse(text).length || '?'} habitaciones`;
+      if (!r.ok) throw new Error(`HTTP ${r.status}: ${text.substring(0, 100)}`);
+      const data = JSON.parse(text);
+      const days = data.data?.length || 0;
+      const cats = data.data?.[0]?.categories?.length || 0;
+      return `${days} días, ${cats} categorías de habitación`;
     }
   },
   {
