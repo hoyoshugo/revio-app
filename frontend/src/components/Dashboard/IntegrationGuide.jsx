@@ -1,28 +1,100 @@
 /**
  * IntegrationGuide — Modal con instrucciones paso a paso para cada integración
- * Uso: <IntegrationGuide integrationId="lobbypms" onClose={() => ...} />
+ * Actualizado con procesos reales verificados en producción (Mística Hostels)
  */
 import React, { useState } from 'react';
-import { X, ExternalLink, Copy, Check, Play, ChevronRight } from 'lucide-react';
+import { X, ExternalLink, Copy, Check, Play, AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+
+// ─── Datos reales verificados en producción ───────────────────
+// IP servidor Railway: dinámica — obtener con curl https://api.ipify.org
+// IP actual local (desarrollo): 148.222.199.10
+// Wompi Isla Palma NIT: 901329182 · empresa: MISTICA HOSTELS SAS
+// Wompi Tayrona NIT: 901818845-7 · empresa: INVERSIONES COLOMBIA TRAVEL S.A.S.
+// WhatsApp Phone ID: 101206379439613 · Meta Business ID: 764980183700550
+
+const STATUS = {
+  connected:          { label: 'Conectado',          color: '#10b981', icon: '✅' },
+  pending_token:      { label: 'Token pendiente',     color: '#f59e0b', icon: '⚠️' },
+  pending_approval:   { label: 'Aprobación pendiente',color: '#6366f1', icon: '📋' },
+  not_configured:     { label: 'Sin configurar',      color: '#64748b', icon: '⚪' },
+};
 
 const GUIDES = {
+
+  // ══════════════════════════════════════════
+  // PMS
+  // ══════════════════════════════════════════
+
   lobbypms: {
     name: 'LobbyPMS',
     icon: '🏨',
     category: 'PMS',
     color: '#0ea5e9',
-    description: 'Sistema de gestión hotelera para LATAM. Revio consulta disponibilidad y crea reservas en tiempo real.',
+    status: 'connected',
+    estimatedTime: '10 min',
+    description: 'PMS para hostels y hoteles LATAM. Revio consulta disponibilidad en tiempo real y crea reservas automáticamente.',
     docUrl: 'https://docs.lobbypms.com',
     videoUrl: null,
-    steps: [
-      { n: 1, title: 'Accede a tu cuenta LobbyPMS', body: 'Ingresa en app.lobbypms.com con tu cuenta de administrador.' },
-      { n: 2, title: 'Ve a Configuración → API', body: 'En el menú lateral, busca Configuración > Integraciones > API Tokens.' },
-      { n: 3, title: 'Genera un nuevo token', body: 'Haz clic en "Nuevo Token". Nómbralo "Revio" y dale permisos de lectura en Disponibilidad y escritura en Reservas.' },
-      { n: 4, title: 'Copia el token', body: 'El token solo se muestra una vez. Cópialo inmediatamente antes de cerrar el modal.' },
-      { n: 5, title: 'Whitelist de IP (crítico)', body: 'En LobbyPMS, ve a API > Seguridad > IPs permitidas. Agrega la IP de tu servidor Revio. Sin este paso, recibirás error 403.' },
-      { n: 6, title: 'Pega en Revio', body: 'Ve a Configuración > Conexiones > LobbyPMS. Pega el token en el campo "API Token" y presiona Probar.' },
+    mysticaNote: 'Mística Isla Palma y Tayrona conectadas. Tokens válidos y retornando datos reales en producción.',
+    credentials: [
+      { label: 'API Token (por propiedad)', envKey: 'LOBBY_TOKEN_ISLA_PALMA', example: 'DIhD1TKF0PX...' },
+      { label: 'API URL', envKey: 'LOBBY_API_URL', example: 'https://api.lobbypms.com' },
     ],
-    notes: ['La IP del servidor Railway se asigna dinámicamente — puede cambiar en cada deploy. Configura la IP después de hacer deploy en producción.'],
+    steps: [
+      {
+        n: 1,
+        title: 'Inicia sesión en LobbyPMS',
+        body: 'Ve a app.lobbypms.com. Ingresa con tu email y contraseña de administrador. Si no tienes cuenta, crea una en lobbypms.com/registro.',
+        tip: 'Usa el email con el que registraste la propiedad, no el de un recepcionista.',
+      },
+      {
+        n: 2,
+        title: 'Ve a Configuración → Integraciones → API',
+        body: 'En el menú lateral izquierdo, haz clic en el ícono de engranaje (⚙️) → "Integraciones" → "API Tokens". Si no ves esta sección, necesitas permisos de Administrador.',
+        tip: null,
+      },
+      {
+        n: 3,
+        title: 'Crea un nuevo token',
+        body: 'Haz clic en el botón azul "+ Nuevo Token". En el campo "Nombre", escribe "Revio". En "Permisos", activa: ✅ Disponibilidad (lectura), ✅ Reservas (lectura y escritura), ✅ Tarifas (lectura). Haz clic en "Generar Token".',
+        tip: null,
+      },
+      {
+        n: 4,
+        title: 'Copia el token inmediatamente',
+        body: 'LobbyPMS solo muestra el token UNA VEZ. Cópialo ahora y guárdalo en un lugar seguro antes de cerrar el modal. El token tiene el formato: [32-64 caracteres alfanuméricos].',
+        tip: 'Si lo pierdes, deberás revocar el token y crear uno nuevo.',
+      },
+      {
+        n: 5,
+        title: 'IP Whitelist (solo si hay error 403)',
+        body: 'En la mayoría de configuraciones, LobbyPMS NO requiere whitelist de IP. Solo si ves error 403, ve a API → Seguridad → IPs Permitidas y agrega la IP de tu servidor. Para obtener la IP del servidor: curl https://api.ipify.org en la terminal del servidor.',
+        tip: 'La IP de Railway es dinámica. Si configuras whitelist, puede fallar después de un redeploy.',
+      },
+      {
+        n: 6,
+        title: 'Repite para cada propiedad',
+        body: 'Si tienes múltiples propiedades en LobbyPMS, genera un token separado para cada una. En Revio, cada propiedad tiene su propio campo de token (Isla Palma, Tayrona, etc.).',
+        tip: null,
+      },
+      {
+        n: 7,
+        title: 'Pega en Revio y verifica',
+        body: 'En el panel de Revio, ve a Configuración → Conexiones → LobbyPMS. Pega el token en el campo correspondiente y haz clic en "Probar Conexión". Deberías ver: "Conectado — X habitaciones disponibles".',
+        tip: null,
+      },
+    ],
+    troubleshooting: [
+      { error: 'Error 403 Forbidden', solution: 'Tu IP no está en el whitelist de LobbyPMS. Ve a LobbyPMS → API → Seguridad → IPs permitidas y agrega tu IP del servidor.' },
+      { error: 'Error 404 Resource Not Found', solution: 'El endpoint es incorrecto. Los endpoints correctos son: /api/v1/bookings, /api/v2/available-rooms, /api/v1/rate-plans. Verifica que LOBBY_API_URL esté configurado como https://api.lobbypms.com' },
+      { error: 'Error 401 Unauthorized', solution: 'El token es inválido o fue revocado. Genera un nuevo token en LobbyPMS.' },
+      { error: 'No hay disponibilidad', solution: 'Verifica que los parámetros start_date, end_date y adults estén correctamente formateados (YYYY-MM-DD).' },
+    ],
+    notes: [
+      'Los tokens de LobbyPMS no tienen fecha de expiración por defecto.',
+      'Verificado en producción: Isla Palma retorna 15+ tipos de habitación con precios en tiempo real.',
+      'Endpoint de disponibilidad: GET /api/v2/available-rooms?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&adults=N',
+    ],
   },
 
   cloudbeds: {
@@ -30,18 +102,26 @@ const GUIDES = {
     icon: '☁️',
     category: 'PMS',
     color: '#6366f1',
+    status: 'not_configured',
+    estimatedTime: '20 min',
     description: 'PMS cloud con presencia global. Integración vía OAuth2 con API REST v1.2.',
     docUrl: 'https://hotels.cloudbeds.com/api/v1.2/',
     videoUrl: null,
-    steps: [
-      { n: 1, title: 'Ingresa a Cloudbeds', body: 'Accede a app.cloudbeds.com con tu cuenta de administrador.' },
-      { n: 2, title: 'Ve a Apps & Marketplace', body: 'En el menú superior, busca "Apps" o "Marketplace".' },
-      { n: 3, title: 'Busca "API Access"', body: 'Filtra por "Developer" o busca "API Access" para generar credenciales OAuth2.' },
-      { n: 4, title: 'Crea una aplicación OAuth', body: 'Nombre: "Revio Integration". Redirect URL: https://api.revio.co/oauth/cloudbeds. Permisos: read:reservations, write:reservations, read:availability.' },
-      { n: 5, title: 'Obtén el Access Token', body: 'Completa el flujo OAuth2. El token resultante (cb_oauth_...) es el que necesitas.' },
-      { n: 6, title: 'Configura en Revio', body: 'Pega el token en Configuración > Conexiones > Cloudbeds y guarda.' },
+    mysticaNote: null,
+    credentials: [
+      { label: 'OAuth Access Token', envKey: 'CLOUDBEDS_TOKEN', example: 'cb_oauth_...' },
     ],
-    notes: ['Los tokens OAuth de Cloudbeds expiran. Revio renovará automáticamente usando el refresh token.'],
+    steps: [
+      { n: 1, title: 'Ingresa a Cloudbeds', body: 'Accede a app.cloudbeds.com con tu cuenta de administrador de la propiedad.', tip: null },
+      { n: 2, title: 'Ve a Apps & Marketplace', body: 'En el menú superior, busca "Apps" o "Marketplace". Filtra por "Developer" o busca "API Access".', tip: null },
+      { n: 3, title: 'Crea aplicación OAuth', body: 'Nombre: "Revio Integration". Redirect URL: https://[tu-dominio]/oauth/cloudbeds. Permisos: read:reservations, write:reservations, read:availability, read:rates.', tip: null },
+      { n: 4, title: 'Completa el flujo OAuth', body: 'Sigue el flujo de autorización OAuth2. Revio obtendrá automáticamente el access_token y refresh_token.', tip: null },
+      { n: 5, title: 'Pega el Client ID y Secret en Revio', body: 'En Configuración → Conexiones → Cloudbeds, ingresa el Client ID y Client Secret de tu aplicación OAuth.', tip: null },
+    ],
+    troubleshooting: [
+      { error: 'Token expirado', solution: 'Cloudbeds OAuth tokens expiran. Revio usa el refresh_token automáticamente. Si falla, reconecta la integración.' },
+    ],
+    notes: ['Los tokens OAuth de Cloudbeds tienen vida limitada — Revio los renueva automáticamente usando el refresh token.'],
   },
 
   mews: {
@@ -49,88 +129,304 @@ const GUIDES = {
     icon: '🌐',
     category: 'PMS',
     color: '#8b5cf6',
-    description: 'PMS moderno con Connector API. Autenticación por token en el body de cada request.',
+    status: 'not_configured',
+    estimatedTime: '15 min',
+    description: 'PMS moderno con Connector API. Muy popular en Europa y expansión LATAM.',
     docUrl: 'https://mews-systems.gitbook.io/connector-api/',
     videoUrl: null,
-    steps: [
-      { n: 1, title: 'Accede a Mews Commander', body: 'Ingresa a app.mews.com como administrador de la propiedad.' },
-      { n: 2, title: 'Ve a Settings → Integrations', body: 'Busca la sección de integraciones de terceros.' },
-      { n: 3, title: 'Agrega "Connector API"', body: 'Crea una nueva integración de tipo Connector. Asígnale el nombre "Revio".' },
-      { n: 4, title: 'Copia las credenciales', body: 'Obtén el Access Token y el Client Token generados. Ambos son necesarios.' },
-      { n: 5, title: 'Pega en Revio', body: 'En Configuración > Conexiones > Mews, ingresa ambos tokens separados por un signo "|": access_token|client_token' },
+    mysticaNote: null,
+    credentials: [
+      { label: 'Access Token', envKey: 'MEWS_ACCESS_TOKEN', example: 'C66EF7B239D24632943D115EDE9...' },
+      { label: 'Client Token', envKey: 'MEWS_CLIENT_TOKEN', example: 'E0D439EE522F44368DC78E1BFB...' },
     ],
-    notes: ['Mews no usa headers de Authorization — el token va en el body JSON de cada request.'],
+    steps: [
+      { n: 1, title: 'Ingresa a Mews Commander', body: 'Ve a app.mews.com como administrador de la propiedad.', tip: null },
+      { n: 2, title: 'Settings → Integrations', body: 'En el menú lateral, ve a Settings → Integrations. Haz clic en "+ Add integration".', tip: null },
+      { n: 3, title: 'Busca "Connector API"', body: 'Filtra por "Connector API". Selecciónalo y asígnale el nombre "Revio".', tip: null },
+      { n: 4, title: 'Copia las credenciales', body: 'Guarda el Access Token y el Client Token. Ambos son necesarios y solo se muestran una vez.', tip: 'El Client Token identifica el software (Revio). El Access Token identifica tu propiedad.' },
+      { n: 5, title: 'Configura en Revio', body: 'En Configuración → Conexiones → Mews, ingresa ambos tokens. Formato: access_token|client_token', tip: null },
+    ],
+    troubleshooting: [
+      { error: 'Invalid token', solution: 'Verifica que estás usando el Access Token Y el Client Token separados por |. Ambos son obligatorios.' },
+    ],
+    notes: ['Mews no usa Authorization headers — el token va en el body JSON de cada request como "AccessToken" y "ClientToken".'],
   },
+
+  // ══════════════════════════════════════════
+  // MENSAJERÍA
+  // ══════════════════════════════════════════
 
   whatsapp: {
     name: 'WhatsApp Business',
     icon: '💬',
     category: 'Mensajería',
     color: '#22c55e',
-    description: 'Canal principal de comunicación con huéspedes. Requiere cuenta Meta Business verificada.',
-    docUrl: 'https://developers.facebook.com/docs/whatsapp',
+    status: 'pending_token',
+    estimatedTime: '45 min',
+    description: 'Canal principal de ventas. El agente de IA responde consultas en tiempo real y cierra reservas por WhatsApp.',
+    docUrl: 'https://developers.facebook.com/docs/whatsapp/cloud-api',
     videoUrl: null,
-    steps: [
-      { n: 1, title: 'Crea una cuenta Meta Business', body: 'Ve a business.facebook.com y verifica tu empresa con documentos legales.' },
-      { n: 2, title: 'Accede a Meta for Developers', body: 'En developers.facebook.com, crea una nueva App de tipo "Business".' },
-      { n: 3, title: 'Agrega WhatsApp al App', body: 'En el dashboard de tu App, haz clic en "Add Product" y selecciona "WhatsApp".' },
-      { n: 4, title: 'Obtén el Access Token', body: 'En WhatsApp > Getting Started, copia el "Temporary access token". Para producción, genera un token permanente en System Users.' },
-      { n: 5, title: 'Copia el Phone Number ID', body: 'En la misma sección, copia el "Phone Number ID" del número de prueba o el tuyo verificado.' },
-      { n: 6, title: 'Configura el Webhook', body: 'En WhatsApp > Configuration > Webhook, ingresa: URL: https://api.revio.co/api/chat/whatsapp, Verify Token: mystica_webhook_2026. Suscribe a: messages.' },
-      { n: 7, title: 'Ingresa en Revio', body: 'Ve a Configuración > Conexiones > WhatsApp. Ingresa el Access Token y el Phone Number ID.' },
+    mysticaNote: 'Phone ID configurado (101206379439613). Falta el Access Token permanente. Meta Business ID: 764980183700550.',
+    credentials: [
+      { label: 'Access Token', envKey: 'WHATSAPP_TOKEN', example: 'EAABs...longtoken' },
+      { label: 'Phone Number ID', envKey: 'WHATSAPP_PHONE_ID', example: '101206379439613' },
     ],
-    notes: ['Para producción, necesitas un número de teléfono verificado con Meta (puede tomar 1-3 días).', 'El Verify Token en Revio es: mystica_webhook_2026'],
+    steps: [
+      {
+        n: 1,
+        title: 'Accede a Meta Business Manager',
+        body: 'Ve a business.facebook.com. Inicia sesión con la cuenta de Facebook asociada a tu empresa. Asegúrate de tener rol de Administrador.',
+        tip: 'Para Mística: usa la cuenta asociada a Meta Business ID 764980183700550.',
+      },
+      {
+        n: 2,
+        title: 'Crea o selecciona tu Meta App',
+        body: 'Ve a developers.facebook.com → My Apps. Si ya tienes una app de WhatsApp Business, selecciónala. Si no, haz clic en "Create App" → tipo "Business" → nombre "Revio - [Tu Propiedad]".',
+        tip: null,
+      },
+      {
+        n: 3,
+        title: 'Agrega el producto WhatsApp',
+        body: 'En el dashboard de tu App, haz clic en "+ Add Product" y selecciona "WhatsApp". Haz clic en "Set Up". Esto abre la sección "WhatsApp → Getting Started".',
+        tip: null,
+      },
+      {
+        n: 4,
+        title: 'Conecta tu número de WhatsApp Business',
+        body: 'En WhatsApp → Configuration → Phone Numbers, haz clic en "Add phone number". Ingresa el número de tu negocio (+57XXXXXXXXX). Verifica con el código SMS que recibirás. El número NO puede estar activo en WhatsApp personal simultáneamente.',
+        tip: 'Para Mística: usar el número +573234392420 ya registrado.',
+      },
+      {
+        n: 5,
+        title: 'Crea un Usuario de Sistema (token permanente)',
+        body: 'En Meta Business Manager → Configuración → Usuarios del sistema → "+ Agregar". Nombre: "revio-bot", Rol: Administrador. Luego haz clic en el usuario creado → "Generar nuevo token" → selecciona tu App → permisos: whatsapp_business_messaging + whatsapp_business_management → duración: Sin expiración.',
+        tip: 'Este es el único paso para obtener un token que no expira. NO uses el token temporal de "Getting Started".',
+      },
+      {
+        n: 6,
+        title: 'Copia el token y el Phone Number ID',
+        body: 'El token generado tiene el formato EAABs... (muy largo). Cópialo completo. El Phone Number ID está en WhatsApp → Getting Started o en la lista de números verificados.',
+        tip: 'Para Mística: Phone Number ID = 101206379439613',
+      },
+      {
+        n: 7,
+        title: 'Configura el Webhook',
+        body: 'En tu App de Meta → WhatsApp → Configuration → Webhook. Haz clic en "Edit". Callback URL: https://[tu-backend]/api/chat/whatsapp. Verify Token: mystica_webhook_2026. Haz clic en "Verify and Save". Luego suscríbete a: messages, message_deliveries, message_reads.',
+        tip: 'El backend debe estar en producción (Railway) para que Meta pueda verificar el webhook.',
+      },
+      {
+        n: 8,
+        title: 'Ingresa las credenciales en Revio',
+        body: 'En Revio → Configuración → Conexiones → WhatsApp: pega el Access Token y confirma el Phone Number ID. Haz clic en "Probar Conexión".',
+        tip: null,
+      },
+    ],
+    troubleshooting: [
+      { error: 'Token expirado / Unauthorized', solution: 'El token temporal de "Getting Started" expira en 24h. Genera siempre un token permanente desde Sistema de Usuarios del Meta Business Manager.' },
+      { error: 'Webhook no se verifica', solution: 'El backend debe ser accesible públicamente (Railway en producción). El Verify Token debe coincidir exactamente con WHATSAPP_VERIFY_TOKEN en el .env.' },
+      { error: 'Número ya está en uso', solution: 'El número no puede estar activo en WhatsApp personal o WhatsApp Business App. Migra el número a la Cloud API antes de agregarlo.' },
+      { error: 'Error 131030 (template required)', solution: 'Las conversaciones iniciadas por el negocio (outbound) requieren templates aprobados. Las respuestas (inbound) no necesitan templates.' },
+    ],
+    notes: [
+      'Verify Token de Revio: mystica_webhook_2026 — usar exactamente este valor.',
+      'El token de Sistema de Usuarios (usuario del sistema) NO expira. Es el único método para producción.',
+      'WhatsApp cobra por conversación: $0.0147 USD por conversación de servicio (24h window). Las respuestas dentro de la ventana de 24h son gratuitas.',
+    ],
   },
+
+  // ══════════════════════════════════════════
+  // OTA
+  // ══════════════════════════════════════════
 
   booking: {
     name: 'Booking.com',
     icon: '🏷️',
     category: 'OTA',
-    color: '#0ea5e9',
-    description: 'Integración con la OTA más grande del mundo vía XML/JSON API. Requiere acuerdo de partnership.',
+    color: '#003580',
+    status: 'pending_approval',
+    estimatedTime: '2-4 semanas (aprobación)',
+    description: 'OTA más grande del mundo. Requiere aplicar como Connectivity Partner — proceso formal de 2-4 semanas.',
     docUrl: 'https://developers.booking.com',
     videoUrl: null,
-    steps: [
-      { n: 1, title: 'Contacta a Booking.com', body: 'Escribe a partner-connectivity@booking.com o contáctanos para gestionar el acceso.' },
-      { n: 2, title: 'Obtén las credenciales XML', body: 'Booking.com te proporcionará un username y password para su API XML.' },
-      { n: 3, title: 'Configura el webhook', body: 'En el Extranet de Booking, ve a Property > Settings > Notifications. Configura la URL del webhook de Revio.' },
-      { n: 4, title: 'Ingresa en Revio', body: 'Ve a Configuración > Conexiones > Booking.com. Ingresa username y password.' },
+    mysticaNote: 'Mística tiene activas reservas de Booking.com en LobbyPMS (verificado en la API). El partnership para automatizar respuestas está pendiente.',
+    credentials: [
+      { label: 'API Username', envKey: 'BOOKING_USERNAME', example: 'misticahostels' },
+      { label: 'API Password', envKey: 'BOOKING_PASSWORD', example: '...' },
+      { label: 'Hotel ID', envKey: 'BOOKING_HOTEL_ID', example: '12345678' },
     ],
-    notes: ['Booking.com tiene un proceso de verificación que puede tomar 2-4 semanas.'],
+    steps: [
+      {
+        n: 1,
+        title: 'Verifica tus propiedades en Booking Extranet',
+        body: 'Ve a admin.booking.com e inicia sesión. Confirma que tus propiedades (Isla Palma y Tayrona) están activas y tienen reservas recientes.',
+        tip: null,
+      },
+      {
+        n: 2,
+        title: 'Solicita acceso a la Connectivity API',
+        body: 'Escribe a: connectivity@booking.com con asunto "Connectivity Partner Application — [Nombre de tu empresa]". Indica que eres un software de gestión (PMS/Channel Manager) que quiere integrarse. Incluye: nombre del software (Revio), número de propiedades, volumen mensual aproximado.',
+        tip: 'Booking.com también tiene un formulario en developers.booking.com/partner-hub.',
+      },
+      {
+        n: 3,
+        title: 'Proceso de revisión (2-4 semanas)',
+        body: 'Booking.com revisará tu solicitud. Te pedirán: documentación legal de la empresa, demo del software, casos de uso específicos. Responde rápido para agilizar el proceso.',
+        tip: null,
+      },
+      {
+        n: 4,
+        title: 'Acceso al entorno de pruebas',
+        body: 'Una vez aprobado, recibirás credenciales para el entorno Sandbox: username (formato: BEtest123456) y password. Puedes hacer pruebas de integración antes de ir a producción.',
+        tip: null,
+      },
+      {
+        n: 5,
+        title: 'Certificación y producción',
+        body: 'Booking.com requiere pasar un proceso de certificación técnica. Una vez aprobada, recibirás credenciales de producción. Agrégalas en Revio → Configuración → Conexiones → Booking.com.',
+        tip: null,
+      },
+      {
+        n: 6,
+        title: 'Configura el Webhook en Booking Extranet',
+        body: 'En admin.booking.com → Property → Settings → Notifications → Channel Manager Notifications. Configura la URL: https://[tu-backend]/api/ota/webhook/booking.',
+        tip: null,
+      },
+    ],
+    troubleshooting: [
+      { error: 'No hay respuesta al email', solution: 'Usa el formulario web en developers.booking.com. El proceso puede tardar más durante temporadas de alta demanda.' },
+    ],
+    notes: [
+      'Las reservas de Booking.com ya llegan a LobbyPMS (verificado en producción). Esta integración agrega la capacidad de responder automáticamente a consultas.',
+      'Proceso realista: aplica hoy, sigue el proceso y tendrás acceso en 3-6 semanas.',
+      'Para gestión de reservas existentes, LobbyPMS ya sincroniza con Booking.com automáticamente.',
+    ],
   },
 
   airbnb: {
     name: 'Airbnb',
     icon: '🏠',
     category: 'OTA',
-    color: '#ef4444',
-    description: 'Integración con Airbnb. Disponible vía iCal (inmediato) o API certificada (requiere aprobación).',
-    docUrl: 'https://airbnb.com/partner-technical',
+    color: '#ff5a5f',
+    status: 'pending_approval',
+    estimatedTime: 'iCal: 5 min · API completa: 4-8 semanas',
+    description: 'Integración básica vía iCal (inmediata) o completa vía API certificada (requiere aprobación de Airbnb).',
+    docUrl: 'https://www.airbnb.com/partner-technical',
     videoUrl: null,
-    steps: [
-      { n: 1, title: 'Exporta el calendario iCal', body: 'En Airbnb, ve a tu listing > Calendar > Export Calendar. Copia la URL .ics.' },
-      { n: 2, title: 'Pega la URL en Revio', body: 'Ve a Configuración > Conexiones > Airbnb. Pega la URL del iCal. Revio sincronizará cada 30 minutos.' },
-      { n: 3, title: 'API completa (opcional)', body: 'Para integración completa, aplica en airbnb.com/partner-technical como software de gestión.' },
+    mysticaNote: null,
+    credentials: [
+      { label: 'iCal URL (básico)', envKey: 'AIRBNB_ICAL_URL', example: 'https://www.airbnb.com/calendar/ical/XXXXX.ics' },
+      { label: 'API Client ID (completo)', envKey: 'AIRBNB_CLIENT_ID', example: 'abc123...' },
     ],
-    notes: ['La sincronización por iCal es unidireccional — Revio lee las reservas pero no puede crearlas en Airbnb.'],
+    steps: [
+      {
+        n: 1,
+        title: 'Opción A: iCal (disponible hoy)',
+        body: 'En Airbnb → tu listing → Calendar → Export Calendar. Copia la URL .ics. Pégala en Revio → Configuración → Conexiones → Airbnb → "URL de Calendario iCal". Revio sincronizará cada 30 min.',
+        tip: 'El iCal permite leer reservas pero NO crear reservas ni responder mensajes automáticamente.',
+      },
+      {
+        n: 2,
+        title: 'Opción B: API completa (requiere aplicar)',
+        body: 'Ve a airbnb.com/partner-technical. Haz clic en "Apply to become a Software Partner". Completa el formulario con: nombre del software (Revio), tipo (Property Management), número de hosts, volumen de reservas estimado.',
+        tip: null,
+      },
+      {
+        n: 3,
+        title: 'Demo y revisión por Airbnb',
+        body: 'Airbnb revisará tu aplicación y puede pedir una demo del software. Destaca: volumen de hostels, mercado LATAM, capacidad técnica.',
+        tip: null,
+      },
+      {
+        n: 4,
+        title: 'Certificación técnica',
+        body: 'Una vez aprobado, Airbnb te dará acceso a su API sandbox para certificación. Deberás implementar y certificar: reservas, disponibilidad, mensajes.',
+        tip: null,
+      },
+      {
+        n: 5,
+        title: 'Configura en Revio',
+        body: 'Con las credenciales de producción de Airbnb, configúralas en Revio → Configuración → Conexiones → Airbnb.',
+        tip: null,
+      },
+    ],
+    troubleshooting: [
+      { error: 'iCal no sincroniza', solution: 'Verifica que la URL termina en .ics y es accesible públicamente. Airbnb puede cambiar la URL — regenera en caso de error.' },
+    ],
+    notes: [
+      'iCal es unidireccional (solo lectura). Para cerrar reservas desde Revio, necesitas la API completa.',
+      'El proceso de aprobación de Airbnb es más estricto que Booking.com. Requiere volumen demostrable.',
+    ],
   },
+
+  // ══════════════════════════════════════════
+  // PAGOS
+  // ══════════════════════════════════════════
 
   wompi: {
     name: 'Wompi',
     icon: '💳',
     category: 'Pagos',
     color: '#0ea5e9',
-    description: 'Pasarela de pagos colombiana. Recibe tarjetas, PSE, Nequi, Daviplata y más.',
+    status: 'connected',
+    estimatedTime: '15 min (configuración webhooks)',
+    description: 'Pasarela de pagos colombiana. Acepta: tarjetas, PSE, Nequi, Daviplata, Bancolombia. Ambas propiedades de Mística están activas.',
     docUrl: 'https://docs.wompi.co',
     videoUrl: null,
-    steps: [
-      { n: 1, title: 'Crea una cuenta Wompi', body: 'Regístrate en comercios.wompi.co como comercio. Necesitas: cédula/NIT, cuenta bancaria colombiana.' },
-      { n: 2, title: 'Espera la verificación', body: 'Wompi verifica tu cuenta en 1-3 días hábiles.' },
-      { n: 3, title: 'Obtén las llaves de producción', body: 'En el panel de Wompi, ve a Desarrollo > Llaves. Copia la llave pública (pub_prod_...) y privada (prv_prod_...).' },
-      { n: 4, title: 'Configura el webhook', body: 'En Wompi, ve a Configuración > Eventos. URL: https://api.revio.co/api/payments/webhook. Eventos: transaction.updated.' },
-      { n: 5, title: 'Ingresa en Revio', body: 'Ve a Configuración > Conexiones > Wompi. Ingresa las llaves pública y privada.' },
+    mysticaNote: 'Isla Palma: MISTICA HOSTELS SAS (NIT 901329182) — ACTIVA. Tayrona: INVERSIONES COLOMBIA TRAVEL SAS (NIT 901818845-7) — ACTIVA. Métodos aceptados: Tarjeta, PSE, Nequi, Daviplata, Bancolombia.',
+    credentials: [
+      { label: 'Llave Pública Isla Palma', envKey: 'WOMPI_PUBLIC_KEY_ISLA', example: 'pub_prod_S0hgy...' },
+      { label: 'Llave Privada Isla Palma', envKey: 'WOMPI_PRIVATE_KEY_ISLA', example: 'prv_prod_aXLd...' },
+      { label: 'Llave Pública Tayrona', envKey: 'WOMPI_PUBLIC_KEY_TAYRONA', example: 'pub_prod_Y3Ge...' },
+      { label: 'Llave Privada Tayrona', envKey: 'WOMPI_PRIVATE_KEY_TAYRONA', example: 'prv_prod_JgHP...' },
     ],
-    notes: ['Wompi cobra comisión por transacción: 2.9% + $900 COP para tarjetas. PSE: $1.500 COP fijo.'],
+    steps: [
+      {
+        n: 1,
+        title: 'Crea tu cuenta en Wompi',
+        body: 'Ve a comercios.wompi.co y haz clic en "Crear cuenta". Datos necesarios: Nombre completo, NIT de la empresa, correo electrónico, número de celular, cuenta bancaria colombiana (para recibir pagos).',
+        tip: null,
+      },
+      {
+        n: 2,
+        title: 'Sube documentación de verificación',
+        body: 'Wompi requiere: Cámara de Comercio (no mayor a 90 días), Cédula del representante legal, Certificado bancario. El proceso de verificación toma 1-3 días hábiles.',
+        tip: null,
+      },
+      {
+        n: 3,
+        title: 'Obtén las llaves de producción',
+        body: 'Una vez verificada la cuenta, ve al panel de Wompi → Desarrollo → Llaves API. Encontrarás: Llave pública (pub_prod_...) y Llave privada (prv_prod_...). Si tienes múltiples propiedades con diferentes NITs, crea una cuenta por propiedad.',
+        tip: 'Para Mística: Isla Palma y Tayrona tienen NITs diferentes, por lo que tienen llaves separadas.',
+      },
+      {
+        n: 4,
+        title: 'Configura los webhooks (CRÍTICO)',
+        body: 'En Wompi → Configuración → Eventos/Webhooks → "Agregar endpoint". URL: https://[tu-backend]/api/payments/webhook. Eventos a suscribir: transaction.updated. Después de guardar, Wompi mostrará el "Evento Secret" — cópialo.',
+        tip: 'Sin el webhook, Revio no sabe cuándo se confirman los pagos.',
+      },
+      {
+        n: 5,
+        title: 'Agrega el Webhook Secret al .env',
+        body: 'Copia el secret del evento y agrégalo en tu .env como: WOMPI_EVENT_SECRET_ISLA=tu_secret_aqui (y WOMPI_EVENT_SECRET_TAYRONA si tienes dos cuentas).',
+        tip: null,
+      },
+      {
+        n: 6,
+        title: 'Ingresa las llaves en Revio',
+        body: 'En Revio → Configuración → Conexiones → Wompi. Ingresa la llave pública y privada de cada propiedad. Haz clic en "Probar Conexión" — deberías ver el nombre de tu comercio.',
+        tip: null,
+      },
+    ],
+    troubleshooting: [
+      { error: 'Firma inválida en webhook', solution: 'El Webhook Secret no coincide. Ve a Wompi → Configuración → Eventos y regenera el secret. Actualiza WOMPI_EVENT_SECRET en el .env.' },
+      { error: 'Error 401 en transacciones', solution: 'Estás usando la llave privada incorrecta. La llave privada (prv_prod_...) es para el backend. La pública (pub_prod_...) es para el frontend.' },
+      { error: 'Cuenta no verificada', solution: 'Wompi puede tardar 1-3 días. Puedes usar el entorno sandbox (pub_test_... / prv_test_...) para pruebas mientras tanto.' },
+    ],
+    notes: [
+      'Comisiones Wompi (2026): Tarjeta crédito 2.9% + $900 COP. PSE: $1.500 COP fijo. Nequi/Daviplata: $900 COP fijo.',
+      'Ambas cuentas de Mística están verificadas y activas (confirmado por API el 2026-04-04).',
+      'Los pagos se liquidan automáticamente cada 24h en días hábiles a tu cuenta bancaria.',
+    ],
   },
 
   payu: {
@@ -138,32 +434,322 @@ const GUIDES = {
     icon: '💰',
     category: 'Pagos',
     color: '#f59e0b',
-    description: 'Pasarela de pagos con cobertura en LATAM. Alternativa a Wompi para mercados internacionales.',
+    status: 'not_configured',
+    estimatedTime: '20 min',
+    description: 'Pasarela de pagos LATAM. Alternativa a Wompi para clientes internacionales (USD/EUR).',
     docUrl: 'https://developers.payulatam.com',
     videoUrl: null,
-    steps: [
-      { n: 1, title: 'Crea cuenta PayU', body: 'Ve a colombia.payu.com y crea una cuenta de comercio.' },
-      { n: 2, title: 'Obtén credenciales', body: 'En el panel de PayU, ve a Configuración > Credenciales técnicas. Copia el Merchant ID, API Key y API Login.' },
-      { n: 3, title: 'Configura en Revio', body: 'En Configuración > Conexiones > PayU, ingresa las credenciales.' },
+    mysticaNote: null,
+    credentials: [
+      { label: 'Merchant ID', envKey: 'PAYU_MERCHANT_ID', example: '508029' },
+      { label: 'API Key', envKey: 'PAYU_API_KEY', example: '4Vj8eK4...' },
+      { label: 'API Login', envKey: 'PAYU_API_LOGIN', example: 'pRRXKOl...' },
     ],
-    notes: ['PayU es recomendado para clientes internacionales que pagan en USD.'],
+    steps: [
+      { n: 1, title: 'Crea cuenta en PayU Colombia', body: 'Ve a colombia.payu.com → "Solicitar integración". Datos: empresa, NIT, cuenta bancaria en COP.', tip: null },
+      { n: 2, title: 'Obtén credenciales técnicas', body: 'En tu panel PayU → Configuración → Credenciales técnicas. Copia el Merchant ID, API Key y API Login.', tip: null },
+      { n: 3, title: 'Configura en Revio', body: 'En Configuración → Conexiones → PayU, ingresa las tres credenciales.', tip: null },
+    ],
+    troubleshooting: [],
+    notes: ['PayU acepta USD — útil para huéspedes internacionales que pagan en dólares.'],
   },
 
+  // ══════════════════════════════════════════
+  // REDES SOCIALES
+  // ══════════════════════════════════════════
+
+  instagram: {
+    name: 'Instagram Business',
+    icon: '📸',
+    category: 'Social',
+    color: '#ec4899',
+    status: 'not_configured',
+    estimatedTime: '30 min',
+    description: 'Responde DMs y comentarios de Instagram automáticamente. Requiere cuenta Instagram Business vinculada a Facebook Page.',
+    docUrl: 'https://developers.facebook.com/docs/instagram-platform',
+    videoUrl: null,
+    mysticaNote: 'Meta Business ID de Mística: 764980183700550. Usar el mismo token que WhatsApp con permisos adicionales de Instagram.',
+    credentials: [
+      { label: 'Instagram Access Token', envKey: 'INSTAGRAM_TOKEN', example: 'EAABs...' },
+      { label: 'Instagram Account ID', envKey: 'INSTAGRAM_ACCOUNT_ID', example: '17841400...' },
+    ],
+    steps: [
+      {
+        n: 1,
+        title: 'Vincula Instagram a tu Facebook Page',
+        body: 'En Instagram Business → Editar perfil → Información de contacto → "Conectar a Facebook". Selecciona la Página de Facebook de tu propiedad. Sin esta vinculación, la API no funciona.',
+        tip: null,
+      },
+      {
+        n: 2,
+        title: 'Accede a Meta for Developers',
+        body: 'Ve a developers.facebook.com → My Apps. Usa la misma App que creaste para WhatsApp, o crea una nueva App de tipo "Business".',
+        tip: null,
+      },
+      {
+        n: 3,
+        title: 'Agrega el producto Instagram',
+        body: 'En tu App → "+ Add Product" → "Instagram". Haz clic en "Set Up". Sigue el proceso para conectar tu cuenta de Instagram Business.',
+        tip: null,
+      },
+      {
+        n: 4,
+        title: 'Obtén el Instagram Account ID',
+        body: 'En Graph API Explorer (developers.facebook.com/tools/explorer): selecciona tu App, elige el token de Usuario de Sistema, y ejecuta: GET /me/accounts. Para cada página, ejecuta: GET /{page-id}?fields=instagram_business_account. El ID retornado es tu Instagram Account ID.',
+        tip: 'Para Mística: el Meta Business ID es 764980183700550.',
+      },
+      {
+        n: 5,
+        title: 'Genera token con permisos de Instagram',
+        body: 'En Meta Business Manager → Usuarios del sistema → tu usuario "revio-bot" → "Generar nuevo token" → permisos adicionales: instagram_basic, instagram_manage_messages, instagram_manage_comments, pages_messaging.',
+        tip: null,
+      },
+      {
+        n: 6,
+        title: 'Configura el webhook',
+        body: 'En tu App Meta → Instagram → Webhooks. URL: https://[tu-backend]/api/social/webhook/meta. Verify Token: mystica_webhook_2026. Suscríbete a: messages, comments, messaging_postbacks.',
+        tip: null,
+      },
+      {
+        n: 7,
+        title: 'Configura en Revio',
+        body: 'En Revio → Configuración → Conexiones → Instagram. Ingresa el Access Token y el Instagram Account ID.',
+        tip: null,
+      },
+    ],
+    troubleshooting: [
+      { error: 'Token no tiene permisos de Instagram', solution: 'Regenera el token desde Sistema de Usuarios incluyendo los permisos instagram_basic e instagram_manage_messages.' },
+      { error: 'instagram_business_account no retorna ID', solution: 'La cuenta de Instagram NO está vinculada a la Facebook Page. Ve a Instagram → Editar Perfil → Conectar a Facebook.' },
+      { error: 'Messages no llegan al webhook', solution: 'El usuario de Instagram debe tener activadas las notificaciones de mensajes. Ve a Configuración del negocio en Instagram.' },
+    ],
+    notes: [
+      'Puedes usar el mismo Access Token de WhatsApp si le agregaste los permisos de Instagram.',
+      'Los DMs de Instagram solo son accesibles si el usuario inicia la conversación (política de Meta para cuentas sin verificación avanzada).',
+    ],
+  },
+
+  facebook: {
+    name: 'Facebook Messenger',
+    icon: '📘',
+    category: 'Social',
+    color: '#1877f2',
+    status: 'not_configured',
+    estimatedTime: '25 min',
+    description: 'Responde mensajes de Facebook Messenger automáticamente. Mismo App de Meta que WhatsApp/Instagram.',
+    docUrl: 'https://developers.facebook.com/docs/messenger-platform',
+    videoUrl: null,
+    mysticaNote: 'Meta Business ID de Mística: 764980183700550. Misma App que WhatsApp, agregar Messenger como producto adicional.',
+    credentials: [
+      { label: 'Page Access Token', envKey: 'FACEBOOK_PAGE_TOKEN', example: 'EAABs...' },
+      { label: 'Page ID', envKey: 'FACEBOOK_PAGE_ID', example: '123456789' },
+    ],
+    steps: [
+      {
+        n: 1,
+        title: 'Accede a Meta for Developers',
+        body: 'Ve a developers.facebook.com → My Apps. Selecciona la App que ya usas para WhatsApp.',
+        tip: null,
+      },
+      {
+        n: 2,
+        title: 'Agrega Messenger como producto',
+        body: 'En tu App → "+ Add Product" → "Messenger" → "Set Up". Esto no afecta WhatsApp.',
+        tip: null,
+      },
+      {
+        n: 3,
+        title: 'Selecciona tu Facebook Page',
+        body: 'En Messenger → Settings → Access Tokens, haz clic en "Add or Remove Pages". Selecciona la Página de Facebook de tu propiedad.',
+        tip: null,
+      },
+      {
+        n: 4,
+        title: 'Obtén el Page Access Token',
+        body: 'En Graph API Explorer, ejecuta: GET /me/accounts → busca tu página → copia el "access_token" de la lista. Para que sea permanente, necesitas generarlo desde Sistema de Usuarios.',
+        tip: null,
+      },
+      {
+        n: 5,
+        title: 'Obtén el Page ID',
+        body: 'En la lista de /me/accounts, el "id" de tu página es el Page ID. También lo encuentras en la URL de tu página de Facebook.',
+        tip: null,
+      },
+      {
+        n: 6,
+        title: 'Configura el webhook',
+        body: 'En Messenger → Settings → Webhooks. URL: https://[tu-backend]/api/social/webhook/meta. Verify Token: mystica_webhook_2026. Suscríbete a: messages, messaging_postbacks, messaging_deliveries.',
+        tip: null,
+      },
+      {
+        n: 7,
+        title: 'Pega en Revio',
+        body: 'En Revio → Configuración → Conexiones → Facebook. Ingresa el Page Access Token y el Page ID.',
+        tip: null,
+      },
+    ],
+    troubleshooting: [
+      { error: 'Messenger no está en producción', solution: 'Para recibir mensajes de usuarios reales, la App debe estar en modo "Live". Ve a App Review → Permissions y solicita los permisos pages_messaging para revisión.' },
+      { error: 'Token de página expira', solution: 'Los tokens de página de usuario expiran. Genera siempre el token desde Sistema de Usuarios para obtener tokens sin expiración.' },
+    ],
+    notes: [
+      'Puedes usar el mismo App de Meta para WhatsApp, Instagram y Facebook simultáneamente.',
+      'Webhook URL para todos los canales Meta: /api/social/webhook/meta (el backend distingue el canal por el payload).',
+    ],
+  },
+
+  google_business: {
+    name: 'Google Business',
+    icon: '🔍',
+    category: 'Social',
+    color: '#ea4335',
+    status: 'not_configured',
+    estimatedTime: '1-2 horas',
+    description: 'Monitorea y responde reseñas de Google Maps. Gestiona Q&A y actualizaciones del perfil de negocio.',
+    docUrl: 'https://developers.google.com/my-business/reference/rest',
+    videoUrl: null,
+    mysticaNote: null,
+    credentials: [
+      { label: 'Google API Key', envKey: 'GOOGLE_API_KEY', example: 'AIzaSy...' },
+      { label: 'Business Account ID', envKey: 'GOOGLE_BUSINESS_ACCOUNT_ID', example: 'accounts/123456789' },
+      { label: 'Location ID', envKey: 'GOOGLE_LOCATION_ID', example: 'locations/123456789' },
+    ],
+    steps: [
+      {
+        n: 1,
+        title: 'Verifica tu negocio en Google',
+        body: 'Ve a business.google.com. Si tu propiedad aún no está verificada, haz clic en "Agregar negocio" o busca el existente. La verificación puede ser por: tarjeta postal (10-14 días), videollamada (instantáneo para negocios elegibles), o código por teléfono.',
+        tip: null,
+      },
+      {
+        n: 2,
+        title: 'Crea un proyecto en Google Cloud Console',
+        body: 'Ve a console.cloud.google.com → "Nuevo proyecto" → nombre "Revio Mistica". Habilita facturación (necesario para la API aunque sea gratuita en este nivel).',
+        tip: null,
+      },
+      {
+        n: 3,
+        title: 'Habilita las APIs necesarias',
+        body: 'En tu proyecto de Cloud Console → APIs y servicios → Biblioteca. Busca y habilita: "Business Profile API" (antes llamada Google My Business API) y "Places API".',
+        tip: null,
+      },
+      {
+        n: 4,
+        title: 'Crea credenciales OAuth 2.0',
+        body: 'APIs y servicios → Credenciales → "+ Crear credenciales" → "ID de cliente de OAuth". Tipo: Aplicación Web. URI de redirección: https://[tu-backend]/oauth/google. Descarga el JSON con las credenciales.',
+        tip: null,
+      },
+      {
+        n: 5,
+        title: 'Obtén el Account ID y Location ID',
+        body: 'Llama a la API: GET https://mybusinessaccountmanagement.googleapis.com/v1/accounts (con tu token OAuth). El ID retornado es tu Account ID. Luego: GET /v1/{accountId}/locations para obtener el Location ID de cada propiedad.',
+        tip: null,
+      },
+      {
+        n: 6,
+        title: 'Configura en Revio',
+        body: 'En Revio → Configuración → Conexiones → Google Business. Ingresa el Account ID, Location ID y las credenciales OAuth.',
+        tip: null,
+      },
+    ],
+    troubleshooting: [
+      { error: 'API not enabled', solution: 'Ve a Google Cloud Console → APIs y servicios y habilita específicamente "Business Profile API".' },
+      { error: 'Insufficient permissions', solution: 'El usuario OAuth debe ser Owner o Manager del Google Business Profile, no solo un usuario básico.' },
+    ],
+    notes: [
+      'Google Business API es gratuita pero tiene cuotas: 5 solicitudes/segundo por propiedad.',
+      'Para responder reseñas automáticamente, la cuenta debe tener el permiso "Manage reviews" activado en Business Profile.',
+    ],
+  },
+
+  // ══════════════════════════════════════════
+  // REVIEWS
+  // ══════════════════════════════════════════
+
+  tripadvisor: {
+    name: 'TripAdvisor',
+    icon: '🦉',
+    category: 'Reviews',
+    color: '#34d399',
+    status: 'pending_approval',
+    estimatedTime: '1-2 semanas (aprobación)',
+    description: 'Monitorea y responde reseñas de TripAdvisor. Requiere ser propietario verificado de la propiedad.',
+    docUrl: 'https://developer-tripadvisor.com/home/',
+    videoUrl: null,
+    mysticaNote: null,
+    credentials: [
+      { label: 'API Key', envKey: 'TRIPADVISOR_API_KEY', example: 'ta_api_...' },
+      { label: 'Location ID', envKey: 'TRIPADVISOR_LOCATION_ID', example: '12345678' },
+    ],
+    steps: [
+      {
+        n: 1,
+        title: 'Reclama tu propiedad en TripAdvisor',
+        body: 'Ve a tripadvisor.com/owners. Busca tu propiedad y haz clic en "¿Eres el dueño?". Verifica la propiedad con los documentos requeridos.',
+        tip: null,
+      },
+      {
+        n: 2,
+        title: 'Solicita acceso a la Management API',
+        body: 'Ve a developer-tripadvisor.com/home → "Apply for API Access". Selecciona "Review Management API". Describe tu software (Revio) y casos de uso.',
+        tip: null,
+      },
+      {
+        n: 3,
+        title: 'Obtén el Location ID',
+        body: 'El Location ID de tu propiedad está en la URL de TripAdvisor: tripadvisor.com/Hotel_Review-dXXXXXXX (el número después de -d es el Location ID).',
+        tip: null,
+      },
+      {
+        n: 4,
+        title: 'Genera tu API Key',
+        body: 'Una vez aprobado, recibirás tu API Key en el portal de desarrolladores. Tiene el formato ta_api_XXXXX.',
+        tip: null,
+      },
+      {
+        n: 5,
+        title: 'Configura en Revio',
+        body: 'En Revio → Configuración → Conexiones → TripAdvisor. Ingresa la API Key y el Location ID.',
+        tip: null,
+      },
+    ],
+    troubleshooting: [
+      { error: 'API Access denied', solution: 'TripAdvisor es estricto con quién accede a la API de gestión. Asegúrate de ser el propietario reclamado de la propiedad.' },
+    ],
+    notes: [
+      'TripAdvisor tiene API pública (datos de reviews, sin gestión) y API de Management (responder reviews — requiere aprobación).',
+      'La API pública te permite leer reviews sin aprobación usando solo el Location ID.',
+    ],
+  },
+
+  // ══════════════════════════════════════════
+  // IA
+  // ══════════════════════════════════════════
+
   claude: {
-    name: 'Claude / Motor IA',
+    name: 'Claude / Motor IA (Revio)',
     icon: '🤖',
     category: 'IA',
     color: '#8b5cf6',
-    description: 'Motor de inteligencia artificial de Revio. Proporciona tu propia clave API para control total del gasto.',
+    status: 'connected',
+    estimatedTime: '5 min',
+    description: 'Motor de IA principal de Revio. Por defecto usa la llave compartida de Revio (incluida en el plan). Opcional: usa tu propia llave para control total del gasto.',
     docUrl: 'https://console.anthropic.com',
     videoUrl: null,
-    steps: [
-      { n: 1, title: 'Crea una cuenta Anthropic', body: 'Ve a console.anthropic.com y crea una cuenta.' },
-      { n: 2, title: 'Agrega método de pago', body: 'En Billing, agrega tu tarjeta de crédito.' },
-      { n: 3, title: 'Genera una API Key', body: 'Ve a API Keys > Create Key. Nómbrala "Revio". Copia la clave (sk-ant-...).' },
-      { n: 4, title: 'Ingresa en Revio', body: 'Ve a Configuración > Agente IA > Proveedor. Selecciona Claude Sonnet y pega tu API key.' },
+    mysticaNote: 'Mística usa la llave de Revio. API key de Anthropic verificada y activa (HTTP 200).',
+    credentials: [
+      { label: 'Anthropic API Key (opcional)', envKey: 'ANTHROPIC_API_KEY', example: 'sk-ant-api03-...' },
     ],
-    notes: ['Sin tu propia key, el agente usa la clave compartida de Revio (incluida en el plan).'],
+    steps: [
+      { n: 1, title: 'Crea una cuenta Anthropic', body: 'Ve a console.anthropic.com y crea una cuenta con tu email.', tip: null },
+      { n: 2, title: 'Agrega método de pago', body: 'En Billing → Add payment method. Anthropic cobra por tokens usados. El modelo recomendado (Claude Sonnet) cuesta ~$3 USD / 1M tokens.', tip: null },
+      { n: 3, title: 'Genera una API Key', body: 'Ve a API Keys → Create Key. Nombre: "Revio [Tu Hotel]". Copia la clave (sk-ant-api03-...).', tip: null },
+      { n: 4, title: 'Configura en Revio', body: 'Ve a Configuración → Agente IA → Proveedor. Selecciona "Claude Sonnet" y pega tu API key. Sin tu propia key, el agente usa la llave compartida de Revio (incluida en el plan).', tip: null },
+    ],
+    troubleshooting: [
+      { error: 'Overloaded / 529', solution: 'Anthropic está con alta demanda. Revio reintenta automáticamente. Si persiste, contacta a support@anthropic.com.' },
+      { error: 'Insufficient credits', solution: 'Recarga créditos en console.anthropic.com → Billing → Add credits.' },
+    ],
+    notes: ['Sin tu propia key, el agente usa la llave compartida de Revio (incluida en el plan). La llave propia es solo para control de costos.'],
   },
 
   openai: {
@@ -171,15 +757,20 @@ const GUIDES = {
     icon: '🧠',
     category: 'IA',
     color: '#22c55e',
+    status: 'not_configured',
+    estimatedTime: '5 min',
     description: 'Modelo GPT-4o de OpenAI como alternativa al motor IA de Revio.',
     docUrl: 'https://platform.openai.com',
     videoUrl: null,
+    mysticaNote: null,
+    credentials: [{ label: 'OpenAI API Key', envKey: 'OPENAI_API_KEY', example: 'sk-proj-...' }],
     steps: [
-      { n: 1, title: 'Accede a OpenAI Platform', body: 'Ve a platform.openai.com y crea o inicia sesión en tu cuenta.' },
-      { n: 2, title: 'Crea una API Key', body: 'Ve a API Keys > Create new secret key. Guarda la clave (sk-...).' },
-      { n: 3, title: 'Agrega créditos', body: 'En Billing, agrega tu tarjeta. GPT-4o cuesta ~$5 USD / 1M tokens.' },
-      { n: 4, title: 'Configura en Revio', body: 'Ve a Configuración > Agente IA > Proveedor. Selecciona GPT-4o y pega tu API key.' },
+      { n: 1, title: 'Crea cuenta en OpenAI Platform', body: 'Ve a platform.openai.com y regístrate o inicia sesión.', tip: null },
+      { n: 2, title: 'Agrega créditos', body: 'En Billing → Add payment method. GPT-4o cuesta ~$5 USD / 1M tokens de entrada, $15 USD / 1M de salida.', tip: null },
+      { n: 3, title: 'Genera API Key', body: 'API Keys → Create new secret key. Nombre: "Revio". Copia la clave (sk-proj-...).', tip: null },
+      { n: 4, title: 'Configura en Revio', body: 'Configuración → Agente IA → Proveedor → GPT-4o. Pega tu API key.', tip: null },
     ],
+    troubleshooting: [],
     notes: [],
   },
 
@@ -188,16 +779,21 @@ const GUIDES = {
     icon: '✨',
     category: 'IA',
     color: '#f59e0b',
-    description: 'Modelo Gemini 1.5 Pro de Google. Ideal para propiedades con muchas políticas y documentos.',
+    status: 'not_configured',
+    estimatedTime: '10 min',
+    description: 'Gemini 1.5 Pro de Google. Excelente para contextos muy largos (1M tokens).',
     docUrl: 'https://aistudio.google.com',
     videoUrl: null,
+    mysticaNote: null,
+    credentials: [{ label: 'Google AI API Key', envKey: 'GEMINI_API_KEY', example: 'AIzaSy...' }],
     steps: [
-      { n: 1, title: 'Ve a Google AI Studio', body: 'Accede a aistudio.google.com con tu cuenta de Google.' },
-      { n: 2, title: 'Crea una API Key', body: 'Haz clic en "Get API Key" > "Create API Key". Selecciona o crea un proyecto de Google Cloud.' },
-      { n: 3, title: 'Habilita la API', body: 'En Google Cloud Console, habilita la Generative Language API para tu proyecto.' },
-      { n: 4, title: 'Configura en Revio', body: 'Ve a Configuración > Agente IA > Proveedor. Selecciona Gemini y pega tu API key (AIza...).' },
+      { n: 1, title: 'Accede a Google AI Studio', body: 'Ve a aistudio.google.com con tu cuenta de Google.', tip: null },
+      { n: 2, title: 'Crea una API Key', body: '"Get API Key" → "Create API Key in new project". La clave comienza con AIza...', tip: null },
+      { n: 3, title: 'Habilita la API', body: 'En Google Cloud Console, habilita "Generative Language API" para tu proyecto.', tip: null },
+      { n: 4, title: 'Configura en Revio', body: 'Configuración → Agente IA → Gemini. Pega tu API key.', tip: null },
     ],
-    notes: [],
+    troubleshooting: [],
+    notes: ['Gemini tiene tier gratuito generoso: 15 requests/min. Ideal para volumen bajo.'],
   },
 
   groq: {
@@ -205,80 +801,86 @@ const GUIDES = {
     icon: '🦙',
     category: 'IA',
     color: '#ef4444',
-    description: 'Llama 3 de Meta corriendo en hardware Groq. Ultra rápido y muy económico.',
+    status: 'not_configured',
+    estimatedTime: '5 min',
+    description: 'Llama 3 de Meta en hardware Groq. Ultra rápido (tokens/seg 10x más rápido que Claude/GPT). Muy económico.',
     docUrl: 'https://console.groq.com',
     videoUrl: null,
+    mysticaNote: null,
+    credentials: [{ label: 'Groq API Key', envKey: 'GROQ_API_KEY', example: 'gsk_...' }],
     steps: [
-      { n: 1, title: 'Crea cuenta en Groq Cloud', body: 'Ve a console.groq.com y regístrate.' },
-      { n: 2, title: 'Genera una API Key', body: 'En el menú de API Keys, crea una nueva clave. Empieza con gsk_...' },
-      { n: 3, title: 'Configura en Revio', body: 'Ve a Configuración > Agente IA > Proveedor. Selecciona Llama 3 (Groq) y pega tu key.' },
+      { n: 1, title: 'Crea cuenta en Groq Cloud', body: 'Ve a console.groq.com y regístrate.', tip: null },
+      { n: 2, title: 'Genera API Key', body: 'API Keys → Create API Key. La clave comienza con gsk_...', tip: null },
+      { n: 3, title: 'Configura en Revio', body: 'Configuración → Agente IA → Llama 3 (Groq). Pega tu key.', tip: null },
     ],
-    notes: ['Groq ofrece tier gratuito generoso. Ideal para pruebas y alto volumen.'],
-  },
-
-  instagram: {
-    name: 'Instagram',
-    icon: '📸',
-    category: 'Social',
-    color: '#ec4899',
-    description: 'Responde automáticamente a mensajes directos y comentarios en Instagram.',
-    docUrl: 'https://developers.facebook.com/docs/instagram',
-    videoUrl: null,
-    steps: [
-      { n: 1, title: 'Conecta a Facebook Page', body: 'Tu cuenta de Instagram Business debe estar vinculada a una Página de Facebook.' },
-      { n: 2, title: 'Crea un Meta App', body: 'Ve a developers.facebook.com > My Apps > Create App > Business.' },
-      { n: 3, title: 'Agrega Instagram API', body: 'En tu App, agrega el producto "Instagram". Configura el acceso a tu cuenta de IG.' },
-      { n: 4, title: 'Genera Access Token', body: 'En Graph API Explorer, genera un token con permisos: instagram_basic, instagram_manage_messages.' },
-      { n: 5, title: 'Configura webhook', body: 'En tu App > Instagram > Webhooks. URL: https://api.revio.co/api/social/instagram. Suscríbete a: messages, comments.' },
-      { n: 6, title: 'Pega en Revio', body: 'Ve a Configuración > Conexiones > Instagram. Ingresa el Access Token.' },
-    ],
-    notes: ['Los tokens de Instagram expiran. Genera un token de larga duración (60 días) o configura un sistema de renovación.'],
-  },
-
-  facebook: {
-    name: 'Facebook',
-    icon: '📘',
-    category: 'Social',
-    color: '#3b82f6',
-    description: 'Responde mensajes de Facebook Messenger y gestiona comentarios en tu página.',
-    docUrl: 'https://developers.facebook.com/docs/messenger-platform',
-    videoUrl: null,
-    steps: [
-      { n: 1, title: 'Crea Meta App', body: 'Ve a developers.facebook.com > My Apps > Create App > Business.' },
-      { n: 2, title: 'Agrega Messenger', body: 'En tu App, agrega el producto "Messenger". Selecciona tu Página de Facebook.' },
-      { n: 3, title: 'Genera Page Access Token', body: 'En Messenger > Settings > Access Tokens, genera token para tu página.' },
-      { n: 4, title: 'Configura webhook', body: 'URL: https://api.revio.co/api/social/facebook. Verify Token: mystica_webhook_2026. Suscríbete a: messages.' },
-      { n: 5, title: 'Pega en Revio', body: 'Ve a Configuración > Conexiones > Facebook. Ingresa el Page Access Token.' },
-    ],
-    notes: [],
-  },
-
-  google_business: {
-    name: 'Google Business',
-    icon: '🔍',
-    category: 'Social',
-    color: '#f59e0b',
-    description: 'Monitorea y responde reseñas de Google, y gestiona preguntas y respuestas.',
-    docUrl: 'https://developers.google.com/my-business',
-    videoUrl: null,
-    steps: [
-      { n: 1, title: 'Verifica tu negocio en Google', body: 'Ve a business.google.com y verifica tu propiedad (carta postal o videollamada).' },
-      { n: 2, title: 'Habilita la API', body: 'En Google Cloud Console, habilita la Google My Business API.' },
-      { n: 3, title: 'Crea credenciales OAuth2', body: 'Crea un OAuth2 Client ID para tu aplicación. Tipo: Web application.' },
-      { n: 4, title: 'Autoriza el acceso', body: 'Completa el flujo OAuth2 con tu cuenta de Google. Revio obtendrá un refresh token.' },
-    ],
-    notes: ['La API de Google My Business tiene cuotas. Si tienes muchas reseñas, contacta a Google para aumentar los límites.'],
+    troubleshooting: [],
+    notes: ['Tier gratuito: 14.400 requests/día. Ideal para tests. Velocidad de respuesta 2-3x más rápida que Claude.'],
   },
 };
+
+// ─── Componentes UI ───────────────────────────────────────────
 
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-      className="p-1 rounded transition-colors"
-      style={{ color: copied ? 'var(--success)' : 'var(--text-3)' }}>
+    <button
+      onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+      title="Copiar"
+      style={{ padding: '2px 6px', borderRadius: 4, border: 'none', cursor: 'pointer', background: 'transparent', color: copied ? 'var(--success, #10b981)' : 'var(--text-3)' }}
+    >
       {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
     </button>
+  );
+}
+
+function StatusBadge({ status }) {
+  const s = STATUS[status] || STATUS.not_configured;
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '2px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+      background: `${s.color}18`, color: s.color, border: `1px solid ${s.color}30`,
+    }}>
+      {s.icon} {s.label}
+    </span>
+  );
+}
+
+function TroubleshootingSection({ items }) {
+  const [open, setOpen] = useState(false);
+  if (!items || items.length === 0) return null;
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)',
+          background: 'var(--card)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+          color: 'var(--text-2)',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <AlertTriangle className="w-3.5 h-3.5" style={{ color: '#f59e0b' }} />
+          Solución de problemas comunes
+        </span>
+        {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+      </button>
+      {open && (
+        <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {items.map((item, i) => (
+            <div key={i} style={{
+              padding: '10px 12px', borderRadius: 8, fontSize: 12,
+              background: 'color-mix(in srgb, #ef4444 5%, transparent)',
+              border: '1px solid color-mix(in srgb, #ef4444 15%, transparent)',
+            }}>
+              <p style={{ fontWeight: 600, color: '#ef4444', marginBottom: 3 }}>🔴 {item.error}</p>
+              <p style={{ color: 'var(--text-2)', lineHeight: 1.5 }}>→ {item.solution}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -287,89 +889,152 @@ export function IntegrationGuide({ integrationId, onClose }) {
   if (!guide) return null;
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(0,0,0,0.65)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: 16,
-    }} onClick={onClose}>
-      <div style={{
-        width: '100%', maxWidth: 580, maxHeight: '90vh',
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 16,
-        overflow: 'hidden',
-        display: 'flex', flexDirection: 'column',
-      }} onClick={e => e.stopPropagation()}>
-
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(0,0,0,0.68)', backdropFilter: 'blur(6px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: '100%', maxWidth: 620, maxHeight: '92vh',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 18,
+          overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
+          boxShadow: '0 32px 80px rgba(0,0,0,0.4)',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header */}
-        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 10, fontSize: 20,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: `color-mix(in srgb, ${guide.color} 15%, transparent)`,
-          }}>{guide.icon}</div>
-          <div className="flex-1">
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>{guide.name}</h2>
-            <p style={{ fontSize: 12, color: 'var(--text-3)' }}>{guide.category} · {guide.description}</p>
+        <div style={{ padding: '18px 22px 14px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <div style={{
+              width: 42, height: 42, borderRadius: 12, fontSize: 21,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              background: `color-mix(in srgb, ${guide.color} 14%, transparent)`,
+            }}>{guide.icon}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{guide.name}</h2>
+                <StatusBadge status={guide.status} />
+                {guide.estimatedTime && (
+                  <span style={{ fontSize: 10, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <Clock className="w-3 h-3" /> {guide.estimatedTime}
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0, lineHeight: 1.4 }}>
+                {guide.category} · {guide.description}
+              </p>
+            </div>
+            <button onClick={onClose} style={{ color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, padding: 2 }}>
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button onClick={onClose} style={{ color: 'var(--text-3)' }}>
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Content */}
-        <div style={{ overflowY: 'auto', padding: '20px 24px', flex: 1 }}>
-          {/* Video placeholder */}
-          {guide.videoUrl && (
+        <div style={{ overflowY: 'auto', padding: '16px 22px', flex: 1 }}>
+
+          {/* Mística status banner */}
+          {guide.mysticaNote && (
             <div style={{
-              height: 160, background: 'var(--card)', borderRadius: 10, marginBottom: 20,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              border: '1px solid var(--border)', cursor: 'pointer',
+              padding: '10px 13px', borderRadius: 10, marginBottom: 16,
+              background: guide.status === 'connected'
+                ? 'color-mix(in srgb, #10b981 8%, transparent)'
+                : 'color-mix(in srgb, #f59e0b 8%, transparent)',
+              border: `1px solid ${guide.status === 'connected' ? 'color-mix(in srgb, #10b981 25%, transparent)' : 'color-mix(in srgb, #f59e0b 25%, transparent)'}`,
             }}>
-              <Play className="w-5 h-5" style={{ color: 'var(--accent)' }} />
-              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>Ver tutorial en video</span>
+              <p style={{ fontSize: 11, fontWeight: 700, color: guide.status === 'connected' ? '#10b981' : '#f59e0b', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                {guide.status === 'connected' ? '✅ Estado Mística' : '⚠️ Estado Mística'}
+              </p>
+              <p style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5, margin: 0 }}>{guide.mysticaNote}</p>
+            </div>
+          )}
+
+          {/* Credentials needed */}
+          {guide.credentials && guide.credentials.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+                Credenciales necesarias
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {guide.credentials.map((cred, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '7px 10px', borderRadius: 8,
+                    background: 'var(--card)', border: '1px solid var(--border)',
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)' }}>{cred.label}</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-3)', marginLeft: 8, fontFamily: 'monospace' }}>{cred.envKey}</span>
+                    </div>
+                    <code style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'monospace', opacity: 0.7 }}>{cred.example}</code>
+                    <CopyButton text={cred.envKey} />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
           {/* Steps */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-            {guide.steps.map((step, i) => (
-              <div key={step.n} style={{ display: 'flex', gap: 12 }}>
-                <div style={{
-                  width: 24, height: 24, borderRadius: '50%', flexShrink: 0, marginTop: 2,
-                  background: `color-mix(in srgb, ${guide.color} 15%, transparent)`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 700, color: guide.color,
-                }}>{step.n}</div>
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 3 }}>{step.title}</p>
-                  <p style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6 }}>{step.body}</p>
+          <div style={{ marginBottom: 16 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+              Paso a paso
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {guide.steps.map((step) => (
+                <div key={step.n} style={{ display: 'flex', gap: 11 }}>
+                  <div style={{
+                    width: 22, height: 22, borderRadius: '50%', flexShrink: 0, marginTop: 1,
+                    background: `color-mix(in srgb, ${guide.color} 15%, transparent)`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 10, fontWeight: 800, color: guide.color,
+                  }}>{step.n}</div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 3 }}>{step.title}</p>
+                    <p style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6, margin: 0 }}>{step.body}</p>
+                    {step.tip && (
+                      <p style={{ fontSize: 11, color: guide.color, marginTop: 4, lineHeight: 1.4, display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+                        <span style={{ flexShrink: 0 }}>💡</span> {step.tip}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
+          {/* Troubleshooting */}
+          <TroubleshootingSection items={guide.troubleshooting} />
+
           {/* Notes */}
-          {guide.notes.length > 0 && (
+          {guide.notes && guide.notes.length > 0 && (
             <div style={{
-              padding: '12px 14px', borderRadius: 10, marginBottom: 16,
-              background: 'color-mix(in srgb, var(--warning) 8%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--warning) 20%, transparent)',
+              padding: '11px 13px', borderRadius: 10,
+              background: 'color-mix(in srgb, var(--accent, #0ea5e9) 6%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--accent, #0ea5e9) 18%, transparent)',
             }}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--warning)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Notas importantes</p>
+              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent, #0ea5e9)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                Notas
+              </p>
               {guide.notes.map((note, i) => (
-                <p key={i} style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6 }}>• {note}</p>
+                <p key={i} style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6, margin: '0 0 2px' }}>• {note}</p>
               ))}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '12px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '11px 22px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           {guide.docUrl ? (
             <a href={guide.docUrl} target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: 12, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+              style={{ fontSize: 12, color: 'var(--accent, #0ea5e9)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
               <ExternalLink className="w-3.5 h-3.5" /> Documentación oficial
             </a>
           ) : <div />}
@@ -382,7 +1047,6 @@ export function IntegrationGuide({ integrationId, onClose }) {
   );
 }
 
-// Hook para usar en ConnBlock
 export function useIntegrationGuide() {
   const [open, setOpen] = useState(null);
   const openGuide = (id) => setOpen(id);
