@@ -100,7 +100,7 @@ const TESTS = [
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: 'Hola, ¿tienen disponibilidad?',
-          property_slug: 'mistica-isla-palma',
+          property_slug: 'isla-palma',
           session_id: `test-${Date.now()}`
         })
       });
@@ -137,7 +137,7 @@ const TESTS = [
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: 'Hi, do you have availability for May?',
-          property_slug: 'mistica-isla-palma',
+          property_slug: 'isla-palma',
           session_id: `test-en-${Date.now()}`
         })
       });
