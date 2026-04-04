@@ -13,7 +13,9 @@ RUN cd backend && npm ci --omit=dev
 # Copy all source files
 COPY . .
 
-# Build frontend
+# Build frontend with production API URL
+ARG VITE_API_URL=https://revio-app-production.up.railway.app
+ENV VITE_API_URL=${VITE_API_URL}
 RUN cd frontend && npm run build
 
 EXPOSE 3001
