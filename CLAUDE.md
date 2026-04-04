@@ -1,4 +1,32 @@
-# Mística AI Agent — Instrucciones para Claude Code
+# Revio — Revenue Intelligence SaaS (ex Mística AI Agent)
+
+## Empresa y producto
+- **Empresa**: TRES HACHE ENTERPRISE SAS (NIT 901696556-6)
+- **Producto**: Revio (revio.co)
+- **Cliente demo**: Mística Hostels (2 propiedades)
+- **Producción**: https://revio-app-production.up.railway.app
+- **GitHub**: https://github.com/hoyoshugo/revio-app
+- **Supabase**: https://supabase.com/dashboard/project/apghalkivuvyhbmethxk
+
+## Estado de producción (2026-04-04)
+```
+✅ Backend (uptime OK) ✅ Auth ✅ Dashboard ✅ Wompi ✅ WhatsApp token
+❌ Agente IA → recargar créditos: console.anthropic.com/settings/billing ($20)
+❌ LobbyPMS  → whitelist IP 200.189.27.14 en dashboard LobbyPMS
+❌ WhatsApp  → phone DISCONNECTED → Meta Business Manager → reconectar
+❌ Supabase  → service_role key faltante → settings/api → Reveal → actualizar Railway
+```
+
+## Tests rápidos
+```bash
+# Suite completa de integración (12/15 pasando)
+node backend/src/tests/integration-tests.js
+
+# Health check producción
+curl https://revio-app-production.up.railway.app/health
+```
+
+---
 
 ## Auto-activación al abrir el proyecto
 

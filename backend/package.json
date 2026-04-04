@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "jest"
+    "test": "jest",
+    "test:integration": "node src/tests/integration-tests.js",
+    "test:local": "BASE_URL=http://localhost:3001 node src/tests/integration-tests.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
