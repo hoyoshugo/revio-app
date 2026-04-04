@@ -191,42 +191,32 @@ const TESTS = [
     name: '13. LobbyPMS Isla Palma',
     category: 'PMS',
     test: async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
-      const r = await fetch(
-        `https://api.lobbypms.com/api/v2/available-rooms?start_date=${today}&end_date=${nextWeek}&adults=2`,
-        { headers: { 'Authorization': `Bearer ${LOBBY_TOKEN_ISLA}` } }
-      );
-      const text = await r.text();
-      if (r.status === 403 || text.includes('not set as a valid ip')) {
-        throw new Error('IP 200.189.27.14 no está en whitelist');
-      }
-      if (!r.ok) throw new Error(`HTTP ${r.status}: ${text.substring(0, 100)}`);
-      const data = JSON.parse(text);
-      const days = data.data?.length || 0;
-      const cats = data.data?.[0]?.categories?.length || 0;
-      return `${days} días, ${cats} categorías de habitación`;
+      // Testar via backend (usa IP de Railway, que sí está en whitelist)
+      const token = await getClientToken();
+      const r = await fetch(`${API}/api/connections/67fbce21-1b88-449f-93e2-1226cda2a7fb/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ key: 'lobbypms_token' })
+      });
+      const d = await r.json();
+      if (!d.success) throw new Error(d.message || 'test failed');
+      return d.message;
     }
   },
   {
     name: '14. LobbyPMS Tayrona',
     category: 'PMS',
     test: async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
-      const r = await fetch(
-        `https://api.lobbypms.com/api/v2/available-rooms?start_date=${today}&end_date=${nextWeek}&adults=2`,
-        { headers: { 'Authorization': `Bearer ${LOBBY_TOKEN_TAYRONA}` } }
-      );
-      const text = await r.text();
-      if (r.status === 403 || text.includes('not set as a valid ip')) {
-        throw new Error('IP 200.189.27.14 no está en whitelist');
-      }
-      if (!r.ok) throw new Error(`HTTP ${r.status}: ${text.substring(0, 100)}`);
-      const data = JSON.parse(text);
-      const days = data.data?.length || 0;
-      const cats = data.data?.[0]?.categories?.length || 0;
-      return `${days} días, ${cats} categorías de habitación`;
+      // Testar via backend (usa IP de Railway, que sí está en whitelist)
+      const token = await getClientToken();
+      const r = await fetch(`${API}/api/connections/148f7836-6fcf-4d06-8570-bd65fcc2ccf0/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ key: 'lobbypms_token' })
+      });
+      const d = await r.json();
+      if (!d.success) throw new Error(d.message || 'test failed');
+      return d.message;
     }
   },
   {

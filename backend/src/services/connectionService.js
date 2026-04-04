@@ -14,7 +14,7 @@
  *   groq_config         → { api_key, model }
  *   meta_config         → { access_token, business_id, page_id, instagram_id }
  */
-import { db } from '../models/supabase.js';
+import { supabase } from '../models/supabase.js';
 import { decrypt, encrypt } from './encryption.js';
 
 // Cache en memoria: { "propertyId:key" → { value, ts } }
@@ -46,7 +46,7 @@ export async function getSetting(propertyId, key) {
   const cached = cacheGet(propertyId, key);
   if (cached !== null) return cached;
 
-  const { data, error } = await db.client
+  const { data, error } = await supabase
     .from('settings')
     .select('value')
     .eq('property_id', propertyId)
@@ -91,7 +91,7 @@ export async function saveSetting(propertyId, key, value, updatedBy = null) {
     storedValue = encrypted;
   }
 
-  const { error } = await db.client
+  const { error } = await supabase
     .from('settings')
     .upsert({
       property_id: propertyId,
@@ -199,7 +199,7 @@ export async function listConnections(propertyId) {
     'meta_config', 'booking_config', 'airbnb_config', 'cloudbeds_config',
   ];
 
-  const { data, error } = await db.client
+  const { data, error } = await supabase
     .from('settings')
     .select('key, updated_at, updated_by')
     .eq('property_id', propertyId)
