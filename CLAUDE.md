@@ -11,29 +11,34 @@
 ## Estado de producción (2026-04-04)
 ```
 ✅ Backend (uptime OK)  ✅ Auth (superadmin + cliente)  ✅ Dashboard  ✅ Wompi x2
-✅ WhatsApp CONNECTED + GREEN quality  ✅ Meta webhook  ✅ WA token (vence ~2026-06-03)
+⚠️  WhatsApp → token válido (nunca expira) pero número DISCONNECTED (reconectar en Meta)
+✅ Meta webhook  ✅ WA token (nunca expira)
 ✅ Agente IA → OPERATIVO con Claude claude-sonnet-4-6 (créditos activos)
-✅ LobbyPMS → IP whitelist OK — 14 categorías Isla, 3 categorías Tayrona
+⚠️  LobbyPMS → IP Railway 184.169.168.179 NO en whitelist (IP cambió de 200.189.27.14)
+              → Agente funciona con cache fallback (huéspedes no afectados)
+              → Acción: agregar 184.169.168.179 en dashboard LobbyPMS
 ✅ Supabase  → service_role key correcto en Railway y backend/.env
-⚠️  property_knowledge tabla → pendiente crear en Supabase SQL Editor
-              → Auto-creará en Railway si se agrega SUPABASE_DB_URL (ver update-railway-vars.ps1)
+✅ property_knowledge → 40 entradas en Supabase (Isla Palma + Tayrona)
+✅ Arquitectura multitenancy → credenciales en BD, connectionService.js operativo
 ```
 
-## Tests (15/15 pasando) — 2026-04-04
+## Tests (13/15 pasando) — 2026-04-04
 ```
 ✅ Health Check   ✅ SA Login   ✅ Client Login  ✅ Dashboard Metrics
 ✅ Meta Webhook   ✅ Agent ES   ✅ Agent Tayrona ✅ Agent EN
-✅ Wompi Isla     ✅ Wompi Tayrona  ✅ WA Token  ✅ WA Phone CONNECTED
-✅ LobbyPMS Isla  ✅ LobbyPMS Tayrona  ✅ Anthropic OK
+✅ Wompi Isla     ✅ Wompi Tayrona  ✅ WA Token  ✅ Anthropic OK
+❌ LobbyPMS Isla  ❌ LobbyPMS Tayrona  (IP 184.169.168.179 no en whitelist)
+⚠️ WA Phone DISCONNECTED (el token es válido, el número necesita reconexión en Meta)
 ```
 
 ## Acciones manuales pendientes (prioridad)
 ```
 1. ✅ Railway SUPABASE_SERVICE_KEY actualizado (2026-04-04)
-2. ✅ LobbyPMS IP whitelist resuelta (2026-04-04) — 14 categorías disponibles
-3. ✅ Anthropic créditos operativos (2026-04-04) — 15/15 tests pasando
-4. Supabase SQL Editor → migration_009_property_knowledge.sql  ← property_knowledge tabla
-   O agregar SUPABASE_DB_URL en Railway para auto-migración en próximo deploy
+2. ✅ Anthropic créditos operativos (2026-04-04)
+3. ✅ property_knowledge 40 entradas en Supabase (2026-04-04)
+4. ✅ Arquitectura multitenancy v1.8 (connectionService, ConnectionsPanel)
+5. LobbyPMS → agregar IP 184.169.168.179 al whitelist (Railway cambió de IP)
+6. WhatsApp → reconectar número +573234392420 en Meta Business Manager
 ```
 
 ## Tests rápidos
