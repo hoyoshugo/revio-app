@@ -281,10 +281,12 @@ export async function pollAllOtaMessages(properties) {
 
   for (const property of properties) {
     for (const [platformKey, adapter] of Object.entries(PLATFORMS)) {
-      if (!adapter.CONFIGURED(property.slug)) continue;
+      if (typeof adapter.CONFIGURED !== 'function' || !adapter.CONFIGURED(property.slug)) continue;
 
       try {
-        const messages = await adapter.getUnreadMessages(property.slug);
+        const fn = adapter.getUnreadMessages || adapter.getUnreadReviews;
+        if (typeof fn !== 'function') continue;
+        const messages = await fn.call(adapter, property.slug);
         console.log(`[OTA Hub] ${property.slug}/${platformKey}: ${messages.length} mensajes nuevos`);
 
         for (const msg of messages) {
