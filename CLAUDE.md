@@ -12,33 +12,28 @@
 ```
 ✅ Backend (uptime OK)  ✅ Auth (superadmin + cliente)  ✅ Dashboard  ✅ Wompi x2
 ✅ WhatsApp CONNECTED + GREEN quality  ✅ Meta webhook  ✅ WA token (vence ~2026-06-03)
-⚠️  Agente IA → fallback activo (sin créditos Anthropic) → recargar $20 USD
-❌  LobbyPMS  → IP 200.189.27.14 no está en whitelist → dashboard LobbyPMS
-              → Cache fallback activo (agente no falla, usa último dato conocido)
-⚠️  Supabase  → service_role key correcto en backend/.env LOCAL
-              → Railway aún tiene key antigua → ejecutar .\update-railway-vars.ps1
-              → Fallback a anon key funciona (backend operativo)
+✅ Agente IA → OPERATIVO con Claude claude-sonnet-4-6 (créditos activos)
+✅ LobbyPMS → IP whitelist OK — 14 categorías Isla, 3 categorías Tayrona
+✅ Supabase  → service_role key correcto en Railway y backend/.env
 ⚠️  property_knowledge tabla → pendiente crear en Supabase SQL Editor
               → Auto-creará en Railway si se agrega SUPABASE_DB_URL (ver update-railway-vars.ps1)
 ```
 
-## Tests (12/15 pasando) — 2026-04-04
+## Tests (15/15 pasando) — 2026-04-04
 ```
 ✅ Health Check   ✅ SA Login   ✅ Client Login  ✅ Dashboard Metrics
 ✅ Meta Webhook   ✅ Agent ES   ✅ Agent Tayrona ✅ Agent EN
 ✅ Wompi Isla     ✅ Wompi Tayrona  ✅ WA Token  ✅ WA Phone CONNECTED
-❌ LobbyPMS Isla  ❌ LobbyPMS Tayrona  ❌ Anthropic (sin créditos)
+✅ LobbyPMS Isla  ✅ LobbyPMS Tayrona  ✅ Anthropic OK
 ```
 
 ## Acciones manuales pendientes (prioridad)
 ```
 1. ✅ Railway SUPABASE_SERVICE_KEY actualizado (2026-04-04)
 2. ✅ LobbyPMS IP whitelist resuelta (2026-04-04) — 14 categorías disponibles
-3. Supabase SQL Editor → migration_009_property_knowledge.sql  ← property_knowledge tabla
-4. console.anthropic.com/settings/billing → verificar organización correcta ← agente IA
-   IMPORTANTE: El key sk-ant-api03-aCImmVu... reporta 0 créditos.
-   Si cargaste créditos, verifica que sean en la misma organización del key.
-   Alternativa: generar nuevo key desde la org donde cargaste créditos.
+3. ✅ Anthropic créditos operativos (2026-04-04) — 15/15 tests pasando
+4. Supabase SQL Editor → migration_009_property_knowledge.sql  ← property_knowledge tabla
+   O agregar SUPABASE_DB_URL en Railway para auto-migración en próximo deploy
 ```
 
 ## Tests rápidos
