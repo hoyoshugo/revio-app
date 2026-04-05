@@ -8,16 +8,17 @@
 - **GitHub**: https://github.com/hoyoshugo/revio-app
 - **Supabase**: https://supabase.com/dashboard/project/apghalkivuvyhbmethxk
 
-## Estado de producción (2026-04-05) — v2.0
+## Estado de producción (2026-04-05) — v2.1
 ```
 ✅ Backend (uptime OK)  ✅ Auth (superadmin + cliente)  ✅ Dashboard  ✅ Wompi x2
 ✅ Agente IA → OPERATIVO con Claude claude-sonnet-4-6
 ✅ Anthropic → créditos activos (local y Railway)
 ✅ WA Token → válido (nunca expira)
+✅ Cloudflare Worker → LIVE: revio-lobbypms-proxy.revio-hostels.workers.dev
 ⚠️  WhatsApp → número DISCONNECTED (reconectar en Meta Business Manager)
-⚠️  LobbyPMS → IP Railway ROTA en cada redeploy (ver IP actual en SuperAdmin → Servidor)
+⚠️  LobbyPMS → CF Worker tiene IPs rotativas, incompatible con whitelist individual de LobbyPMS
               → Agente funciona con cache (huéspedes no afectados)
-              → Solución permanente: Cloudflare Worker (backend/cloudflare-proxy/)
+              → Solución permanente: proxy con IP ESTÁTICA (fly.io ~$2/mes o VPS $5/mes)
 ✅ Supabase  → service_role key correcto
 ✅ property_knowledge → 40 entradas (Isla Palma + Tayrona)
 ✅ Arquitectura multitenancy v2.0 → todo en BD, sin credenciales hardcodeadas
@@ -79,12 +80,19 @@ Siempre invocar `dev-context-loader` primero, luego el orquestador o el skill di
 | Endpoints, rutas Express, lógica ESM | `skill-creator:dev-backend` |
 | UI, React 18, Vite 5, Tailwind | `skill-creator:dev-frontend` |
 | Supabase, SQL, migraciones, RLS | `skill-creator:dev-database` |
-| Claude API, hotelAgent.js, prompts | `skill-creator:dev-ai-agent` |
+| Claude API, hotelAgent.js, streaming | `skill-creator:dev-ai-agent` |
 | LobbyPMS, WhatsApp, Meta Graph, OTAs | `skill-creator:dev-integrations` |
 | Wompi (Isla + Tayrona), webhooks pago | `skill-creator:dev-payments` |
+| System prompt XML, chain-of-thought | `skill-creator:dev-prompt-engineer` |
+| Logs JSON, health checks, alertas WA | `skill-creator:dev-monitoring` |
+| Sync reservas, scheduler, cron jobs | `skill-creator:dev-data-pipeline` |
 | Auth JWT, permisos, OWASP | `skill-creator:dev-security` |
 | Railway, Docker, nixpacks | `skill-creator:dev-devops` |
 | Jest, Supertest, mocks, QA | `skill-creator:dev-testing` |
+| Textos UI, mensajes error, copy WA | `skill-creator:dev-ux-copy` |
+| **App móvil de huéspedes** | `skill-creator:dev-mobile-orchestrator` → `dev-capacitor` |
+| Jest, Supertest, mocks, QA | `skill-creator:dev-testing` |
+| Textos UI, mensajes error, copy WA | `skill-creator:dev-ux-copy` |
 
 ## Contexto del proyecto
 
