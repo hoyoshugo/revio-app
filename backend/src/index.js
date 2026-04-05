@@ -20,6 +20,7 @@ import saRoutes from './routes/superadmin.js';
 import registerRoutes from './routes/register.js';
 import knowledgeRoutes from './routes/knowledge.js';
 import connectionsRoutes from './routes/connections.js';
+import authRoutes from './routes/auth.js';
 import roomsRoutes from './routes/rooms.js';
 import reservationsRoutes from './routes/reservations.js';
 import guestsRoutes from './routes/guests.js';
@@ -29,9 +30,13 @@ import walletsRoutes from './routes/wallets.js';
 import aiRoutes from './routes/ai.js';
 import eventsRoutes from './routes/events.js';
 import publicBookingRoutes from './routes/publicBooking.js';
+import reportsRoutes from './routes/reports.js';
+import channelRoutes from './routes/channel.js';
+import notificationsRoutes from './routes/notifications.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { startScheduler } from './services/scheduler.js';
 import { runPendingMigrations } from './services/dbMigrations.js';
+import { detectAndStoreIp } from './utils/ipMonitor.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -93,6 +98,7 @@ app.use('/api/register', registerRoutes);
 app.use('/api/onboarding', registerRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/connections', connectionsRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomsRoutes);
 app.use('/api/reservations', reservationsRoutes);
 app.use('/api/guests', guestsRoutes);
@@ -102,6 +108,9 @@ app.use('/api/wallets', walletsRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/public/book', publicBookingRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/channel', channelRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -160,6 +169,9 @@ app.listen(PORT, () => {
 
   // Ejecutar migraciones pendientes (solo si SUPABASE_DB_URL configurado)
   runPendingMigrations().catch(err => console.error('[Startup] Migration error:', err.message));
+
+  // Detectar y registrar IP actual del servidor (alerta si cambió)
+  detectAndStoreIp().catch(err => console.error('[Startup] IP monitor error:', err.message));
 });
 
 // ============================================================

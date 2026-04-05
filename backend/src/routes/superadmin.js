@@ -23,6 +23,7 @@ import { Router } from 'express';
 import { supabase } from '../models/supabase.js';
 import { requireSuperadminAuth, signSuperadminToken } from '../middleware/superadminAuth.js';
 import { sendWhatsAppMessage } from '../integrations/whatsapp.js';
+import { getIpStatus } from '../utils/ipMonitor.js';
 
 const router = Router();
 
@@ -679,6 +680,24 @@ router.get('/tenants/:id/limit-check', requireSuperadminAuth, async (req, res) =
       over_limit: pct >= 100,
       warning: pct >= 80
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// ESTADO DEL SERVIDOR — IP dinámica Railway
+// ============================================================
+
+/**
+ * GET /api/sa/server-ip
+ * Retorna la IP actual del servidor Railway y su historial.
+ * Solo accesible para superadmin.
+ */
+router.get('/server-ip', requireSuperadminAuth, async (_req, res) => {
+  try {
+    const status = await getIpStatus();
+    res.json(status);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

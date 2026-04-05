@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Routes, Route, NavLink, useNavigate, Navigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, CreditCard, Package, AlertTriangle,
-  BarChart2, UserPlus, LogOut, Menu, X, Percent, Shield
+  BarChart2, UserPlus, LogOut, Menu, X, Percent, Shield, Server
 } from 'lucide-react';
 import { useSuperAdmin } from '../../context/SuperAdminContext.jsx';
 import { RevioIsotipo } from '../ui/Logo.jsx';
@@ -14,6 +14,7 @@ import ErrorsMonitor from './ErrorsMonitor.jsx';
 import UsageRegistry from './UsageRegistry.jsx';
 import OnboardingWizard from './OnboardingWizard.jsx';
 import DiscountsManager from './DiscountsManager.jsx';
+import ServerStatus from './ServerStatus.jsx';
 
 const navItems = [
   { to: '/superadmin', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -23,6 +24,7 @@ const navItems = [
   { to: '/superadmin/errors', label: 'Errores', icon: AlertTriangle },
   { to: '/superadmin/usage', label: 'Uso y Costos', icon: BarChart2 },
   { to: '/superadmin/onboarding', label: 'Nuevo Cliente', icon: UserPlus },
+  { to: '/superadmin/server', label: 'Servidor', icon: Server },
 ];
 
 export default function SuperAdminLayout() {
@@ -128,6 +130,7 @@ export default function SuperAdminLayout() {
             <Route path="/errors" element={<ErrorsMonitor />} />
             <Route path="/usage" element={<UsageRegistry />} />
             <Route path="/onboarding" element={<OnboardingWizard />} />
+            <Route path="/server" element={<ServerStatus />} />
             <Route path="*" element={<Navigate to="/superadmin" replace />} />
           </Routes>
         </div>

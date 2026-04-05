@@ -70,14 +70,20 @@ Si el usuario ya dio una instrucción específica al abrir la sesión, ejecuta p
 
 ## Enjambre de Desarrollo
 
-Para cualquier tarea de desarrollo en este proyecto, usa el enjambre de skills especializados:
-- **Feature completa / multi-capa** → `skill-creator:dev-swarm` (orquestador)
-- **Endpoints, rutas, lógica** → `skill-creator:dev-backend`
-- **UI, React, Vite, componentes** → `skill-creator:dev-frontend`
-- **Supabase, SQL, migraciones** → `skill-creator:dev-database`
-- **Claude API, agente IA, prompts** → `skill-creator:dev-ai-agent`
-- **Railway, deploy, infra** → `skill-creator:dev-devops`
-- **Auth, Wompi, permisos** → `skill-creator:dev-security`
+Siempre invocar `dev-context-loader` primero, luego el orquestador o el skill directo:
+
+| Tarea | Skill |
+|-------|-------|
+| Feature multi-capa / módulo completo | `skill-creator:dev-swarm` |
+| Endpoints, rutas Express, lógica ESM | `skill-creator:dev-backend` |
+| UI, React 18, Vite 5, Tailwind | `skill-creator:dev-frontend` |
+| Supabase, SQL, migraciones, RLS | `skill-creator:dev-database` |
+| Claude API, hotelAgent.js, prompts | `skill-creator:dev-ai-agent` |
+| LobbyPMS, WhatsApp, Meta Graph, OTAs | `skill-creator:dev-integrations` |
+| Wompi (Isla + Tayrona), webhooks pago | `skill-creator:dev-payments` |
+| Auth JWT, permisos, OWASP | `skill-creator:dev-security` |
+| Railway, Docker, nixpacks | `skill-creator:dev-devops` |
+| Jest, Supertest, mocks, QA | `skill-creator:dev-testing` |
 
 ## Contexto del proyecto
 

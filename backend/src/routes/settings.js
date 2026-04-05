@@ -324,4 +324,71 @@ router.post('/test/:service', requireAuth, async (req, res) => {
   }
 });
 
+// ── GET /api/settings/property ────────────────────────────────
+router.get('/property', requireAuth, async (req, res) => {
+  const pid = req.query.property_id || req.user.property_id;
+  try {
+    const { data, error } = await supabase.from('properties').select('*').eq('id', pid).single();
+    if (error) throw error;
+    res.json(data || {});
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PATCH /api/settings/property ─────────────────────────────
+router.patch('/property', requireAuth, async (req, res) => {
+  const { property_id, ...updates } = req.body;
+  const pid = property_id || req.user.property_id;
+  const allowed = ['name', 'brand_name', 'location', 'phone', 'email', 'website',
+    'description', 'check_in_time', 'check_out_time', 'currency', 'timezone', 'tax_rate',
+    'brand_logo_url', 'cover_url'];
+  const safe = Object.fromEntries(Object.entries(updates).filter(([k]) => allowed.includes(k)));
+  try {
+    const { data, error } = await supabase.from('properties')
+      .update({ ...safe, updated_at: new Date().toISOString() })
+      .eq('id', pid).select().single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/settings/integrations ───────────────────────────
+router.get('/integrations', requireAuth, async (req, res) => {
+  const pid = req.query.property_id || req.user.property_id;
+  try {
+    const { data } = await supabase.from('property_integrations')
+      .select('key,value').eq('property_id', pid);
+    const result = {};
+    for (const row of data || []) {
+      result[row.key] = row.value ? row.value.slice(0, 6) + '...' : '';
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PATCH /api/settings/integrations ─────────────────────────
+router.patch('/integrations', requireAuth, async (req, res) => {
+  const { property_id, ...keys } = req.body;
+  const pid = property_id || req.user.property_id;
+  const ALLOWED_KEYS = ['anthropic_key', 'wompi_public', 'wompi_private', 'whatsapp_token', 'whatsapp_phone_id', 'lobbypms_key'];
+  try {
+    const upserts = Object.entries(keys)
+      .filter(([k, v]) => ALLOWED_KEYS.includes(k) && v && !v.endsWith('...'))
+      .map(([k, v]) => ({ property_id: pid, key: k, value: v }));
+    if (upserts.length > 0) {
+      const { error } = await supabase.from('property_integrations')
+        .upsert(upserts, { onConflict: 'property_id,key' });
+      if (error) throw error;
+    }
+    res.json({ success: true, updated: upserts.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

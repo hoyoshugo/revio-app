@@ -32,14 +32,18 @@ import BillingPanel from './BillingPanel.jsx';
 import ConnectionsPanel from './ConnectionsPanel.jsx';
 
 // New PMS components (lazy loaded)
-const GanttCalendar   = lazy(() => import('./GanttCalendar.jsx'));
-const POSTerminal     = lazy(() => import('./POSTerminal.jsx'));
-const WalletPanel     = lazy(() => import('./WalletPanel.jsx'));
+const GanttCalendar     = lazy(() => import('./GanttCalendar.jsx'));
+const POSTerminal       = lazy(() => import('./POSTerminal.jsx'));
+const WalletPanel       = lazy(() => import('./WalletPanel.jsx'));
 const HousekeepingBoard = lazy(() => import('./HousekeepingBoard.jsx'));
-const GuestsPanel     = lazy(() => import('./GuestsPanel.jsx'));
-const AIConcierge     = lazy(() => import('./AIConcierge.jsx'));
-const EventsPanel     = lazy(() => import('./EventsPanel.jsx'));
-const RoomsManager    = lazy(() => import('./RoomsManager.jsx'));
+const GuestsPanel       = lazy(() => import('./GuestsPanel.jsx'));
+const AIConcierge       = lazy(() => import('./AIConcierge.jsx'));
+const EventsPanel       = lazy(() => import('./EventsPanel.jsx'));
+const RoomsManager      = lazy(() => import('./RoomsManager.jsx'));
+const Reports           = lazy(() => import('./Reports.jsx'));
+const ChannelManager    = lazy(() => import('./ChannelManager.jsx'));
+const SettingsPage      = lazy(() => import('./Settings.jsx'));
+import NotificationsBell from './NotificationsBell.jsx';
 
 const navGroups = [
   {
@@ -79,6 +83,12 @@ const navGroups = [
     ]
   },
   {
+    label: 'Canales',
+    items: [
+      { to: '/channels', label: 'Channel Manager', icon: Building2 },
+    ]
+  },
+  {
     label: 'Informes',
     items: [
       { to: '/bookings', label: 'Reservas', icon: Calendar },
@@ -94,7 +104,7 @@ const navGroups = [
       { to: '/connections', label: 'Integraciones', icon: Settings },
       { to: '/health', label: 'Monitor', icon: Activity },
       { to: '/billing', label: 'Facturación', icon: Receipt },
-      { to: '/config', label: 'Configuración', icon: Settings },
+      { to: '/settings', label: 'Configuración', icon: Settings },
     ]
   }
 ];
@@ -153,7 +163,7 @@ function BillingPage() {
 }
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
+  const { user, logout, properties, currentProperty, switchProperty } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -208,13 +218,18 @@ export default function Dashboard() {
         {!collapsed && (
           <div className="px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
             <select
-              value={property}
-              onChange={e => setProperty(e.target.value)}
+              value={currentProperty?.id || 'all'}
+              onChange={e => {
+                const p = properties?.find(x => x.id === e.target.value);
+                if (p) switchProperty(p);
+                setProperty(e.target.value);
+              }}
               className="rv-select text-xs"
             >
               <option value="all">Todas las propiedades</option>
-              <option value="isla-palma">Isla Palma</option>
-              <option value="tayrona">Tayrona</option>
+              {(properties || []).map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
             </select>
           </div>
         )}
@@ -307,21 +322,43 @@ export default function Dashboard() {
       <main className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Topbar */}
         <header
-          className="px-4 py-3 flex items-center justify-between flex-shrink-0"
+          className="px-4 py-3 flex items-center justify-between flex-shrink-0 gap-3"
           style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', height: 56 }}
         >
           <button
-            className="lg:hidden p-1.5 rounded-lg"
+            className="lg:hidden p-1.5 rounded-lg flex-shrink-0"
             style={{ color: 'var(--text-2)' }}
             onClick={() => setMobileOpen(true)}
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div className="hidden lg:block" />
-          <div className="flex items-center gap-3">
+
+          {/* Property switcher */}
+          {properties && properties.length > 1 && (
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Building2 className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-3)' }} />
+              <select
+                value={currentProperty?.id || ''}
+                onChange={e => {
+                  const p = properties.find(x => x.id === e.target.value);
+                  if (p) switchProperty(p);
+                }}
+                className="rv-select text-sm max-w-[180px]"
+              >
+                {properties.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex-1" />
+
+          <div className="flex items-center gap-2">
             <span className="text-xs hidden sm:block" style={{ color: 'var(--text-3)' }}>
               {new Date().toLocaleDateString('es-CO', { weekday: 'long', month: 'long', day: 'numeric' })}
             </span>
+            <NotificationsBell />
             <ThemeToggle />
           </div>
         </header>
@@ -357,17 +394,21 @@ export default function Dashboard() {
               <Route path="/property-knowledge" element={<PropertyKnowledgePanel propertyId={property?.id} />} />
               <Route path="/escalations" element={<EscalationsPanel property={property} />} />
 
+              {/* Channels */}
+              <Route path="/channels" element={<ChannelManager />} />
+
               {/* Reports */}
               <Route path="/bookings" element={<BookingsList property={property} />} />
               <Route path="/occupancy" element={<OccupancyChart property={property} />} />
               <Route path="/cancellations" element={<CancellationsPanel property={property} />} />
-              <Route path="/reports" element={<WeeklyReport property={property} />} />
+              <Route path="/reports" element={<Reports />} />
               <Route path="/events" element={<EventsPanel property={property} />} />
 
               {/* System */}
               <Route path="/connections" element={<ConnectionsPanel property={property} />} />
               <Route path="/health" element={<HealthMonitor />} />
               <Route path="/billing" element={<BillingPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
               <Route path="/config" element={<ConfigPanel property={property} />} />
               <Route path="/config/*" element={<ConfigPanel property={property} />} />
             </Routes>

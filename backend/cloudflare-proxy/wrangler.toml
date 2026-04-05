@@ -1,0 +1,9 @@
+name = "lobbypms-proxy"
+main = "lobbypms-proxy.js"
+compatibility_date = "2024-01-01"
+
+# Variables de entorno (definir en el dashboard de Cloudflare, no aquí)
+# LOBBYPMS_SECRET = "token-secreto-compartido-con-revio"
+
+[vars]
+# No poner secrets aquí — usar el dashboard de Cloudflare Workers
