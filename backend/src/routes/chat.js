@@ -68,7 +68,7 @@ router.post('/', chatLimiter, async (req, res) => {
     console.error('[Chat] Error procesando mensaje:', err);
     res.status(500).json({
       error: 'Error interno del servidor',
-      reply: 'Lo siento, tuve un problema técnico. Por favor intenta de nuevo o contáctanos por WhatsApp: +573234392420'
+      reply: 'Lo siento, tuve un problema técnico. Por favor intenta de nuevo en unos momentos.'
     });
   }
 });

@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, MessageSquare, Calendar, CreditCard,
   BarChart2, Inbox, XCircle, LogOut, Menu, X,
-  Activity, BookOpen, AlertTriangle, Settings, ChevronDown,
-  Beaker, Bot, Receipt, TrendingUp
+  Activity, BookOpen, AlertTriangle, Settings,
+  Beaker, Bot, Receipt, TrendingUp, Users, BedDouble,
+  ShoppingCart, Wallet, Wrench, CalendarDays, Sparkles,
+  ChevronLeft, ChevronRight, Building2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { RevioIsotipo, RevioWordmark } from '../ui/Logo.jsx';
 import ThemeToggle from '../ui/ThemeToggle.jsx';
+
+// Existing components
 import MetricsOverview from './MetricsOverview.jsx';
 import ConversationList from './ConversationList.jsx';
 import ConversationDetail from './ConversationDetail.jsx';
@@ -28,6 +31,16 @@ import SandboxPanel from './SandboxPanel.jsx';
 import BillingPanel from './BillingPanel.jsx';
 import ConnectionsPanel from './ConnectionsPanel.jsx';
 
+// New PMS components (lazy loaded)
+const GanttCalendar   = lazy(() => import('./GanttCalendar.jsx'));
+const POSTerminal     = lazy(() => import('./POSTerminal.jsx'));
+const WalletPanel     = lazy(() => import('./WalletPanel.jsx'));
+const HousekeepingBoard = lazy(() => import('./HousekeepingBoard.jsx'));
+const GuestsPanel     = lazy(() => import('./GuestsPanel.jsx'));
+const AIConcierge     = lazy(() => import('./AIConcierge.jsx'));
+const EventsPanel     = lazy(() => import('./EventsPanel.jsx'));
+const RoomsManager    = lazy(() => import('./RoomsManager.jsx'));
+
 const navGroups = [
   {
     label: 'Principal',
@@ -38,23 +51,41 @@ const navGroups = [
     ]
   },
   {
-    label: 'Operaciones',
+    label: 'PMS',
     items: [
-      { to: '/bookings', label: 'Reservas', icon: Calendar },
+      { to: '/gantt', label: 'Calendario', icon: CalendarDays },
+      { to: '/rooms', label: 'Habitaciones', icon: BedDouble },
+      { to: '/guests', label: 'Huéspedes', icon: Users },
+      { to: '/housekeeping', label: 'Housekeeping', icon: Wrench },
+    ]
+  },
+  {
+    label: 'Revenue',
+    items: [
+      { to: '/pos', label: 'POS Terminal', icon: ShoppingCart },
+      { to: '/wallets', label: 'Billeteras NFC', icon: Wallet },
       { to: '/payments', label: 'Pagos', icon: CreditCard },
       { to: '/revenue', label: 'Revenue Intel', icon: TrendingUp },
-      { to: '/occupancy', label: 'Ocupación', icon: BarChart2 },
-      { to: '/cancellations', label: 'Cancelaciones', icon: XCircle },
-      { to: '/reports', label: 'Reportes', icon: BarChart2 },
     ]
   },
   {
     label: 'Agente IA',
     items: [
+      { to: '/ai', label: 'AI Concierge', icon: Sparkles },
       { to: '/sandbox', label: 'Ensayo', icon: Beaker },
       { to: '/knowledge', label: 'Aprendizaje IA', icon: BookOpen },
       { to: '/property-knowledge', label: 'Info Propiedad', icon: Bot },
       { to: '/escalations', label: 'Escalaciones', icon: AlertTriangle },
+    ]
+  },
+  {
+    label: 'Informes',
+    items: [
+      { to: '/bookings', label: 'Reservas', icon: Calendar },
+      { to: '/occupancy', label: 'Ocupación', icon: BarChart2 },
+      { to: '/cancellations', label: 'Cancelaciones', icon: XCircle },
+      { to: '/reports', label: 'Reportes', icon: BarChart2 },
+      { to: '/events', label: 'Eventos', icon: CalendarDays },
     ]
   },
   {
@@ -68,15 +99,17 @@ const navGroups = [
   }
 ];
 
-function NavItem({ to, label, icon: Icon, end }) {
+function NavItem({ to, label, icon: Icon, end, collapsed, onClick }) {
   return (
     <NavLink
       to={to}
       end={end}
+      onClick={onClick}
+      title={collapsed ? label : undefined}
       className={({ isActive }) =>
-        `flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all duration-150 ${
+        `flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm transition-all duration-150 group ${
           isActive ? 'rv-nav-active' : ''
-        }`
+        } ${collapsed ? 'justify-center px-0' : ''}`
       }
       style={({ isActive }) => isActive ? {} : { color: 'var(--text-2)' }}
       onMouseEnter={e => {
@@ -93,8 +126,17 @@ function NavItem({ to, label, icon: Icon, end }) {
       }}
     >
       <Icon className="w-4 h-4 flex-shrink-0" />
-      <span>{label}</span>
+      {!collapsed && <span>{label}</span>}
     </NavLink>
+  );
+}
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+        style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
+    </div>
   );
 }
 
@@ -113,68 +155,97 @@ function BillingPage() {
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [property, setProperty] = useState('all');
 
-  function handleLogout() {
-    logout();
-    navigate('/login');
-  }
+  function handleLogout() { logout(); navigate('/login'); }
+
+  const sidebarWidth = collapsed ? 72 : 260;
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
-      {/* ── Sidebar ── */}
+
+      {/* ── Desktop Sidebar ── */}
       <aside
-        className={`
-          fixed inset-y-0 left-0 z-50 w-60 flex flex-col
-          transition-transform duration-300
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:relative lg:translate-x-0
-        `}
-        style={{ background: 'var(--surface)', borderRight: '1px solid var(--border)' }}
+        className="hidden lg:flex flex-col flex-shrink-0 transition-all duration-200"
+        style={{ width: sidebarWidth, background: 'var(--surface)', borderRight: '1px solid var(--border)' }}
       >
-        {/* Logo */}
-        <div className="px-4 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
-          <RevioLogo />
+        {/* Gradient brand section */}
+        <div
+          className="flex items-center gap-3 px-4 py-4 relative flex-shrink-0"
+          style={{
+            background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 60%, #818CF8 100%)',
+            minHeight: 72
+          }}
+        >
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(255,255,255,0.2)', fontSize: 18 }}
+          >
+            🏨
+          </div>
+          {!collapsed && (
+            <div className="overflow-hidden">
+              <div className="text-white font-bold text-lg leading-none tracking-tight">revio</div>
+              <div className="text-white/70 text-[10px] uppercase tracking-wider mt-0.5">Revenue Intelligence</div>
+            </div>
+          )}
+          {/* Collapse toggle */}
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center shadow-lg z-10"
+            style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', color: 'var(--text-2)' }}
+          >
+            {collapsed
+              ? <ChevronRight className="w-3 h-3" />
+              : <ChevronLeft className="w-3 h-3" />
+            }
+          </button>
         </div>
 
         {/* Property selector */}
-        <div className="px-3 py-2.5" style={{ borderBottom: '1px solid var(--border)' }}>
-          <select
-            value={property}
-            onChange={e => setProperty(e.target.value)}
-            className="rv-select text-xs"
-          >
-            <option value="all">Todas las propiedades</option>
-            <option value="isla-palma">Isla Palma</option>
-            <option value="tayrona">Tayrona</option>
-          </select>
-        </div>
+        {!collapsed && (
+          <div className="px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+            <select
+              value={property}
+              onChange={e => setProperty(e.target.value)}
+              className="rv-select text-xs"
+            >
+              <option value="all">Todas las propiedades</option>
+              <option value="isla-palma">Isla Palma</option>
+              <option value="tayrona">Tayrona</option>
+            </select>
+          </div>
+        )}
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
           {navGroups.map(group => (
             <div key={group.label}>
-              <div
-                className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest"
-                style={{ color: 'var(--text-3)' }}
-              >
-                {group.label}
-              </div>
+              {!collapsed && (
+                <div
+                  className="px-2.5 mb-1 text-[10px] font-semibold uppercase tracking-widest"
+                  style={{ color: 'var(--text-3)' }}
+                >
+                  {group.label}
+                </div>
+              )}
               <div className="space-y-0.5">
                 {group.items.map(item => (
-                  <NavItem key={item.to} {...item} onClick={() => setSidebarOpen(false)} />
+                  <NavItem key={item.to} {...item} collapsed={collapsed} />
                 ))}
               </div>
             </div>
           ))}
         </nav>
 
-        {/* User */}
-        <div className="p-3" style={{ borderTop: '1px solid var(--border)' }}>
+        {/* User footer */}
+        <div className="p-3 flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl transition-colors text-left"
+            title={collapsed ? 'Cerrar sesión' : undefined}
+            className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-xl transition-colors text-left ${collapsed ? 'justify-center' : ''}`}
             style={{ color: 'var(--text-2)' }}
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--card)'; e.currentTarget.style.color = 'var(--text-1)'; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-2)'; }}
@@ -185,39 +256,66 @@ export default function Dashboard() {
             >
               {user?.name?.[0]?.toUpperCase() || 'A'}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium truncate" style={{ color: 'var(--text-1)' }}>
-                {user?.name || user?.email}
+            {!collapsed && (
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium truncate" style={{ color: 'var(--text-1)' }}>
+                  {user?.name || user?.email}
+                </div>
+                <div className="text-[10px] capitalize" style={{ color: 'var(--text-3)' }}>{user?.role}</div>
               </div>
-              <div className="text-xs capitalize" style={{ color: 'var(--text-3)' }}>{user?.role}</div>
-            </div>
-            <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
+            )}
+            {!collapsed && <LogOut className="w-3.5 h-3.5 flex-shrink-0" />}
           </button>
         </div>
       </aside>
 
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 lg:hidden"
-          style={{ background: 'rgba(0,0,0,0.5)' }}
-          onClick={() => setSidebarOpen(false)}
-        />
+      {/* ── Mobile Sidebar ── */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
+          <aside className="relative w-64 flex flex-col" style={{ background: 'var(--surface)' }}>
+            <div className="flex items-center gap-3 px-4 py-4"
+              style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 60%, #818CF8 100%)', minHeight: 72 }}>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.2)', fontSize: 18 }}>🏨</div>
+              <div>
+                <div className="text-white font-bold text-lg leading-none">revio</div>
+                <div className="text-white/70 text-[10px] uppercase tracking-wider mt-0.5">Revenue Intelligence</div>
+              </div>
+              <button className="ml-auto text-white/80" onClick={() => setMobileOpen(false)}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
+              {navGroups.map(group => (
+                <div key={group.label}>
+                  <div className="px-2.5 mb-1 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-3)' }}>
+                    {group.label}
+                  </div>
+                  <div className="space-y-0.5">
+                    {group.items.map(item => (
+                      <NavItem key={item.to} {...item} onClick={() => setMobileOpen(false)} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </nav>
+          </aside>
+        </div>
       )}
 
-      {/* ── Main ── */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      {/* ── Main content ── */}
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Topbar */}
         <header
-          className="px-4 py-3 flex items-center justify-between lg:px-6 flex-shrink-0"
-          style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}
+          className="px-4 py-3 flex items-center justify-between flex-shrink-0"
+          style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', height: 56 }}
         >
           <button
             className="lg:hidden p-1.5 rounded-lg"
             style={{ color: 'var(--text-2)' }}
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+            onClick={() => setMobileOpen(true)}
           >
-            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            <Menu className="w-5 h-5" />
           </button>
           <div className="hidden lg:block" />
           <div className="flex items-center gap-3">
@@ -228,50 +326,54 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Content */}
+        {/* Page content */}
         <div className="flex-1 overflow-y-auto p-4 lg:p-6">
-          <Routes>
-            <Route path="/panel" element={<MetricsOverview property={property} />} />
-            <Route path="/" element={<Navigate to="/panel" replace />} />
-            <Route path="/dashboard" element={<Navigate to="/panel" replace />} />
-            <Route path="/conversations" element={<ConversationList property={property} />} />
-            <Route path="/conversations/:id" element={<ConversationDetail />} />
-            <Route path="/ota-inbox" element={<OtaInbox property={property} />} />
-            <Route path="/bookings" element={<BookingsList property={property} />} />
-            <Route path="/payments" element={<PaymentsPanel property={property} />} />
-            <Route path="/occupancy" element={<OccupancyChart property={property} />} />
-            <Route path="/cancellations" element={<CancellationsPanel property={property} />} />
-            <Route path="/reports" element={<WeeklyReport property={property} />} />
-            <Route path="/health" element={<HealthMonitor />} />
-            <Route path="/knowledge" element={<KnowledgeBase property={property} />} />
-            <Route path="/property-knowledge" element={<PropertyKnowledgePanel propertyId={property?.id} />} />
-            <Route path="/revenue" element={<RevenueIntelligence property={property} />} />
-            <Route path="/escalations" element={<EscalationsPanel property={property} />} />
-            <Route path="/sandbox" element={<SandboxPanel property={property} />} />
-            <Route path="/billing" element={<BillingPage />} />
-            <Route path="/config" element={<ConfigPanel property={property} />} />
-            <Route path="/config/*" element={<ConfigPanel property={property} />} />
-            <Route path="/connections" element={<ConnectionsPanel property={property} />} />
-          </Routes>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* Core */}
+              <Route path="/panel" element={<MetricsOverview property={property} />} />
+              <Route path="/" element={<Navigate to="/panel" replace />} />
+              <Route path="/dashboard" element={<Navigate to="/panel" replace />} />
+              <Route path="/conversations" element={<ConversationList property={property} />} />
+              <Route path="/conversations/:id" element={<ConversationDetail />} />
+              <Route path="/ota-inbox" element={<OtaInbox property={property} />} />
+
+              {/* PMS */}
+              <Route path="/gantt" element={<GanttCalendar property={property} />} />
+              <Route path="/rooms" element={<RoomsManager property={property} />} />
+              <Route path="/guests" element={<GuestsPanel property={property} />} />
+              <Route path="/housekeeping" element={<HousekeepingBoard property={property} />} />
+
+              {/* Revenue */}
+              <Route path="/pos" element={<POSTerminal property={property} />} />
+              <Route path="/wallets" element={<WalletPanel property={property} />} />
+              <Route path="/payments" element={<PaymentsPanel property={property} />} />
+              <Route path="/revenue" element={<RevenueIntelligence property={property} />} />
+
+              {/* AI */}
+              <Route path="/ai" element={<AIConcierge property={property} />} />
+              <Route path="/sandbox" element={<SandboxPanel property={property} />} />
+              <Route path="/knowledge" element={<KnowledgeBase property={property} />} />
+              <Route path="/property-knowledge" element={<PropertyKnowledgePanel propertyId={property?.id} />} />
+              <Route path="/escalations" element={<EscalationsPanel property={property} />} />
+
+              {/* Reports */}
+              <Route path="/bookings" element={<BookingsList property={property} />} />
+              <Route path="/occupancy" element={<OccupancyChart property={property} />} />
+              <Route path="/cancellations" element={<CancellationsPanel property={property} />} />
+              <Route path="/reports" element={<WeeklyReport property={property} />} />
+              <Route path="/events" element={<EventsPanel property={property} />} />
+
+              {/* System */}
+              <Route path="/connections" element={<ConnectionsPanel property={property} />} />
+              <Route path="/health" element={<HealthMonitor />} />
+              <Route path="/billing" element={<BillingPage />} />
+              <Route path="/config" element={<ConfigPanel property={property} />} />
+              <Route path="/config/*" element={<ConfigPanel property={property} />} />
+            </Routes>
+          </Suspense>
         </div>
       </main>
-    </div>
-  );
-}
-
-// Inline logo for sidebar
-function RevioLogo() {
-  return (
-    <div className="flex items-center gap-2.5">
-      <RevioIsotipo size={30} />
-      <div>
-        <div className="text-base leading-none font-normal tracking-tight" style={{ color: 'var(--text-1)' }}>
-          rev<span className="font-bold" style={{ color: 'var(--accent)' }}>io</span>
-        </div>
-        <div className="text-[9px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--text-3)' }}>
-          Revenue intelligence
-        </div>
-      </div>
     </div>
   );
 }

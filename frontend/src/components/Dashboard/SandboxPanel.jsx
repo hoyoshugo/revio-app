@@ -8,11 +8,11 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const CHECKLIST_ITEMS = [
   { key: 'backend',        label: 'Backend API',              test: async () => { const r = await fetch(`${API}/health`); return r.ok; } },
-  { key: 'lobbypms',       label: 'Conexión LobbyPMS',        test: async (token, prop) => { const r = await fetch(`${API}/api/settings/test/lobbypms?property=${prop}`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); return d.ok; } },
+  { key: 'lobbypms',       label: 'Conexión LobbyPMS',        test: async (token, prop) => { const r = await fetch(`${API}/api/settings/test/lobbypms`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ slug: prop }) }); const d = await r.json(); return d.ok; } },
   { key: 'availability',   label: 'Disponibilidad consultada', test: async () => null },  // checked during chat
   { key: 'language',       label: 'Idioma detectado',          test: async () => null },  // checked during chat
   { key: 'payment_link',   label: 'Link de pago generado',     test: async () => null },  // checked during chat
-  { key: 'whatsapp',       label: 'WhatsApp conectado',        test: async (token, prop) => { const r = await fetch(`${API}/api/settings/test/whatsapp?property=${prop}`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); return d.ok; } },
+  { key: 'whatsapp',       label: 'WhatsApp conectado',        test: async (token, prop) => { const r = await fetch(`${API}/api/settings/test/whatsapp`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ slug: prop }) }); const d = await r.json(); return d.ok; } },
 ];
 
 function CheckItem({ label, status }) {
@@ -74,7 +74,7 @@ function ChatBubble({ role, content, ts }) {
 }
 
 export default function SandboxPanel({ property }) {
-  const { token } = { token: localStorage.getItem('rv_token') };
+  const { token } = { token: localStorage.getItem('mystica_token') };
   const [messages, setMessages]     = useState([]);
   const [input, setInput]           = useState('');
   const [loading, setLoading]       = useState(false);

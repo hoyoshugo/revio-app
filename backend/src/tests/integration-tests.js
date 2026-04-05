@@ -10,14 +10,8 @@ const LOCAL = 'http://localhost:3001';
 // Use local if explicitly requested
 const API = process.env.USE_LOCAL === 'true' ? LOCAL : BASE;
 
-const LOBBY_TOKEN_ISLA = process.env.LOBBY_TOKEN_ISLA_PALMA ||
-  'DIhD1TKF0PXyzKmblOgJuNGYMstASOv4Taej4O3w61AWnK9h8l8XK2LkRVDe';
-const LOBBY_TOKEN_TAYRONA = process.env.LOBBY_TOKEN_TAYRONA ||
-  'm25t8qVZ6EJTO45WFx3tb75lbPV0OwE5Y3yVqF4OypeVPSu0iL1bKc5zJQlL';
-const WA_TOKEN = process.env.WHATSAPP_TOKEN ||
-  'EAAcK6VFh7XYBRJzyUw4gEtZAjdymQ77LRQZBFdvakvG8AOpgO1V6sEZCqmRuf9fpNlxYSIYPvM0b0nVsGaRnHdymNWXpuwwL8RL0WXzNEgO1YbV0770wVuQAzeYryQZCQRWZCt4K7hQKZAMPHa084iO5akQAk7hA4TSJXH37EKZCuhGHgF5oniIDuBmzgZDZD';
-const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY ||
-  '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';
+const WA_TOKEN = process.env.WHATSAPP_TOKEN || '';
+const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 
 let cachedClientToken = null;
 
@@ -294,7 +288,7 @@ async function runTests() {
     console.log('   🔴 1. Anthropic créditos → console.anthropic.com/settings/billing ($20 USD)');
   }
   if (failures.find(f => f.name.includes('LobbyPMS'))) {
-    console.log('   🔴 2. LobbyPMS IP whitelist → agregar 200.189.27.14 en dashboard LobbyPMS');
+    console.log('   🔴 2. LobbyPMS IP whitelist → agregar IP de Railway en dashboard LobbyPMS');
   }
   if (results.find(r => r.name.includes('WhatsApp Phone') && r.error?.includes('DISCONNECTED'))) {
     console.log('   🔴 3. WhatsApp → Meta Business Manager → reconectar número +57 323 4392420');

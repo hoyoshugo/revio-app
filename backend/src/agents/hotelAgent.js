@@ -100,7 +100,8 @@ async function loadSalesIntensity(propertyId) {
 // SYSTEM PROMPT base del agente
 // ============================================================
 function buildSystemPrompt(property, dynamicKnowledge = '', salesIntensity = 'moderate') {
-  return `Eres el agente de ventas virtual de ${property.name || 'Mística Hostels'}, una cadena de hostales de lujo en Colombia. Tu nombre es "Mística AI".
+  const agentName = property.agent_name || `${property.name} AI`;
+  return `Eres el agente de ventas virtual de ${property.name}, un alojamiento en ${property.country || 'Colombia'}. Tu nombre es "${agentName}".
 
 ## TU PERSONALIDAD
 - Cálida, entusiasta y auténtica — como un amigo que conoce el lugar perfectamente
@@ -115,31 +116,6 @@ Detecta automáticamente el idioma del mensaje del cliente y responde SIEMPRE en
 - Français → français
 - Deutsch → Deutsch
 Soportas: es, en, fr, de
-
-## PROPIEDADES QUE REPRESENTAS
-
-### MÍSTICA ISLA PALMA
-- Ubicación: Isla Palma, Archipiélago San Bernardo, Cartagena
-- Reservas: https://booking.misticaisland.com
-- Cómo llegar: https://www.misticaisland.com/how-to-get
-- Actividades: https://www.misticaisland.com/activities
-- Menú: https://www.misticaisland.com/services
-- FAQ: https://www.misticaisland.com/faq
-- Maps: https://maps.app.goo.gl/fFhJpQWSHnhgRHxp6
-- Incluye: Desayuno, WiFi gratuito
-- IMPORTANTE: Niños menores de 7 años SOLO permitidos en Cabaña del Árbol o Las Aldea
-
-### MÍSTICA TAYRONA
-- Ubicación: Bahía Cinto, Parque Nacional Natural Tayrona
-- Reservas: https://booking.misticatayrona.com
-- Cómo llegar: https://www.mhostels.co/how-to-get
-- Actividades: https://www.mhostels.co/activities
-- Menú: https://www.mhostels.co/services
-- FAQ: https://www.mhostels.co/faq
-- Maps: https://maps.app.goo.gl/9Prr7GFDqfFRYgyQA
-- Incluye: Desayuno, WiFi gratuito
-
-WhatsApp ambas propiedades: +573234392420
 
 ## ESTRATEGIA DE VENTAS (OBLIGATORIA — EN ESTE ORDEN)
 1. **Primero vende el destino**: Describe la magia del lugar, las experiencias únicas, el entorno natural. Crea deseo antes de hablar de precios.
@@ -163,7 +139,7 @@ WhatsApp ambas propiedades: +573234392420
 6. Recopilar datos del huésped
 7. Confirmar reserva → enviar link de pago
 
-Recuerda: eres la primera impresión de Mística. Cada conversación es una oportunidad de crear un huésped de por vida.
+Recuerda: eres la primera impresión de ${property.name}. Cada conversación es una oportunidad de crear un huésped de por vida.
 ${SALES_INTENSITY_PROMPTS[salesIntensity] || SALES_INTENSITY_PROMPTS.moderate}${dynamicKnowledge}`;
 }
 
@@ -179,8 +155,7 @@ const TOOLS = [
       properties: {
         property: {
           type: 'string',
-          enum: ['isla-palma', 'tayrona'],
-          description: 'La propiedad a consultar'
+          description: 'El slug de la propiedad a consultar'
         },
         checkin: {
           type: 'string',
@@ -210,7 +185,7 @@ const TOOLS = [
       properties: {
         property: {
           type: 'string',
-          enum: ['isla-palma', 'tayrona']
+          description: 'El slug de la propiedad'
         },
         checkin_date: {
           type: 'string',
@@ -253,7 +228,7 @@ const TOOLS = [
       properties: {
         property: {
           type: 'string',
-          enum: ['isla-palma', 'tayrona', 'both']
+          description: 'El slug de la propiedad, o "both" para ambas'
         },
         info_type: {
           type: 'string',
@@ -269,7 +244,7 @@ const TOOLS = [
 // ============================================================
 // Ejecutar herramienta llamada por el agente
 // ============================================================
-async function executeTool(toolName, toolInput, conversation) {
+async function executeTool(toolName, toolInput, conversation, propertyId) {
   const propertySlug = toolInput.property;
 
   switch (toolName) {
@@ -285,7 +260,7 @@ async function executeTool(toolName, toolInput, conversation) {
               adults: toolInput.adults || 1,
               children: toolInput.children || 0
             },
-            { conversationId: conversation.id }
+            { conversationId: conversation.id, propertyId }
           );
           const formatted = lobby.formatRoomsForAgent(data, conversation.guest_language || 'es');
           return { success: true, rooms: formatted, raw: data };
@@ -299,7 +274,7 @@ async function executeTool(toolName, toolInput, conversation) {
     }
 
     case 'check_discount_eligibility': {
-      const result = await calculateDiscount(propertySlug, toolInput.checkin_date);
+      const result = await calculateDiscount(propertySlug, toolInput.checkin_date, { propertyId });
       return result;
     }
 
@@ -382,7 +357,7 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
   // Verificar si la IA está pausada por escalación
   if (await isAiPaused(conversation.id)) {
     return {
-      message: '⏸️ Nuestro equipo está atendiendo tu consulta personalmente. Te responderán en breve. Para urgencias: WhatsApp +573234392420 🌊',
+      message: '⏸️ Nuestro equipo está atendiendo tu consulta personalmente. Te responderán en breve.',
       session_id: sessionId,
       conversation_id: conversation.id,
       ai_paused: true
@@ -483,7 +458,7 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
 
       for (const toolUse of toolUseBlocks) {
         toolsUsed.push({ name: toolUse.name, input: toolUse.input });
-        const result = await executeTool(toolUse.name, toolUse.input, conversation);
+        const result = await executeTool(toolUse.name, toolUse.input, conversation, propertyId);
 
         // Detectar si hay una reserva pendiente de crear
         if (result?.action === 'create_booking') {

@@ -13,6 +13,7 @@ const LandingPage        = React.lazy(() => import('./pages/Landing/LandingPage.
 const RegisterPage       = React.lazy(() => import('./pages/Register/RegisterPage.jsx'));
 const OnboardingWizard   = React.lazy(() => import('./pages/Onboarding/OnboardingWizard.jsx'));
 const LegalPage          = React.lazy(() => import('./pages/Legal/LegalPage.jsx'));
+const BookingPage        = React.lazy(() => import('./pages/BookingEngine/BookingPage.jsx'));
 
 function PageLoader() {
   return (
@@ -75,6 +76,9 @@ export default function App() {
             {/* ── Legal docs (public) ── */}
             <Route path="/legal/:slug" element={<LegalPage />} />
             <Route path="/legal" element={<Navigate to="/legal/terminos" replace />} />
+
+            {/* ── Public booking engine ── */}
+            <Route path="/book/:slug" element={<BookingPage />} />
 
             {/* ── Superadmin (auth separada) ── */}
             <Route

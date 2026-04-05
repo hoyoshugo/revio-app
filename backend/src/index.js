@@ -20,6 +20,15 @@ import saRoutes from './routes/superadmin.js';
 import registerRoutes from './routes/register.js';
 import knowledgeRoutes from './routes/knowledge.js';
 import connectionsRoutes from './routes/connections.js';
+import roomsRoutes from './routes/rooms.js';
+import reservationsRoutes from './routes/reservations.js';
+import guestsRoutes from './routes/guests.js';
+import housekeepingRoutes from './routes/housekeeping.js';
+import posRoutes from './routes/pos.js';
+import walletsRoutes from './routes/wallets.js';
+import aiRoutes from './routes/ai.js';
+import eventsRoutes from './routes/events.js';
+import publicBookingRoutes from './routes/publicBooking.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { startScheduler } from './services/scheduler.js';
 import { runPendingMigrations } from './services/dbMigrations.js';
@@ -84,6 +93,15 @@ app.use('/api/register', registerRoutes);
 app.use('/api/onboarding', registerRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/connections', connectionsRoutes);
+app.use('/api/rooms', roomsRoutes);
+app.use('/api/reservations', reservationsRoutes);
+app.use('/api/guests', guestsRoutes);
+app.use('/api/housekeeping', housekeepingRoutes);
+app.use('/api/pos', posRoutes);
+app.use('/api/wallets', walletsRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/events', eventsRoutes);
+app.use('/api/public/book', publicBookingRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

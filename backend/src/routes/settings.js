@@ -18,6 +18,7 @@ import axios from 'axios';
 import { supabase } from '../models/supabase.js';
 import { requireAuth, requireSuperAdmin } from '../middleware/auth.js';
 import { encryptAiConfig, decryptAiConfig } from '../services/encryption.js';
+import { getLobbyPMSToken, getWompiConfig, getWhatsAppConfig } from '../services/connectionService.js';
 
 const router = Router();
 
@@ -242,8 +243,9 @@ router.post('/test/:service', requireAuth, async (req, res) => {
   try {
     switch (service) {
       case 'lobbypms': {
-        const token = process.env[`LOBBY_TOKEN_${slug?.toUpperCase().replace(/-/g, '_')}`];
-        if (!token || token === 'pendiente') return res.json({ ok: false, message: 'Token no configurado' });
+        const propertyId = req.user?.property_id || null;
+        const token = await getLobbyPMSToken(propertyId, slug);
+        if (!token) return res.json({ ok: false, message: 'Token LobbyPMS no configurado' });
         const r = await axios.get('https://api.lobbypms.com/api/v1/rate-plans', {
           headers: { Authorization: `Bearer ${token}` }, timeout: 8000
         });
@@ -251,16 +253,20 @@ router.post('/test/:service', requireAuth, async (req, res) => {
       }
 
       case 'wompi': {
-        const pubKey = process.env[`WOMPI_PUBLIC_KEY_${slug?.toUpperCase().replace(/-/g, '_')}`];
-        if (!pubKey || pubKey === 'pendiente') return res.json({ ok: false, message: 'Llave pública no configurada' });
+        const propertyId = req.user?.property_id || null;
+        const config = await getWompiConfig(propertyId, slug);
+        const pubKey = config?.public_key;
+        if (!pubKey) return res.json({ ok: false, message: 'Llave pública Wompi no configurada' });
         const r = await axios.get(`https://production.wompi.co/v1/merchants/${pubKey}`, { timeout: 8000 });
         return res.json({ ok: true, message: `Conectado — merchant activo` });
       }
 
       case 'whatsapp': {
-        const token = process.env.WHATSAPP_TOKEN;
-        const phoneId = process.env.WHATSAPP_PHONE_ID;
-        if (!token || token === 'pendiente') return res.json({ ok: false, message: 'Token no configurado' });
+        const propertyId = req.user?.property_id || null;
+        const config = await getWhatsAppConfig(propertyId);
+        const token = config?.access_token;
+        const phoneId = config?.phone_number_id;
+        if (!token) return res.json({ ok: false, message: 'Token WhatsApp no configurado' });
         await axios.get(`https://graph.facebook.com/v18.0/${phoneId}`, {
           headers: { Authorization: `Bearer ${token}` }, timeout: 8000
         });
