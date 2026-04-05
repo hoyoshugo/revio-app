@@ -34,6 +34,9 @@ import reportsRoutes from './routes/reports.js';
 import channelRoutes from './routes/channel.js';
 import notificationsRoutes from './routes/notifications.js';
 import invoicesRoutes from './routes/invoices.js';
+import usersRoutes from './routes/users.js';
+import reviewsRoutes from './routes/reviews.js';
+import propertiesRoutes from './routes/properties.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { startScheduler } from './services/scheduler.js';
 import { runPendingMigrations } from './services/dbMigrations.js';
@@ -113,6 +116,9 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/channel', channelRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/invoices', invoicesRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/reviews', reviewsRoutes);
+app.use('/api/properties', propertiesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

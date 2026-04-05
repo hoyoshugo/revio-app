@@ -2,7 +2,10 @@ import axios from 'axios';
 import { db } from '../models/supabase.js';
 import { getLobbyPMSToken } from '../services/connectionService.js';
 
-const LOBBY_API_URL = process.env.LOBBY_API_URL || 'https://api.lobbypms.com';
+// Use Cloudflare Worker proxy if configured (stable IP, solves Railway dynamic IP issue)
+const LOBBY_API_URL = process.env.LOBBYPMS_PROXY_URL
+  ? `${process.env.LOBBYPMS_PROXY_URL}/proxy`
+  : (process.env.LOBBY_API_URL || 'https://api.lobbypms.com');
 const MAX_RETRIES = 3;
 
 // In-memory cache: { [slug_endpoint]: { data, ts } }
@@ -34,13 +37,18 @@ async function resolveToken(propertySlug, propertyId) {
 
 async function lobbyClientFor(propertySlug, propertyId) {
   const token = await resolveToken(propertySlug, propertyId);
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    Accept: 'application/json'
+  };
+  // Add proxy secret header when using Cloudflare Worker
+  if (process.env.LOBBYPMS_PROXY_URL && process.env.LOBBYPMS_PROXY_SECRET) {
+    headers['X-Proxy-Secret'] = process.env.LOBBYPMS_PROXY_SECRET;
+  }
   return axios.create({
     baseURL: LOBBY_API_URL,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json'
-    },
+    headers,
     timeout: 10000
   });
 }
