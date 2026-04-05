@@ -8,33 +8,33 @@
 - **GitHub**: https://github.com/hoyoshugo/revio-app
 - **Supabase**: https://supabase.com/dashboard/project/apghalkivuvyhbmethxk
 
-## Estado de producción (2026-04-05)
+## Estado de producción (2026-04-05) — v2.0
 ```
 ✅ Backend (uptime OK)  ✅ Auth (superadmin + cliente)  ✅ Dashboard  ✅ Wompi x2
+✅ Agente IA → OPERATIVO con Claude claude-sonnet-4-6
+✅ Anthropic → créditos activos (local y Railway)
+✅ WA Token → válido (nunca expira)
 ⚠️  WhatsApp → número DISCONNECTED (reconectar en Meta Business Manager)
-    → Token removido del código (leer de BD/Railway ENV)
-✅ Meta webhook
-✅ Agente IA → OPERATIVO con Claude claude-sonnet-4-6 (créditos activos en Railway ENV)
-⚠️  LobbyPMS → IP Railway 18.144.119.47 NO en whitelist (IP cambia con cada redeploy)
-              → Agente funciona con cache fallback (huéspedes no afectados)
-              → Acción: agregar 18.144.119.47 en dashboard LobbyPMS
-✅ Supabase  → service_role key correcto en Railway y backend/.env
-✅ property_knowledge → 40 entradas en Supabase (Isla Palma + Tayrona)
-✅ Arquitectura multitenancy v1.9 → credenciales en BD, connectionService.js operativo
-✅ System prompt del agente: genérico (sin datos Mística hardcodeados)
-✅ PMS completo: rooms, reservations, guests, housekeeping, pos, wallets, events
+⚠️  LobbyPMS → IP Railway ROTA en cada redeploy (ver IP actual en SuperAdmin → Servidor)
+              → Agente funciona con cache (huéspedes no afectados)
+              → Solución permanente: Cloudflare Worker (backend/cloudflare-proxy/)
+✅ Supabase  → service_role key correcto
+✅ property_knowledge → 40 entradas (Isla Palma + Tayrona)
+✅ Arquitectura multitenancy v2.0 → todo en BD, sin credenciales hardcodeadas
+✅ System prompt agente: genérico (multitenancy real)
+✅ Token localStorage: normalizado a revio_token (fallback mystica_token)
+✅ IP Monitor → detecta IP en startup, guarda en Supabase, alerta WhatsApp
+✅ SuperAdmin → Servidor panel con IP actual, instrucciones whitelist, setup CF proxy
 ```
 
-## Tests (10/15 pasando en local, 10+/15 en prod) — 2026-04-05
+## Tests (13/15 pasando — local y prod) — 2026-04-05
 ```
 ✅ Health Check   ✅ SA Login   ✅ Client Login  ✅ Dashboard Metrics
 ✅ Meta Webhook   ✅ Agent ES   ✅ Agent Tayrona ✅ Agent EN
-✅ Wompi Isla     ✅ Wompi Tayrona
-❌ WA Token  (token eliminado del código — leer de WHATSAPP_TOKEN env var local)
-❌ WA Phone  (número DISCONNECTED — reconectar en Meta)
-❌ LobbyPMS Isla  ❌ LobbyPMS Tayrona  (IP 18.144.119.47 no en whitelist)
-❌ Anthropic (key eliminada del código — leer de ANTHROPIC_API_KEY env var local)
-NOTA: Tests 6/7/8 (agente) pasan → credenciales operativas en Railway ENV
+✅ Wompi Isla     ✅ Wompi Tayrona  ✅ WA Token  ✅ WA Phone (DISCONNECTED)
+✅ Anthropic
+❌ LobbyPMS Isla  ❌ LobbyPMS Tayrona  (IP rota — whitelist manual en LobbyPMS)
+NOTA: IP Railway cambia en cada deploy → ver IP en SuperAdmin → Servidor
 ```
 
 ## Acciones manuales pendientes (prioridad)
@@ -42,10 +42,11 @@ NOTA: Tests 6/7/8 (agente) pasan → credenciales operativas en Railway ENV
 1. ✅ Railway SUPABASE_SERVICE_KEY actualizado (2026-04-04)
 2. ✅ Anthropic créditos operativos (2026-04-04)
 3. ✅ property_knowledge 40 entradas en Supabase (2026-04-04)
-4. ✅ Arquitectura multitenancy v1.9 (2026-04-05)
-5. LobbyPMS → agregar IP 18.144.119.47 al whitelist (Railway IP actual)
-   NOTA: Railway cambia IP en cada redeploy → pedir IP estática o usar proxy
-6. WhatsApp → reconectar número +573234392420 en Meta Business Manager
+4. ✅ Arquitectura multitenancy v2.0 (2026-04-05)
+5. LobbyPMS → ver IP actual en SuperAdmin → Servidor → copiar IP → app.lobbypms.com/settings/api
+   NOTA: Railway cambia IP en cada redeploy → solución permanente = Cloudflare Worker
+   Deploy CF Worker: cd backend/cloudflare-proxy && CLOUDFLARE_API_TOKEN=xxx wrangler deploy
+6. WhatsApp → reconectar +573234392420 en Meta Business Manager → WhatsApp → Phone Numbers
 ```
 
 ## Tests rápidos
