@@ -26,7 +26,7 @@ export default function WeeklyReport({ property }) {
   useEffect(() => {
     async function resolvePropertyId() {
       if (property === 'all') { setPropertyId(null); return; }
-      const token = localStorage.getItem('mystica_token');
+      const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
       try {
         const { data } = await axios.get('/api/dashboard/properties', {
           headers: { Authorization: `Bearer ${token}` }
@@ -42,7 +42,7 @@ export default function WeeklyReport({ property }) {
     if (!propertyId && property !== 'all') return;
     setLoading(true);
     try {
-      const token = localStorage.getItem('mystica_token');
+      const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
       const pid = propertyId || (await getFirstPropertyId(token));
       if (!pid) { setLoading(false); return; }
       const { data } = await axios.get('/api/dashboard/weekly-report', {

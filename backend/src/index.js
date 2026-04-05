@@ -33,6 +33,7 @@ import publicBookingRoutes from './routes/publicBooking.js';
 import reportsRoutes from './routes/reports.js';
 import channelRoutes from './routes/channel.js';
 import notificationsRoutes from './routes/notifications.js';
+import invoicesRoutes from './routes/invoices.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { startScheduler } from './services/scheduler.js';
 import { runPendingMigrations } from './services/dbMigrations.js';
@@ -111,6 +112,7 @@ app.use('/api/public/book', publicBookingRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/channel', channelRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/invoices', invoicesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

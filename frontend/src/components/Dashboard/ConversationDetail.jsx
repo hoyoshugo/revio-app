@@ -18,7 +18,7 @@ export default function ConversationDetail() {
 
   useEffect(() => {
     async function load() {
-      const token = localStorage.getItem('mystica_token');
+      const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
       const res = await axios.get(`/api/dashboard/conversations/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });

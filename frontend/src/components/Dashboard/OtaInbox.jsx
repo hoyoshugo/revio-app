@@ -32,7 +32,7 @@ export default function OtaInbox({ property }) {
   const [statusFilter, setStatusFilter] = useState('');
   const replyRef = useRef(null);
 
-  const token = localStorage.getItem('mystica_token');
+  const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
   const headers = { Authorization: `Bearer ${token}` };
 
   async function loadMessages() {

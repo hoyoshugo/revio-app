@@ -266,7 +266,7 @@ export default function ConnectionsPanel({ property }) {
   async function loadConnections() {
     setLoading(true);
     try {
-      const token = localStorage.getItem('revio_token') || localStorage.getItem('token');
+      const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
       const r = await fetch(`${API_BASE}/api/connections/${propertyId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -285,7 +285,7 @@ export default function ConnectionsPanel({ property }) {
   }
 
   async function handleSave(key, value) {
-    const token = localStorage.getItem('revio_token') || localStorage.getItem('token');
+    const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
     try {
       const r = await fetch(`${API_BASE}/api/connections/${propertyId}`, {
         method: 'POST',
@@ -308,7 +308,7 @@ export default function ConnectionsPanel({ property }) {
   }
 
   async function handleTest(key) {
-    const token = localStorage.getItem('revio_token') || localStorage.getItem('token');
+    const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
     try {
       const r = await fetch(`${API_BASE}/api/connections/${propertyId}/test`, {
         method: 'POST',

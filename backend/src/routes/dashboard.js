@@ -320,4 +320,94 @@ router.get('/billing', requireAuth, async (req, res) => {
   }
 });
 
+// ============================================================
+// GET /api/dashboard/kpis — Complete KPI + charts shape
+// ============================================================
+router.get('/kpis', requireAuth, async (req, res) => {
+  const pid = req.query.property_id || req.user.property_id;
+  const today = new Date().toISOString().split('T')[0];
+
+  const safeQuery = async (fn) => { try { return await fn(); } catch (e) { return { data: null, count: 0 }; } };
+
+  const [
+    roomsRes,
+    arrivalsRes,
+    departuresRes,
+    revTodayRes,
+    walletsRes,
+    openOrdersRes,
+    hkRes,
+    lowStockRes,
+  ] = await Promise.all([
+    safeQuery(() => supabase.from('rooms').select('id,status').eq('property_id', pid)),
+    safeQuery(() => supabase.from('reservations')
+      .select('id, guests(first_name,last_name), rooms(name,number)')
+      .eq('property_id', pid).eq('check_in', today).in('status', ['confirmed', 'checked_in']).limit(8)),
+    safeQuery(() => supabase.from('reservations')
+      .select('id, guests(first_name,last_name), rooms(name,number)')
+      .eq('property_id', pid).eq('check_out', today).eq('status', 'checked_in').limit(8)),
+    safeQuery(() => supabase.from('reservations')
+      .select('total_amount').eq('property_id', pid).eq('payment_status', 'paid').gte('created_at', today + 'T00:00:00')),
+    safeQuery(() => supabase.from('wristband_wallets')
+      .select('balance').eq('property_id', pid).eq('is_active', true)),
+    safeQuery(() => supabase.from('pos_orders')
+      .select('id,order_number,total_amount,created_at').eq('property_id', pid).eq('status', 'open').limit(5)),
+    safeQuery(() => supabase.from('housekeeping_tasks')
+      .select('status').eq('property_id', pid).gte('created_at', today + 'T00:00:00')),
+    safeQuery(() => supabase.from('pos_products')
+      .select('name,stock,min_stock').eq('track_stock', true).limit(20)),
+  ]);
+
+  const rooms = roomsRes.data || [];
+  const totalRooms = rooms.length;
+  const occupiedRooms = rooms.filter(r => r.status === 'occupied').length;
+  const occupancyPct = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
+  const revenueToday = (revTodayRes.data || []).reduce((s, r) => s + parseFloat(r.total_amount || 0), 0);
+  const wallets = walletsRes.data || [];
+  const walletBalanceTotal = wallets.reduce((s, w) => s + parseFloat(w.balance || 0), 0);
+  const hkCounts = { pending: 0, in_progress: 0, done: 0, verified: 0 };
+  (hkRes.data || []).forEach(t => { if (hkCounts[t.status] !== undefined) hkCounts[t.status]++; });
+
+  // 30-day charts
+  const thirtyAgo = new Date(); thirtyAgo.setDate(thirtyAgo.getDate() - 30);
+  const { data: histRes } = await safeQuery(() =>
+    supabase.from('reservations').select('check_in,check_out,total_amount,status')
+      .eq('property_id', pid).gte('check_in', thirtyAgo.toISOString().split('T')[0])
+  );
+  const hist = histRes || [];
+
+  const occupancy30d = [];
+  const revenue30d = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+    const label = d.toLocaleDateString('es-CO', { month: 'short', day: 'numeric' });
+    const occ = hist.filter(r => r.check_in <= dateStr && r.check_out > dateStr && r.status !== 'cancelled').length;
+    const rev = hist.filter(r => r.check_in === dateStr && r.status !== 'cancelled')
+      .reduce((s, r) => s + parseFloat(r.total_amount || 0), 0);
+    occupancy30d.push({ date: label, pct: totalRooms > 0 ? Math.round((occ / totalRooms) * 100) : 0 });
+    revenue30d.push({ date: label, revenue: rev });
+  }
+
+  res.json({
+    kpis: {
+      occupancy_pct: occupancyPct,
+      revenue_today: revenueToday,
+      arrivals_today: (arrivalsRes.data || []).length,
+      departures_today: (departuresRes.data || []).length,
+      active_wallets: wallets.length,
+      wallet_balance_total: walletBalanceTotal,
+      total_rooms: totalRooms,
+      occupied_rooms: occupiedRooms,
+    },
+    arrivals: arrivalsRes.data || [],
+    departures: departuresRes.data || [],
+    housekeeping: hkCounts,
+    low_stock: (lowStockRes.data || []).filter(p => (p.stock || 0) <= (p.min_stock || 0)).slice(0, 5),
+    open_pos_orders: openOrdersRes.data || [],
+    occupancy_30d: occupancy30d,
+    revenue_30d: revenue30d,
+  });
+});
+
 export default router;

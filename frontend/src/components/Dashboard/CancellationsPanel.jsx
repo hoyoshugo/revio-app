@@ -31,7 +31,7 @@ export default function CancellationsPanel({ property }) {
   const [loading, setLoading] = useState(true);
   const [refundFilter, setRefundFilter] = useState('');
 
-  const token = localStorage.getItem('mystica_token');
+  const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
   const headers = { Authorization: `Bearer ${token}` };
 
   async function load() {

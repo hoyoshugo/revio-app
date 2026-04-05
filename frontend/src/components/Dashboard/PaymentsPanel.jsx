@@ -18,7 +18,7 @@ export default function PaymentsPanel({ property }) {
   async function load() {
     setLoading(true);
     try {
-      const token = localStorage.getItem('mystica_token');
+      const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
       const params = {};
       if (filter) params.status = filter;
       if (property !== 'all') params.property_slug = property;
@@ -34,7 +34,7 @@ export default function PaymentsPanel({ property }) {
   useEffect(() => { load(); }, [property, filter]);
 
   async function resendPaymentLink(bookingId) {
-    const token = localStorage.getItem('mystica_token');
+    const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
     try {
       const { data } = await axios.post(`/api/bookings/${bookingId}/resend-payment`, {}, {
         headers: { Authorization: `Bearer ${token}` }

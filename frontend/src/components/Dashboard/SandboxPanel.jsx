@@ -74,7 +74,7 @@ function ChatBubble({ role, content, ts }) {
 }
 
 export default function SandboxPanel({ property }) {
-  const { token } = { token: localStorage.getItem('mystica_token') };
+  const { token } = { token: localStorage.getItem('revio_token') || localStorage.getItem('mystica_token') };
   const [messages, setMessages]     = useState([]);
   const [input, setInput]           = useState('');
   const [loading, setLoading]       = useState(false);

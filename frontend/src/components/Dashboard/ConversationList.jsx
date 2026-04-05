@@ -27,7 +27,7 @@ export default function ConversationList({ property }) {
   async function load() {
     setLoading(true);
     try {
-      const token = localStorage.getItem('mystica_token');
+      const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
       const params = { limit: 100 };
       if (statusFilter) params.status = statusFilter;
       if (property !== 'all') params.property_slug = property;

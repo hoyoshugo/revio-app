@@ -218,4 +218,107 @@ router.patch('/orders/:id/cancel', requireAuth, async (req, res) => {
   }
 });
 
+// ── GET /api/pos/categories ──
+router.get('/categories', requireAuth, async (req, res) => {
+  const { revenue_center_id } = req.query;
+  const pid = req.user.property_id;
+  try {
+    let q = supabase.from('products').select('category').eq('property_id', pid).eq('is_available', true);
+    if (revenue_center_id) q = q.eq('revenue_center_id', revenue_center_id);
+    const { data, error } = await q;
+    if (error) throw error;
+    const cats = [...new Set((data || []).map(p => p.category).filter(Boolean))];
+    res.json({ categories: cats });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/pos/orders — Crear orden completa ──
+router.post('/orders', requireAuth, async (req, res) => {
+  const pid = req.user.property_id;
+  const {
+    items = [], revenue_center_id, payment_method, reservation_id,
+    guest_id, wallet_id, table_number, discount_amount = 0, notes
+  } = req.body;
+  if (!items.length) return res.status(400).json({ error: 'items requerido' });
+
+  try {
+    // Calculate totals
+    let subtotal = 0;
+    const enrichedItems = [];
+    for (const item of items) {
+      const { data: prod } = await supabase.from('products').select('name,price,stock,track_stock').eq('id', item.product_id).single();
+      if (!prod) return res.status(400).json({ error: `Producto ${item.product_id} no encontrado` });
+      const lineTotal = parseFloat(prod.price) * parseInt(item.quantity || 1);
+      subtotal += lineTotal;
+      enrichedItems.push({ ...item, unit_price: prod.price, line_total: lineTotal, product_name: prod.name, prod });
+    }
+    const discountAmt = parseFloat(discount_amount || 0);
+    const taxableBase = subtotal - discountAmt;
+    const taxAmount = Math.round(taxableBase * 0.08 * 100) / 100;
+    const total = taxableBase + taxAmount;
+    const orderNumber = 'POS-' + Date.now().toString().slice(-6);
+
+    // Wallet payment: pre-check balance
+    if (payment_method === 'wristband' && wallet_id) {
+      const { data: w } = await supabase.from('wristband_wallets').select('balance,is_active').eq('id', wallet_id).single();
+      if (!w || !w.is_active) return res.status(400).json({ error: 'Billetera inactiva' });
+      if (parseFloat(w.balance) < total) {
+        return res.status(402).json({ error: 'Saldo insuficiente', balance: w.balance, shortfall: total - parseFloat(w.balance) });
+      }
+    }
+
+    // Create order
+    const { data: order, error: oErr } = await supabase.from('pos_orders').insert({
+      property_id: pid, revenue_center_id, order_number: orderNumber,
+      payment_method, guest_id, reservation_id, table_number, notes,
+      subtotal, tax_amount: taxAmount, discount_amount: discountAmt, total_amount: total,
+      status: 'paid', created_by: req.user.id
+    }).select().single();
+    if (oErr) throw oErr;
+
+    // Insert items + update stock
+    for (const item of enrichedItems) {
+      await supabase.from('pos_order_items').insert({
+        order_id: order.id, product_id: item.product_id,
+        quantity: item.quantity || 1, unit_price: item.unit_price,
+        subtotal: item.line_total
+      });
+      if (item.prod.track_stock) {
+        const newStock = Math.max(0, (parseInt(item.prod.stock) || 0) - parseInt(item.quantity || 1));
+        await supabase.from('products').update({ stock: newStock }).eq('id', item.product_id);
+      }
+    }
+
+    // Wallet charge
+    if (payment_method === 'wristband' && wallet_id) {
+      const { data: w } = await supabase.from('wristband_wallets').select('balance,property_id').eq('id', wallet_id).single();
+      const newBal = parseFloat(w.balance) - total;
+      await supabase.from('wristband_wallets').update({ balance: newBal }).eq('id', wallet_id);
+      await supabase.from('wallet_transactions').insert({
+        wallet_id, property_id: pid, type: 'charge',
+        amount: -total, balance_after: newBal,
+        description: `POS ${orderNumber}`, pos_order_id: order.id, created_by: req.user.id
+      });
+    }
+
+    // Room charge: bump reservation balance
+    if (payment_method === 'room_charge' && reservation_id) {
+      const { data: resv } = await supabase.from('reservations').select('total_amount').eq('id', reservation_id).single();
+      if (resv) {
+        await supabase.from('reservations').update({ total_amount: parseFloat(resv.total_amount || 0) + total }).eq('id', reservation_id);
+      }
+    }
+
+    // Reload order with items
+    const { data: fullOrder } = await supabase.from('pos_orders')
+      .select('*, pos_order_items(*, products(name,category)), guests(first_name,last_name), revenue_centers(name)')
+      .eq('id', order.id).single();
+    res.status(201).json(fullOrder || order);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

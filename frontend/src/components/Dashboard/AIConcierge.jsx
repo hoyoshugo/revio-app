@@ -7,6 +7,135 @@ import {
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 function getToken() { return localStorage.getItem('revio_token'); }
 
+function FeatureResultView({ featureId, result }) {
+  const [copied, setCopied] = useState(false);
+
+  function copyText(text) {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  if (result.error) {
+    return (
+      <div className="text-xs p-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+        {result.error}
+      </div>
+    );
+  }
+
+  // Pricing: show table of date/price/reason
+  if (featureId === 'pricing') {
+    const rows = result.recommendations || result.pricing || [];
+    if (rows.length === 0) return <div className="text-xs" style={{ color: 'var(--text-3)' }}>{result.narrative || 'Sin datos'}</div>;
+    return (
+      <div className="overflow-auto max-h-48">
+        <table className="w-full text-xs">
+          <thead>
+            <tr style={{ color: 'var(--text-3)', borderBottom: '1px solid var(--border)' }}>
+              <th className="text-left py-1 pr-2">Fecha</th>
+              <th className="text-right py-1 pr-2">Precio</th>
+              <th className="text-left py-1">Motivo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid color-mix(in srgb, var(--border) 40%, transparent)' }}>
+                <td className="py-1 pr-2" style={{ color: 'var(--text-2)' }}>{r.date || r.period}</td>
+                <td className="py-1 pr-2 text-right font-semibold" style={{ color: 'var(--accent)' }}>
+                  ${Number(r.price || r.suggested_price || 0).toLocaleString('es-CO')}
+                </td>
+                <td className="py-1" style={{ color: 'var(--text-3)' }}>{r.reason || r.rationale || ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // Forecast: narrative + week list
+  if (featureId === 'forecast') {
+    const weeks = result.forecast || result.weekly || [];
+    return (
+      <div className="space-y-2 max-h-48 overflow-auto">
+        {result.narrative && (
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-2)' }}>{result.narrative}</p>
+        )}
+        {result.raw && !result.narrative && (
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-2)' }}>{result.raw}</p>
+        )}
+        {weeks.length > 0 && (
+          <div className="space-y-1 mt-2">
+            {weeks.map((w, i) => (
+              <div key={i} className="flex justify-between text-xs py-1"
+                style={{ borderBottom: '1px solid color-mix(in srgb, var(--border) 40%, transparent)' }}>
+                <span style={{ color: 'var(--text-3)' }}>{w.week || w.period || `Semana ${i + 1}`}</span>
+                <span className="font-semibold" style={{ color: 'var(--accent)' }}>
+                  {w.occupancy_pct ?? w.occupancy ?? '—'}% ocupación
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Review response: formatted draft with copy
+  if (featureId === 'review') {
+    const draft = result.response || result.draft || result.reply || result.raw || '';
+    return (
+      <div className="space-y-2">
+        <div className="text-xs p-3 rounded-lg relative" style={{ background: 'color-mix(in srgb, var(--accent) 8%, transparent)', color: 'var(--text-1)', whiteSpace: 'pre-wrap' }}>
+          {draft}
+          <button
+            onClick={() => copyText(draft)}
+            className="absolute top-2 right-2 p-1 rounded"
+            style={{ background: 'var(--surface)' }}
+          >
+            {copied ? <Check className="w-3 h-3" style={{ color: 'var(--success)' }} /> : <Copy className="w-3 h-3" style={{ color: 'var(--text-3)' }} />}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Guest insights: 4 cards
+  if (featureId === 'guest') {
+    const sections = [
+      { key: 'patterns', label: 'Patrones', color: '#6366F1' },
+      { key: 'preferences', label: 'Preferencias', color: '#10B981' },
+      { key: 'upsells', label: 'Oportunidades', color: '#F59E0B' },
+      { key: 'personalization', label: 'Personalización', color: '#8B5CF6' },
+    ];
+    const hasCards = sections.some(s => result[s.key]);
+    if (!hasCards) {
+      return <p className="text-xs" style={{ color: 'var(--text-2)' }}>{result.narrative || result.raw || 'Sin datos'}</p>;
+    }
+    return (
+      <div className="space-y-2 max-h-48 overflow-auto">
+        {sections.map(s => result[s.key] ? (
+          <div key={s.key} className="text-xs p-2 rounded-lg" style={{ background: `${s.color}10`, borderLeft: `2px solid ${s.color}` }}>
+            <div className="font-semibold mb-0.5" style={{ color: s.color }}>{s.label}</div>
+            <div style={{ color: 'var(--text-2)' }}>
+              {Array.isArray(result[s.key]) ? result[s.key].join(', ') : result[s.key]}
+            </div>
+          </div>
+        ) : null)}
+      </div>
+    );
+  }
+
+  // Fallback
+  return (
+    <div className="text-xs p-2 rounded-lg overflow-auto max-h-40"
+      style={{ background: 'var(--bg)', color: 'var(--text-2)', whiteSpace: 'pre-wrap' }}>
+      {result.narrative || result.raw || JSON.stringify(result, null, 2)}
+    </div>
+  );
+}
+
 const SUGGESTIONS = [
   '¿Cómo mejorar la ocupación este fin de semana?',
   '¿Cuáles son las mejores prácticas para pricing dinámico?',
@@ -293,13 +422,7 @@ export default function AIConcierge() {
                   </button>
 
                   {featureResult && (
-                    <div className="text-xs p-3 rounded-lg overflow-auto max-h-48"
-                      style={{ background: 'var(--bg)', color: 'var(--text-1)', whiteSpace: 'pre-wrap' }}>
-                      {featureResult.error
-                        ? <span style={{ color: 'var(--danger)' }}>{featureResult.error}</span>
-                        : JSON.stringify(featureResult, null, 2)
-                      }
-                    </div>
+                    <FeatureResultView featureId={feat.id} result={featureResult} />
                   )}
                 </div>
               )}

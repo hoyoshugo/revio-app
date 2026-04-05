@@ -22,7 +22,7 @@ export default function OccupancyChart({ property }) {
     async function load() {
       setLoading(true);
       try {
-        const token = localStorage.getItem('mystica_token');
+        const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
         const params = property !== 'all' ? { property_slug: property } : {};
         const res = await axios.get('/api/dashboard/occupancy', {
           headers: { Authorization: `Bearer ${token}` },

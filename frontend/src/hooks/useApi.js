@@ -4,7 +4,7 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export function useApi() {
-  const token = localStorage.getItem('mystica_token');
+  const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
 
   const client = axios.create({
     baseURL: API_URL,

@@ -148,4 +148,88 @@ router.get('/:id/transactions', requireAuth, async (req, res) => {
   }
 });
 
+// ── POST /api/wallets/scan — Buscar por UID o QR ──
+router.post('/scan', requireAuth, async (req, res) => {
+  const { uid } = req.body;
+  if (!uid) return res.status(400).json({ error: 'uid requerido' });
+  try {
+    const { data, error } = await supabase.from('wristband_wallets')
+      .select('*, guests(id,first_name,last_name,email,phone)')
+      .or(`wristband_code.eq.${uid},qr_data.ilike.%${uid}%`)
+      .eq('is_active', true).single();
+    if (error || !data) return res.status(404).json({ error: 'Pulsera no encontrada' });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/wallets/:id/simulate-nfc ──
+router.post('/:id/simulate-nfc', requireAuth, async (req, res) => {
+  const uid = 'NFC-' + Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase();
+  try {
+    const { data, error } = await supabase.from('wristband_wallets')
+      .update({ wristband_code: uid, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id).select().single();
+    if (error) throw error;
+    res.json({ ...data, simulated_uid: uid });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/wallets/:id/freeze ──
+router.post('/:id/freeze', requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('wristband_wallets')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id).select().single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/wallets/:id/refund ──
+router.post('/:id/refund', requireAuth, async (req, res) => {
+  try {
+    const { data: wallet, error: wErr } = await supabase.from('wristband_wallets')
+      .select('balance,property_id').eq('id', req.params.id).single();
+    if (wErr || !wallet) return res.status(404).json({ error: 'Billetera no encontrada' });
+    const refundAmount = parseFloat(wallet.balance || 0);
+    if (refundAmount > 0) {
+      await supabase.from('wallet_transactions').insert({
+        wallet_id: req.params.id, property_id: wallet.property_id,
+        type: 'refund', amount: -refundAmount, balance_after: 0,
+        description: 'Reembolso de saldo restante', created_by: req.user.id
+      });
+    }
+    const { data } = await supabase.from('wristband_wallets')
+      .update({ balance: 0, is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id).select().single();
+    res.json({ ...data, refunded_amount: refundAmount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/wallets/:id/transactions — Paginado ──
+router.get('/:id/transactions', requireAuth, async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+  const offset = (page - 1) * limit;
+  try {
+    const { data, count, error } = await supabase.from('wallet_transactions')
+      .select('*', { count: 'exact' })
+      .eq('wallet_id', req.params.id)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (error) throw error;
+    res.json({ data: data || [], total: count || 0, page });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

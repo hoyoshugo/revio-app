@@ -23,7 +23,7 @@ export default function BookingsList({ property }) {
   async function load() {
     setLoading(true);
     try {
-      const token = localStorage.getItem('mystica_token');
+      const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
       const params = { limit: 100 };
       if (statusFilter) params.status = statusFilter;
       if (property !== 'all') params.property_slug = property;
@@ -39,7 +39,7 @@ export default function BookingsList({ property }) {
   useEffect(() => { load(); }, [property, statusFilter]);
 
   async function updateStatus(id, status) {
-    const token = localStorage.getItem('mystica_token');
+    const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
     await axios.patch(`/api/bookings/${id}/status`, { status }, { headers: { Authorization: `Bearer ${token}` } });
     load();
   }

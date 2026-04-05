@@ -4,6 +4,17 @@
  * Or:  npm run test:integration (from backend/)
  */
 
+// Load .env from backend/ regardless of working directory
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+import { existsSync } from 'fs';
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const envPath = resolve(__dirname, '../../.env'); // backend/.env
+if (existsSync(envPath)) {
+  const { config } = await import('dotenv');
+  config({ path: envPath });
+}
+
 const BASE = process.env.BASE_URL || 'https://revio-app-production.up.railway.app';
 const LOCAL = 'http://localhost:3001';
 
