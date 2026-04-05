@@ -8,27 +8,33 @@
 - **GitHub**: https://github.com/hoyoshugo/revio-app
 - **Supabase**: https://supabase.com/dashboard/project/apghalkivuvyhbmethxk
 
-## Estado de producción (2026-04-04)
+## Estado de producción (2026-04-05)
 ```
 ✅ Backend (uptime OK)  ✅ Auth (superadmin + cliente)  ✅ Dashboard  ✅ Wompi x2
-⚠️  WhatsApp → token válido (nunca expira) pero número DISCONNECTED (reconectar en Meta)
-✅ Meta webhook  ✅ WA token (nunca expira)
-✅ Agente IA → OPERATIVO con Claude claude-sonnet-4-6 (créditos activos)
-⚠️  LobbyPMS → IP Railway 184.169.168.179 NO en whitelist (IP cambió de 200.189.27.14)
+⚠️  WhatsApp → número DISCONNECTED (reconectar en Meta Business Manager)
+    → Token removido del código (leer de BD/Railway ENV)
+✅ Meta webhook
+✅ Agente IA → OPERATIVO con Claude claude-sonnet-4-6 (créditos activos en Railway ENV)
+⚠️  LobbyPMS → IP Railway 18.144.119.47 NO en whitelist (IP cambia con cada redeploy)
               → Agente funciona con cache fallback (huéspedes no afectados)
-              → Acción: agregar 184.169.168.179 en dashboard LobbyPMS
+              → Acción: agregar 18.144.119.47 en dashboard LobbyPMS
 ✅ Supabase  → service_role key correcto en Railway y backend/.env
 ✅ property_knowledge → 40 entradas en Supabase (Isla Palma + Tayrona)
-✅ Arquitectura multitenancy → credenciales en BD, connectionService.js operativo
+✅ Arquitectura multitenancy v1.9 → credenciales en BD, connectionService.js operativo
+✅ System prompt del agente: genérico (sin datos Mística hardcodeados)
+✅ PMS completo: rooms, reservations, guests, housekeeping, pos, wallets, events
 ```
 
-## Tests (13/15 pasando) — 2026-04-04
+## Tests (10/15 pasando en local, 10+/15 en prod) — 2026-04-05
 ```
 ✅ Health Check   ✅ SA Login   ✅ Client Login  ✅ Dashboard Metrics
 ✅ Meta Webhook   ✅ Agent ES   ✅ Agent Tayrona ✅ Agent EN
-✅ Wompi Isla     ✅ Wompi Tayrona  ✅ WA Token  ✅ Anthropic OK
-❌ LobbyPMS Isla  ❌ LobbyPMS Tayrona  (IP 184.169.168.179 no en whitelist)
-⚠️ WA Phone DISCONNECTED (el token es válido, el número necesita reconexión en Meta)
+✅ Wompi Isla     ✅ Wompi Tayrona
+❌ WA Token  (token eliminado del código — leer de WHATSAPP_TOKEN env var local)
+❌ WA Phone  (número DISCONNECTED — reconectar en Meta)
+❌ LobbyPMS Isla  ❌ LobbyPMS Tayrona  (IP 18.144.119.47 no en whitelist)
+❌ Anthropic (key eliminada del código — leer de ANTHROPIC_API_KEY env var local)
+NOTA: Tests 6/7/8 (agente) pasan → credenciales operativas en Railway ENV
 ```
 
 ## Acciones manuales pendientes (prioridad)
@@ -36,8 +42,9 @@
 1. ✅ Railway SUPABASE_SERVICE_KEY actualizado (2026-04-04)
 2. ✅ Anthropic créditos operativos (2026-04-04)
 3. ✅ property_knowledge 40 entradas en Supabase (2026-04-04)
-4. ✅ Arquitectura multitenancy v1.8 (connectionService, ConnectionsPanel)
-5. LobbyPMS → agregar IP 184.169.168.179 al whitelist (Railway cambió de IP)
+4. ✅ Arquitectura multitenancy v1.9 (2026-04-05)
+5. LobbyPMS → agregar IP 18.144.119.47 al whitelist (Railway IP actual)
+   NOTA: Railway cambia IP en cada redeploy → pedir IP estática o usar proxy
 6. WhatsApp → reconectar número +573234392420 en Meta Business Manager
 ```
 
