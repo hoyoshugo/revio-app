@@ -113,9 +113,16 @@ router.post('/:propertyId/test', async (req, res) => {
 
         const today = new Date().toISOString().split('T')[0];
         const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+        const lobbyBase = process.env.LOBBYPMS_PROXY_URL
+          ? `${process.env.LOBBYPMS_PROXY_URL}/proxy`
+          : 'https://api.lobbypms.com';
+        const lobbyHeaders = { Authorization: `Bearer ${token}` };
+        if (process.env.LOBBYPMS_PROXY_URL && process.env.LOBBYPMS_PROXY_SECRET) {
+          lobbyHeaders['X-Proxy-Secret'] = process.env.LOBBYPMS_PROXY_SECRET;
+        }
         const r = await fetch(
-          `https://api.lobbypms.com/api/v2/available-rooms?start_date=${today}&end_date=${nextWeek}&adults=1`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${lobbyBase}/api/v2/available-rooms?start_date=${today}&end_date=${nextWeek}&adults=1`,
+          { headers: lobbyHeaders }
         );
         if (r.ok) {
           const d = await r.json();
