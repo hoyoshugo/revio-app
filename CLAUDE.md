@@ -8,17 +8,17 @@
 - **GitHub**: https://github.com/hoyoshugo/revio-app
 - **Supabase**: https://supabase.com/dashboard/project/apghalkivuvyhbmethxk
 
-## Estado de producción (2026-04-05) — v2.1
+## Estado de producción (2026-04-05) — v2.2
 ```
 ✅ Backend (uptime OK)  ✅ Auth (superadmin + cliente)  ✅ Dashboard  ✅ Wompi x2
 ✅ Agente IA → OPERATIVO con Claude claude-sonnet-4-6
 ✅ Anthropic → créditos activos (local y Railway)
 ✅ WA Token → válido (nunca expira)
-✅ Cloudflare Worker → LIVE: revio-lobbypms-proxy.revio-hostels.workers.dev
+✅ Cloudflare Worker → LIVE (revio-lobbypms-proxy.revio-hostels.workers.dev) — solo como fallback
+✅ fly.io Proxy → LIVE: https://revio-lobbypms-proxy.fly.dev (IP estática, auto-stop)
+   IPs egreso fly.io: 64.34.84.154 / 204.93.227.88 — ambas en whitelist LobbyPMS
+✅ LobbyPMS → OPERATIVO vía fly.io proxy (Isla Palma: 14 cat. | Tayrona: 3 cat.)
 ⚠️  WhatsApp → número DISCONNECTED (reconectar en Meta Business Manager)
-⚠️  LobbyPMS → CF Worker tiene IPs rotativas, incompatible con whitelist individual de LobbyPMS
-              → Agente funciona con cache (huéspedes no afectados)
-              → Solución permanente: proxy con IP ESTÁTICA (fly.io ~$2/mes o VPS $5/mes)
 ✅ Supabase  → service_role key correcto
 ✅ property_knowledge → 40 entradas (Isla Palma + Tayrona)
 ✅ Arquitectura multitenancy v2.0 → todo en BD, sin credenciales hardcodeadas
@@ -28,14 +28,13 @@
 ✅ SuperAdmin → Servidor panel con IP actual, instrucciones whitelist, setup CF proxy
 ```
 
-## Tests (13/15 pasando — local y prod) — 2026-04-05
+## Tests (15/15 pasando — prod) — 2026-04-05
 ```
 ✅ Health Check   ✅ SA Login   ✅ Client Login  ✅ Dashboard Metrics
 ✅ Meta Webhook   ✅ Agent ES   ✅ Agent Tayrona ✅ Agent EN
 ✅ Wompi Isla     ✅ Wompi Tayrona  ✅ WA Token  ✅ WA Phone (DISCONNECTED)
 ✅ Anthropic
-❌ LobbyPMS Isla  ❌ LobbyPMS Tayrona  (IP rota — whitelist manual en LobbyPMS)
-NOTA: IP Railway cambia en cada deploy → ver IP en SuperAdmin → Servidor
+✅ LobbyPMS Isla   ✅ LobbyPMS Tayrona  (vía fly.io proxy — IP estática permanente)
 ```
 
 ## Acciones manuales pendientes (prioridad)
@@ -44,9 +43,7 @@ NOTA: IP Railway cambia en cada deploy → ver IP en SuperAdmin → Servidor
 2. ✅ Anthropic créditos operativos (2026-04-04)
 3. ✅ property_knowledge 40 entradas en Supabase (2026-04-04)
 4. ✅ Arquitectura multitenancy v2.0 (2026-04-05)
-5. LobbyPMS → ver IP actual en SuperAdmin → Servidor → copiar IP → app.lobbypms.com/settings/api
-   NOTA: Railway cambia IP en cada redeploy → solución permanente = Cloudflare Worker
-   Deploy CF Worker: cd backend/cloudflare-proxy && CLOUDFLARE_API_TOKEN=xxx wrangler deploy
+5. ✅ fly.io proxy desplegado — LobbyPMS operativo (2026-04-05)
 6. WhatsApp → reconectar +573234392420 en Meta Business Manager → WhatsApp → Phone Numbers
 ```
 
