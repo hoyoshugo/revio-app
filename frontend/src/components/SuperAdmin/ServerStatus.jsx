@@ -184,10 +184,16 @@ export default function ServerStatus() {
               </div>
             </div>
             <div className="p-4 space-y-4">
-              <p className="text-sm" style={{ color: 'var(--text-2)' }}>
-                LobbyPMS restringe el acceso por IP. Cada vez que Railway cambia la IP del servidor,
-                debes agregarla manualmente al whitelist.
-              </p>
+              <div className="text-sm space-y-1.5" style={{ color: 'var(--text-2)' }}>
+                <p>
+                  LobbyPMS restringe el acceso por IP. Railway usa <strong style={{ color: 'var(--warning)' }}>IPs rotativas</strong> —
+                  la IP cambia con cada redeploy Y puede variar entre instancias del mismo servidor.
+                </p>
+                <p>
+                  La solución definitiva es el <strong style={{ color: 'var(--text-1)' }}>Cloudflare Worker proxy</strong> (ver abajo).
+                  Mientras tanto, puedes agregar la IP actual al whitelist como medida temporal.
+                </p>
+              </div>
 
               {/* Pasos */}
               <ol className="space-y-3">

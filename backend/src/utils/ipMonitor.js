@@ -39,41 +39,33 @@ export async function getCurrentIp() {
 }
 
 /**
- * Lee la IP almacenada en Supabase.
+ * Lee la IP almacenada en Supabase (toma la más reciente si hay varias instancias).
  */
 async function getStoredIpRecord() {
   const { data } = await supabase
     .from('settings')
-    .select('value')
+    .select('value, updated_at')
     .is('property_id', null)
     .eq('key', SETTING_KEY)
-    .maybeSingle();
-  return data?.value || null;
+    .order('updated_at', { ascending: false })
+    .limit(1);
+  return data?.[0]?.value || null;
 }
 
 /**
  * Guarda la IP actual en Supabase.
- * Usa INSERT ... ON CONFLICT con manejo explícito de NULL property_id.
+ * Railway puede tener múltiples instancias → borramos duplicados y reinsertamos.
  */
 async function storeIpRecord(record) {
-  // Intentar UPDATE primero (si ya existe el registro)
-  const { data: existing } = await supabase
-    .from('settings')
-    .select('id')
-    .is('property_id', null)
-    .eq('key', SETTING_KEY)
-    .maybeSingle();
-
-  if (existing?.id) {
-    await supabase
-      .from('settings')
-      .update({ value: record, updated_at: new Date().toISOString() })
-      .eq('id', existing.id);
-  } else {
-    await supabase
-      .from('settings')
-      .insert({ property_id: null, key: SETTING_KEY, value: record, updated_at: new Date().toISOString() });
-  }
+  // Borrar todos los registros existentes para railway_ip (puede haber múltiples de varias instancias)
+  await supabase.from('settings').delete().is('property_id', null).eq('key', SETTING_KEY);
+  // Insertar el nuevo registro limpio
+  await supabase.from('settings').insert({
+    property_id: null,
+    key: SETTING_KEY,
+    value: record,
+    updated_at: new Date().toISOString()
+  });
 }
 
 /**
