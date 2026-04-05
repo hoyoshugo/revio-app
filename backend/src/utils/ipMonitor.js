@@ -53,17 +53,27 @@ async function getStoredIpRecord() {
 
 /**
  * Guarda la IP actual en Supabase.
+ * Usa INSERT ... ON CONFLICT con manejo explícito de NULL property_id.
  */
 async function storeIpRecord(record) {
-  await supabase.from('settings').upsert(
-    {
-      property_id: null,
-      key: SETTING_KEY,
-      value: record,
-      updated_at: new Date().toISOString()
-    },
-    { onConflict: 'property_id,key' }
-  );
+  // Intentar UPDATE primero (si ya existe el registro)
+  const { data: existing } = await supabase
+    .from('settings')
+    .select('id')
+    .is('property_id', null)
+    .eq('key', SETTING_KEY)
+    .maybeSingle();
+
+  if (existing?.id) {
+    await supabase
+      .from('settings')
+      .update({ value: record, updated_at: new Date().toISOString() })
+      .eq('id', existing.id);
+  } else {
+    await supabase
+      .from('settings')
+      .insert({ property_id: null, key: SETTING_KEY, value: record, updated_at: new Date().toISOString() });
+  }
 }
 
 /**
