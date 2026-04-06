@@ -341,7 +341,52 @@ const TESTS = [
     }
   },
   {
-    name: '23. Anthropic API',
+    name: '24. PMS Room Types (GET)',
+    category: 'PMS',
+    test: async () => {
+      const token = await getClientToken();
+      const r = await fetch(`${API}/api/rooms/types`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      if (!Array.isArray(d.room_types)) throw new Error('room_types not array');
+      return `${d.room_types.length} tipos de habitacion`;
+    }
+  },
+  {
+    name: '25. PMS Gantt Availability (GET)',
+    category: 'PMS',
+    test: async () => {
+      const token = await getClientToken();
+      const today = new Date().toISOString().slice(0, 10);
+      const nextMonth = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+      const r = await fetch(`${API}/api/rooms/gantt/availability?date_from=${today}&date_to=${nextMonth}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      if (!Array.isArray(d.rooms)) throw new Error('rooms not array');
+      if (!Array.isArray(d.reservations)) throw new Error('reservations not array');
+      return `${d.rooms.length} habitaciones, ${d.reservations.length} reservas`;
+    }
+  },
+  {
+    name: '26. PMS Reservations List (GET)',
+    category: 'PMS',
+    test: async () => {
+      const token = await getClientToken();
+      const r = await fetch(`${API}/api/reservations?limit=5`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      if (!Array.isArray(d.reservations)) throw new Error('reservations not array');
+      return `${d.reservations.length} reservas recientes`;
+    }
+  },
+  {
+    name: '27. Anthropic API',
     category: 'AI',
     test: async () => {
       const r = await fetch('https://api.anthropic.com/v1/messages', {

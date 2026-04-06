@@ -15,11 +15,13 @@ import UsageRegistry from './UsageRegistry.jsx';
 import OnboardingWizard from './OnboardingWizard.jsx';
 import DiscountsManager from './DiscountsManager.jsx';
 import ServerStatus from './ServerStatus.jsx';
+import ModulesPanel from './ModulesPanel.jsx';
 
 const navItems = [
   { to: '/superadmin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/superadmin/clients', label: 'Clientes', icon: Users },
   { to: '/superadmin/plans', label: 'Planes', icon: Package },
+  { to: '/superadmin/modules', label: 'Módulos', icon: Package },
   { to: '/superadmin/discounts', label: 'Descuentos', icon: Percent },
   { to: '/superadmin/errors', label: 'Errores', icon: AlertTriangle },
   { to: '/superadmin/usage', label: 'Uso y Costos', icon: BarChart2 },
@@ -130,6 +132,7 @@ export default function SuperAdminLayout() {
             <Route path="/errors" element={<ErrorsMonitor />} />
             <Route path="/usage" element={<UsageRegistry />} />
             <Route path="/onboarding" element={<OnboardingWizard />} />
+            <Route path="/modules" element={<ModulesPanel />} />
             <Route path="/server" element={<ServerStatus />} />
             <Route path="*" element={<Navigate to="/superadmin" replace />} />
           </Routes>

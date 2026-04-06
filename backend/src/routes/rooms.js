@@ -75,6 +75,28 @@ router.patch('/types/:id', requireAuth, async (req, res) => {
   }
 });
 
+// ── GET /api/rooms/gantt/availability — Disponibilidad para Gantt ──
+router.get('/gantt/availability', requireAuth, async (req, res) => {
+  const { property_id, date_from, date_to } = req.query;
+  const pid = property_id || req.user.property_id;
+  if (!date_from || !date_to) return res.status(400).json({ error: 'date_from y date_to requeridos' });
+  try {
+    const [{ data: rooms }, { data: reservations }] = await Promise.all([
+      supabase.from('rooms').select('*, room_types(id,name,base_price)')
+        .eq('property_id', pid).eq('is_active', true).order('number'),
+      supabase.from('reservations')
+        .select('*, guests(id,first_name,last_name,email,phone)')
+        .eq('property_id', pid)
+        .neq('status', 'cancelled')
+        .lte('check_in', date_to)
+        .gte('check_out', date_from)
+    ]);
+    res.json({ rooms: rooms || [], reservations: reservations || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET /api/rooms/:id ──
 router.get('/:id', requireAuth, async (req, res) => {
   try {
@@ -128,28 +150,6 @@ router.delete('/:id', requireAuth, async (req, res) => {
     const { error } = await supabase.from('rooms').update({ is_active: false }).eq('id', req.params.id);
     if (error) throw error;
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── GET /api/rooms/availability — Disponibilidad para Gantt ──
-router.get('/gantt/availability', requireAuth, async (req, res) => {
-  const { property_id, date_from, date_to } = req.query;
-  const pid = property_id || req.user.property_id;
-  if (!date_from || !date_to) return res.status(400).json({ error: 'date_from y date_to requeridos' });
-  try {
-    const [{ data: rooms }, { data: reservations }] = await Promise.all([
-      supabase.from('rooms').select('*, room_types(id,name,base_price)')
-        .eq('property_id', pid).eq('is_active', true).order('number'),
-      supabase.from('reservations')
-        .select('*, guests(id,first_name,last_name,email,phone)')
-        .eq('property_id', pid)
-        .neq('status', 'cancelled')
-        .lte('check_in', date_to)
-        .gte('check_out', date_from)
-    ]);
-    res.json({ rooms: rooms || [], reservations: reservations || [] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

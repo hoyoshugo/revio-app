@@ -38,6 +38,7 @@ import usersRoutes from './routes/users.js';
 import reviewsRoutes from './routes/reviews.js';
 import propertiesRoutes from './routes/properties.js';
 import inventoryRoutes from './routes/inventory.js';
+import modulesRoutes from './routes/modules.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { startScheduler } from './services/scheduler.js';
 import { runPendingMigrations } from './services/dbMigrations.js';
@@ -121,6 +122,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/properties', propertiesRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/modules', modulesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
