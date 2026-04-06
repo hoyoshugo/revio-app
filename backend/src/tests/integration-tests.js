@@ -225,7 +225,49 @@ const TESTS = [
     }
   },
   {
-    name: '15. Inventory Items (GET)',
+    name: '15. POS Revenue Centers (GET)',
+    category: 'POS',
+    test: async () => {
+      const token = await getClientToken();
+      const r = await fetch(`${API}/api/pos/revenue-centers`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      if (!Array.isArray(d.revenue_centers)) throw new Error('revenue_centers not array');
+      return `${d.revenue_centers.length} centros de revenue`;
+    }
+  },
+  {
+    name: '16. POS Products (GET)',
+    category: 'POS',
+    test: async () => {
+      const token = await getClientToken();
+      const r = await fetch(`${API}/api/pos/products`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      if (!Array.isArray(d.products)) throw new Error('products not array');
+      return `${d.products.length} productos disponibles`;
+    }
+  },
+  {
+    name: '17. POS Orders (GET)',
+    category: 'POS',
+    test: async () => {
+      const token = await getClientToken();
+      const r = await fetch(`${API}/api/pos/orders?limit=5`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      if (!Array.isArray(d.orders)) throw new Error('orders not array');
+      return `${d.orders.length} ordenes recientes`;
+    }
+  },
+  {
+    name: '19. Inventory Items (GET)',
     category: 'Inventory',
     test: async () => {
       const token = await getClientToken();
@@ -239,7 +281,7 @@ const TESTS = [
     }
   },
   {
-    name: '16. Inventory Alerts (GET)',
+    name: '20. Inventory Alerts (GET)',
     category: 'Inventory',
     test: async () => {
       const token = await getClientToken();
@@ -253,7 +295,7 @@ const TESTS = [
     }
   },
   {
-    name: '17. Inventory Report (GET)',
+    name: '21. Inventory Report (GET)',
     category: 'Inventory',
     test: async () => {
       const token = await getClientToken();
@@ -267,7 +309,7 @@ const TESTS = [
     }
   },
   {
-    name: '18. Inventory Create + Movement + Delete',
+    name: '22. Inventory Create + Movement + Delete',
     category: 'Inventory',
     test: async () => {
       const token = await getClientToken();
@@ -299,7 +341,7 @@ const TESTS = [
     }
   },
   {
-    name: '19. Anthropic API',
+    name: '23. Anthropic API',
     category: 'AI',
     test: async () => {
       const r = await fetch('https://api.anthropic.com/v1/messages', {

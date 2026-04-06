@@ -79,7 +79,7 @@ function ReceiptModal({ order, onClose }) {
   );
 }
 
-export default function POSTerminal() {
+export default function POSTerminal({ standalone = false }) {
   const { authHeaders, propertyId } = useAuth();
   const [centers, setCenters] = useState([]);
   const [products, setProducts] = useState([]);
@@ -267,7 +267,7 @@ export default function POSTerminal() {
   const centerIcons = { bar: '🍺', restaurant: '🍽️', tours: '🏄', store: '🛍️', spa: '💆', other: '📦' };
 
   return (
-    <div className="pos-layout" style={{ height: 'calc(100vh - 56px)', margin: '-1.5rem' }}>
+    <div className="pos-layout" style={{ height: standalone ? '100%' : 'calc(100vh - 56px)', margin: standalone ? 0 : '-1.5rem' }}>
 
       {/* Left: Products */}
       <div className="pos-products-panel">

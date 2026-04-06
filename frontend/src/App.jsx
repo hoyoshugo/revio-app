@@ -15,6 +15,7 @@ const OnboardingWizard   = React.lazy(() => import('./pages/Onboarding/Onboardin
 const LegalPage          = React.lazy(() => import('./pages/Legal/LegalPage.jsx'));
 const BookingPage        = React.lazy(() => import('./pages/BookingEngine/BookingPage.jsx'));
 const EcosystemVisualizer = React.lazy(() => import('./pages/Ecosystem/EcosystemVisualizer.jsx'));
+const POSTerminalPage    = React.lazy(() => import('./pages/POS/POSTerminalPage.jsx'));
 
 function PageLoader() {
   return (
@@ -83,6 +84,15 @@ export default function App() {
 
             {/* ── Ecosystem visualizer ── */}
             <Route path="/ecosystem" element={<EcosystemVisualizer />} />
+
+            {/* ── POS Terminal standalone (tablet mode) ── */}
+            <Route path="/pos" element={
+              <AuthProvider>
+                <ProtectedRoute>
+                  <POSTerminalPage />
+                </ProtectedRoute>
+              </AuthProvider>
+            } />
 
             {/* ── Superadmin (auth separada) ── */}
             <Route

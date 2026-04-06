@@ -98,42 +98,6 @@ router.get('/orders', requireAuth, async (req, res) => {
   }
 });
 
-// ── POST /api/pos/orders — Nueva orden ──
-router.post('/orders', requireAuth, async (req, res) => {
-  const pid = req.user.property_id;
-  const { revenue_center_id, guest_id, reservation_id, items, notes } = req.body;
-  if (!items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: 'items requeridos' });
-  }
-  try {
-    // Calcular totales
-    const subtotal = items.reduce((s, i) => s + (i.unit_price * i.quantity), 0);
-    const taxes = Math.round(subtotal * 0.08 * 100) / 100; // 8% IVA
-    const total = subtotal + taxes;
-
-    const { data: order, error: orderErr } = await supabase.from('pos_orders').insert({
-      property_id: pid, revenue_center_id, guest_id, reservation_id,
-      subtotal, taxes, total, currency: 'COP', status: 'open',
-      notes, created_by: req.user.id
-    }).select().single();
-    if (orderErr) throw orderErr;
-
-    const itemRows = items.map(i => ({
-      order_id: order.id, product_id: i.product_id,
-      product_name: i.product_name, unit_price: i.unit_price, quantity: i.quantity, notes: i.notes
-    }));
-    const { error: itemsErr } = await supabase.from('pos_order_items').insert(itemRows);
-    if (itemsErr) throw itemsErr;
-
-    const { data: full } = await supabase.from('pos_orders')
-      .select(`*, pos_order_items(*, products(name,category)), guests(id,first_name,last_name)`)
-      .eq('id', order.id).single();
-    res.status(201).json(full);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // ── POST /api/pos/orders/:id/items — Agregar items ──
 router.post('/orders/:id/items', requireAuth, async (req, res) => {
   const { items } = req.body;
