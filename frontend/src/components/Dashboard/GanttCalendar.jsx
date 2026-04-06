@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ChevronLeft, ChevronRight, Plus, RefreshCw, ZoomIn, ZoomOut,
-  X, LogIn, LogOut, Search, Loader2, User, Home
+  X, LogIn, LogOut, Search, Loader2, User, Ban, Calendar, Phone, Mail
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { formatCOP } from '../../lib/utils.js';
@@ -27,11 +27,159 @@ function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n)
 function toISO(d) { return d.toISOString().split('T')[0]; }
 function dayDiff(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000); }
 
+// ── Modal: detalle de reserva ───────────────────────────────────────────────
+function ReservationDetailModal({ reservation, onClose, onDone, onCheckIn, onCheckOut, authHeaders }) {
+  const [cancelling, setCancelling] = useState(false);
+  const guest = reservation.guests || {};
+  const room  = reservation.rooms  || {};
+  const nights = dayDiff(reservation.check_in, reservation.check_out);
+  const color = STATUS_COLORS[reservation.status] || '#6366F1';
+
+  const canCheckIn  = reservation.status === 'confirmed';
+  const canCheckOut = reservation.status === 'checked_in';
+  const canCancel   = !['cancelled', 'checked_out', 'no_show'].includes(reservation.status);
+
+  async function doCancel() {
+    if (!confirm('¿Cancelar esta reserva?')) return;
+    setCancelling(true);
+    try {
+      const res = await fetch(`${API}/api/reservations/${reservation.id}`, {
+        method: 'DELETE',
+        headers: authHeaders
+      });
+      if (res.ok) { onDone(); onClose(); }
+      else { const e = await res.json(); alert(e.error || 'Error al cancelar'); }
+    } catch { alert('Error de conexión'); }
+    setCancelling(false);
+  }
+
+  return (
+    <div className="rv-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="rv-modal" style={{ maxWidth: 460 }}>
+        <div className="rv-modal-header">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4" style={{ color }} />
+            <h2 className="font-semibold text-base" style={{ color: 'var(--text-1)' }}>Detalle de Reserva</h2>
+          </div>
+          <button onClick={onClose} className="rv-btn-ghost p-1"><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="rv-modal-body space-y-4">
+          {/* Status badge */}
+          <div className="flex items-center justify-between">
+            <span className="rv-badge text-xs px-2 py-0.5 rounded-full font-medium"
+              style={{ background: color + '20', color }}>
+              {STATUS_LABELS[reservation.status] || reservation.status}
+            </span>
+            {reservation.source && (
+              <span className="text-xs" style={{ color: 'var(--text-3)' }}>
+                Fuente: {reservation.source}
+              </span>
+            )}
+          </div>
+
+          {/* Guest */}
+          <div className="p-3 rounded-xl space-y-2" style={{ background: 'var(--surface-2)' }}>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center"
+                style={{ background: color + '20' }}>
+                <User className="w-4 h-4" style={{ color }} />
+              </div>
+              <div>
+                <div className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>
+                  {guest.first_name ? `${guest.first_name} ${guest.last_name || ''}` : 'Sin huésped asignado'}
+                </div>
+                <div className="text-xs" style={{ color: 'var(--text-3)' }}>
+                  Hab. {room.number || reservation.room_id?.slice(0, 8) || '—'}
+                  {room.name && room.name !== room.number ? ` — ${room.name}` : ''}
+                </div>
+              </div>
+            </div>
+            {guest.email && (
+              <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-2)' }}>
+                <Mail className="w-3 h-3" /> {guest.email}
+              </div>
+            )}
+            {guest.phone && (
+              <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-2)' }}>
+                <Phone className="w-3 h-3" /> {guest.phone}
+              </div>
+            )}
+          </div>
+
+          {/* Dates */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="p-3 rounded-xl text-center" style={{ background: 'var(--surface-2)' }}>
+              <div className="text-xs mb-1" style={{ color: 'var(--text-3)' }}>Check-in</div>
+              <div className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>
+                {reservation.check_in}
+              </div>
+            </div>
+            <div className="p-3 rounded-xl text-center" style={{ background: 'var(--surface-2)' }}>
+              <div className="text-xs mb-1" style={{ color: 'var(--text-3)' }}>Noches</div>
+              <div className="font-bold text-lg" style={{ color: 'var(--accent)' }}>{nights}</div>
+            </div>
+            <div className="p-3 rounded-xl text-center" style={{ background: 'var(--surface-2)' }}>
+              <div className="text-xs mb-1" style={{ color: 'var(--text-3)' }}>Check-out</div>
+              <div className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>
+                {reservation.check_out}
+              </div>
+            </div>
+          </div>
+
+          {/* Amount */}
+          {reservation.total_amount > 0 && (
+            <div className="flex justify-between items-center p-3 rounded-xl"
+              style={{ background: 'color-mix(in srgb, var(--accent) 8%, transparent)' }}>
+              <span className="text-sm" style={{ color: 'var(--text-2)' }}>Total</span>
+              <span className="font-bold" style={{ color: 'var(--text-1)' }}>
+                {formatCOP(reservation.total_amount)}
+              </span>
+            </div>
+          )}
+
+          {/* Notes */}
+          {reservation.special_requests && (
+            <div className="text-xs p-2 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-2)' }}>
+              <span className="font-medium" style={{ color: 'var(--text-1)' }}>Solicitudes: </span>
+              {reservation.special_requests}
+            </div>
+          )}
+        </div>
+
+        <div className="rv-modal-footer">
+          <button onClick={onClose} className="rv-btn-ghost">Cerrar</button>
+          {canCancel && (
+            <button onClick={doCancel} disabled={cancelling}
+              className="rv-btn-ghost flex items-center gap-1.5 text-rose-400 hover:text-rose-300">
+              {cancelling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+              Cancelar
+            </button>
+          )}
+          {canCheckIn && (
+            <button onClick={() => { onClose(); onCheckIn(reservation); }}
+              className="rv-btn-primary flex items-center gap-2">
+              <LogIn className="w-4 h-4" /> Check-in
+            </button>
+          )}
+          {canCheckOut && (
+            <button onClick={() => { onClose(); onCheckOut(reservation); }}
+              className="rv-btn-primary flex items-center gap-2">
+              <LogOut className="w-4 h-4" /> Check-out
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal: check-in ─────────────────────────────────────────────────────────
 function CheckInModal({ reservation, onClose, onDone, authHeaders }) {
   const [loading, setLoading] = useState(false);
   const [docOk, setDocOk] = useState(false);
   const guest = reservation.guests || {};
-  const room = reservation.rooms || {};
+  const room  = reservation.rooms  || {};
 
   async function doCheckIn() {
     setLoading(true);
@@ -64,7 +212,7 @@ function CheckInModal({ reservation, onClose, onDone, authHeaders }) {
             </div>
             <div>
               <div className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>
-                {guest.first_name} {guest.last_name || ''}
+                {guest.first_name ? `${guest.first_name} ${guest.last_name || ''}` : 'Sin huésped'}
               </div>
               <div className="text-xs" style={{ color: 'var(--text-3)' }}>
                 {guest.email || guest.phone || '—'}
@@ -93,19 +241,17 @@ function CheckInModal({ reservation, onClose, onDone, authHeaders }) {
             </span>
           </label>
           {reservation.total_amount > 0 && (
-            <div className="text-sm p-2 rounded-lg" style={{ background: 'color-mix(in srgb, var(--accent) 8%, transparent)', color: 'var(--text-2)' }}>
+            <div className="text-sm p-2 rounded-lg"
+              style={{ background: 'color-mix(in srgb, var(--accent) 8%, transparent)', color: 'var(--text-2)' }}>
               Total de reserva: <strong style={{ color: 'var(--text-1)' }}>{formatCOP(reservation.total_amount)}</strong>
             </div>
           )}
         </div>
         <div className="rv-modal-footer">
           <button onClick={onClose} className="rv-btn-ghost">Cancelar</button>
-          <button
-            onClick={doCheckIn}
-            disabled={!docOk || loading}
+          <button onClick={doCheckIn} disabled={!docOk || loading}
             className="rv-btn-primary flex items-center gap-2"
-            style={{ opacity: !docOk ? 0.5 : 1 }}
-          >
+            style={{ opacity: !docOk ? 0.5 : 1 }}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
             Hacer Check-in
           </button>
@@ -115,23 +261,19 @@ function CheckInModal({ reservation, onClose, onDone, authHeaders }) {
   );
 }
 
+// ── Modal: check-out ────────────────────────────────────────────────────────
 function CheckOutModal({ reservation, onClose, onDone, authHeaders }) {
   const [loading, setLoading] = useState(false);
   const [walletBalance, setWalletBalance] = useState(null);
   const guest = reservation.guests || {};
-  const room = reservation.rooms || {};
+  const room  = reservation.rooms  || {};
 
   useEffect(() => {
-    async function fetchWallet() {
-      if (!guest.id) return;
-      try {
-        const res = await fetch(`${API}/api/wallets?guest_id=${guest.id}`, { headers: authHeaders });
-        const data = await res.json();
-        const wallets = data.wallets || [];
-        if (wallets.length > 0) setWalletBalance(wallets[0].balance);
-      } catch {}
-    }
-    fetchWallet();
+    if (!guest.id) return;
+    fetch(`${API}/api/wallets?guest_id=${guest.id}`, { headers: authHeaders })
+      .then(r => r.json())
+      .then(d => { const w = (d.wallets || [])[0]; if (w) setWalletBalance(w.balance); })
+      .catch(() => {});
   }, [guest.id]);
 
   async function doCheckOut() {
@@ -146,22 +288,6 @@ function CheckOutModal({ reservation, onClose, onDone, authHeaders }) {
       else { const e = await res.json(); alert(e.error || 'Error al hacer check-out'); }
     } catch { alert('Error de conexión'); }
     setLoading(false);
-  }
-
-  async function generateInvoice() {
-    try {
-      const res = await fetch(`${API}/api/invoices`, {
-        method: 'POST',
-        headers: { ...authHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reservation_id: reservation.id,
-          guest_id: guest.id,
-          items: [{ description: `Estadía ${reservation.check_in} → ${reservation.check_out}`, amount: reservation.total_amount || 0, quantity: 1 }],
-          notes: `Reserva ${reservation.confirmation_number || ''}`
-        })
-      });
-      if (res.ok) alert('Factura generada correctamente');
-    } catch { alert('Error generando factura'); }
   }
 
   return (
@@ -181,11 +307,9 @@ function CheckOutModal({ reservation, onClose, onDone, authHeaders }) {
             </div>
             <div>
               <div className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>
-                {guest.first_name} {guest.last_name || ''}
+                {guest.first_name ? `${guest.first_name} ${guest.last_name || ''}` : 'Sin huésped'}
               </div>
-              <div className="text-xs" style={{ color: 'var(--text-3)' }}>
-                Hab. {room.number || '—'}
-              </div>
+              <div className="text-xs" style={{ color: 'var(--text-3)' }}>Hab. {room.number || '—'}</div>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -212,9 +336,6 @@ function CheckOutModal({ reservation, onClose, onDone, authHeaders }) {
         </div>
         <div className="rv-modal-footer">
           <button onClick={onClose} className="rv-btn-ghost">Cancelar</button>
-          <button onClick={generateInvoice} className="rv-btn-ghost flex items-center gap-1.5">
-            Generar factura
-          </button>
           <button onClick={doCheckOut} disabled={loading} className="rv-btn-primary flex items-center gap-2">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
             Hacer Check-out
@@ -225,8 +346,9 @@ function CheckOutModal({ reservation, onClose, onDone, authHeaders }) {
   );
 }
 
+// ── Modal: nueva reserva ────────────────────────────────────────────────────
 function NewReservationModal({ rooms, onClose, onDone, authHeaders }) {
-  const [form, setForm] = useState({ room_id: '', check_in: '', check_out: '', notes: '' });
+  const [form, setForm] = useState({ room_id: '', check_in: '', check_out: '', special_requests: '' });
   const [guestSearch, setGuestSearch] = useState('');
   const [guestResults, setGuestResults] = useState([]);
   const [selectedGuest, setSelectedGuest] = useState(null);
@@ -252,14 +374,17 @@ function NewReservationModal({ rooms, onClose, onDone, authHeaders }) {
     setSaving(true);
     try {
       const room = rooms.find(r => r.id === form.room_id);
+      const nights = dayDiff(form.check_in, form.check_out);
+      const rate = room?.room_types?.base_price || 0;
       const body = {
         room_id: form.room_id,
         room_type_id: room?.room_type_id,
         check_in: form.check_in,
         check_out: form.check_out,
-        rate_per_night: room?.room_types?.base_price || 0,
+        rate_per_night: rate,
+        total_amount: rate * nights,
         source: 'direct',
-        notes: form.notes,
+        special_requests: form.special_requests || undefined,
       };
       if (selectedGuest) body.guest_id = selectedGuest.id;
       const res = await fetch(`${API}/api/reservations`, {
@@ -274,8 +399,8 @@ function NewReservationModal({ rooms, onClose, onDone, authHeaders }) {
   }
 
   const nights = form.check_in && form.check_out ? dayDiff(form.check_in, form.check_out) : 0;
-  const room = rooms.find(r => r.id === form.room_id);
-  const total = room?.room_types?.base_price ? nights * room.room_types.base_price : 0;
+  const room   = rooms.find(r => r.id === form.room_id);
+  const total  = room?.room_types?.base_price ? nights * room.room_types.base_price : 0;
 
   return (
     <div className="rv-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -288,7 +413,6 @@ function NewReservationModal({ rooms, onClose, onDone, authHeaders }) {
           <button onClick={onClose} className="rv-btn-ghost p-1"><X className="w-4 h-4" /></button>
         </div>
         <div className="rv-modal-body space-y-4">
-          {/* Guest search */}
           <div>
             <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>Huésped</label>
             {selectedGuest ? (
@@ -304,18 +428,12 @@ function NewReservationModal({ rooms, onClose, onDone, authHeaders }) {
             ) : (
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--text-3)' }} />
-                <input
-                  className="rv-input pl-8"
-                  placeholder="Buscar huésped por nombre..."
-                  value={guestSearch}
-                  onChange={e => setGuestSearch(e.target.value)}
-                />
+                <input className="rv-input pl-8" placeholder="Buscar huésped por nombre..."
+                  value={guestSearch} onChange={e => setGuestSearch(e.target.value)} />
                 {(guestResults.length > 0 || searchLoading) && (
                   <div className="absolute top-full left-0 right-0 mt-1 z-10 rounded-xl shadow-lg overflow-hidden"
                     style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-                    {searchLoading && (
-                      <div className="px-3 py-2 text-xs" style={{ color: 'var(--text-3)' }}>Buscando...</div>
-                    )}
+                    {searchLoading && <div className="px-3 py-2 text-xs" style={{ color: 'var(--text-3)' }}>Buscando...</div>}
                     {guestResults.map(g => (
                       <button key={g.id} onClick={() => { setSelectedGuest(g); setGuestSearch(''); setGuestResults([]); }}
                         className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--surface-2)]" style={{ color: 'var(--text-1)' }}>
@@ -328,7 +446,6 @@ function NewReservationModal({ rooms, onClose, onDone, authHeaders }) {
               </div>
             )}
           </div>
-          {/* Room */}
           <div>
             <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>Habitación *</label>
             <select className="rv-select" value={form.room_id}
@@ -342,7 +459,6 @@ function NewReservationModal({ rooms, onClose, onDone, authHeaders }) {
               ))}
             </select>
           </div>
-          {/* Dates */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>Check-in *</label>
@@ -351,8 +467,7 @@ function NewReservationModal({ rooms, onClose, onDone, authHeaders }) {
             </div>
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>Check-out *</label>
-              <input type="date" className="rv-input" value={form.check_out}
-                min={form.check_in}
+              <input type="date" className="rv-input" value={form.check_out} min={form.check_in}
                 onChange={e => setForm(f => ({ ...f, check_out: e.target.value }))} />
             </div>
           </div>
@@ -363,9 +478,9 @@ function NewReservationModal({ rooms, onClose, onDone, authHeaders }) {
             </div>
           )}
           <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>Notas</label>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>Notas / Solicitudes</label>
             <textarea className="rv-input" rows={2} placeholder="Solicitudes especiales..."
-              value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+              value={form.special_requests} onChange={e => setForm(f => ({ ...f, special_requests: e.target.value }))} />
           </div>
         </div>
         <div className="rv-modal-footer">
@@ -381,8 +496,9 @@ function NewReservationModal({ rooms, onClose, onDone, authHeaders }) {
   );
 }
 
+// ── Componente principal ────────────────────────────────────────────────────
 export default function GanttCalendar() {
-  const { authHeaders, propertyId } = useAuth();
+  const { authHeaders } = useAuth();
   const [startDate, setStartDate] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - 3); return d;
   });
@@ -390,11 +506,19 @@ export default function GanttCalendar() {
   const [rooms, setRooms] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [dragging, setDragging] = useState(null);
+
+  // Drag state
+  const [dragging, setDragging] = useState(null);          // resId being dragged
+  const [dragOverCell, setDragOverCell] = useState(null);  // { roomId, date }
+
+  // Tooltip
   const [tooltip, setTooltip] = useState(null);
+
+  // Modals
   const [showNewModal, setShowNewModal] = useState(false);
-  const [checkInRes, setCheckInRes] = useState(null);
-  const [checkOutRes, setCheckOutRes] = useState(null);
+  const [detailRes, setDetailRes]       = useState(null);
+  const [checkInRes, setCheckInRes]     = useState(null);
+  const [checkOutRes, setCheckOutRes]   = useState(null);
 
   const dates = Array.from({ length: days }, (_, i) => addDays(startDate, i));
   const today = toISO(new Date());
@@ -427,18 +551,60 @@ export default function GanttCalendar() {
   function getBarStyle(res) {
     const startOffset = dayDiff(toISO(startDate), res.check_in);
     const width       = dayDiff(res.check_in, res.check_out);
-    const left  = Math.max(0, startOffset) * DAY_W;
-    const widthPx = Math.min(width, days - startOffset) * DAY_W - 4;
+    const left        = Math.max(0, startOffset) * DAY_W;
+    const widthPx     = Math.min(width, days - startOffset) * DAY_W - 4;
     if (widthPx <= 0) return null;
     return { left, width: widthPx, color: STATUS_COLORS[res.status] || '#6366F1' };
+  }
+
+  // ── Drag-drop con update optimista ────────────────────────────────────────
+  function handleDragStart(e, res) {
+    e.dataTransfer.setData('reservationId',    res.id);
+    e.dataTransfer.setData('originalCheckIn',  res.check_in);
+    e.dataTransfer.setData('originalRoomId',   res.room_id || '');
+    e.dataTransfer.effectAllowed = 'move';
+    setDragging(res.id);
+  }
+
+  function handleDragEnd() {
+    setDragging(null);
+    setDragOverCell(null);
+  }
+
+  function handleDragOver(e, roomId, dateStr) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverCell(prev =>
+      prev?.roomId === roomId && prev?.date === dateStr ? prev : { roomId, date: dateStr }
+    );
+  }
+
+  function handleDragLeave(e) {
+    // Only clear if leaving to an element outside the gantt grid
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setDragOverCell(null);
+    }
+  }
+
+  function handleDrop(e, roomId, dateStr) {
+    e.preventDefault();
+    const resId          = e.dataTransfer.getData('reservationId');
+    const originalCheckIn = e.dataTransfer.getData('originalCheckIn');
+    const originalRoomId  = e.dataTransfer.getData('originalRoomId');
+    setDragging(null);
+    setDragOverCell(null);
+    // Skip if dropped on exact same cell
+    if (!resId || (dateStr === originalCheckIn && roomId === originalRoomId)) return;
+    moveReservation(resId, roomId, dateStr);
   }
 
   async function moveReservation(resId, newRoomId, newCheckIn) {
     const res = reservations.find(r => r.id === resId);
     if (!res) return;
-    const nights = dayDiff(res.check_in, res.check_out);
+    const nights      = dayDiff(res.check_in, res.check_out);
     const newCheckOut = toISO(addDays(new Date(newCheckIn), nights));
-    // Conflict check
+
+    // Client-side conflict check
     const conflicts = reservations.filter(r =>
       r.id !== resId && r.room_id === newRoomId &&
       r.check_in < newCheckOut && r.check_out > newCheckIn &&
@@ -448,42 +614,38 @@ export default function GanttCalendar() {
       alert('Conflicto: hay otra reserva en esa habitación para esas fechas.');
       return;
     }
+
+    // Optimistic update — move bar immediately
+    setReservations(prev => prev.map(r =>
+      r.id === resId ? { ...r, room_id: newRoomId, check_in: newCheckIn, check_out: newCheckOut } : r
+    ));
+
     try {
       const response = await fetch(`${API}/api/reservations/${resId}`, {
         method: 'PATCH',
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({ room_id: newRoomId, check_in: newCheckIn, check_out: newCheckOut })
       });
-      if (response.ok) load();
-      else { const err = await response.json(); alert(err.error || 'No se pudo mover la reserva'); }
-    } catch { alert('Error de conexión'); }
-  }
-
-  function handleDragStart(e, res) {
-    e.dataTransfer.setData('reservationId', res.id);
-    e.dataTransfer.setData('originalCheckIn', res.check_in);
-    setDragging(res.id);
-  }
-  function handleDragEnd() { setDragging(null); }
-
-  function handleDrop(e, roomId, dateStr) {
-    e.preventDefault();
-    const resId = e.dataTransfer.getData('reservationId');
-    const originalCheckIn = e.dataTransfer.getData('originalCheckIn');
-    if (resId && dateStr !== originalCheckIn) {
-      moveReservation(resId, roomId, dateStr);
+      if (!response.ok) {
+        // Revert optimistic update on error
+        setReservations(prev => prev.map(r => r.id === resId ? res : r));
+        const err = await response.json();
+        alert(err.error || 'No se pudo mover la reserva');
+      }
+    } catch {
+      setReservations(prev => prev.map(r => r.id === resId ? res : r));
+      alert('Error de conexión');
     }
-    setDragging(null);
   }
-  function handleDragOver(e) { e.preventDefault(); }
 
+  // ── Click en barra: abrir detalle para TODOS los estados ─────────────────
   function handleBarClick(res) {
-    if (res.status === 'confirmed') setCheckInRes(res);
-    else if (res.status === 'checked_in') setCheckOutRes(res);
+    setTooltip(null);
+    setDetailRes(res);
   }
 
   const roomStatusBadge = (status) => {
-    const map = { available: 'room-available', occupied: 'room-occupied', maintenance: 'room-maintenance', cleaning: 'room-cleaning', blocked: 'room-blocked' };
+    const map    = { available: 'room-available', occupied: 'room-occupied', maintenance: 'room-maintenance', cleaning: 'room-cleaning', blocked: 'room-blocked' };
     const labels = { available: 'Libre', occupied: 'Ocupada', maintenance: 'Mant.', cleaning: 'Limpieza', blocked: 'Bloqueada' };
     return <span className={`rv-badge ${map[status] || 'rv-badge-gray'} text-[9px]`}>{labels[status] || status}</span>;
   };
@@ -495,7 +657,7 @@ export default function GanttCalendar() {
         <div>
           <h1 className="text-xl font-bold" style={{ color: 'var(--text-1)' }}>Calendario de Reservas</h1>
           <p className="text-sm" style={{ color: 'var(--text-2)' }}>
-            Vista Gantt — arrastra para mover · haz clic para check-in/out
+            Vista Gantt — arrastra para mover · haz clic para ver detalle
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -532,7 +694,7 @@ export default function GanttCalendar() {
           </div>
         ))}
         <span className="text-xs ml-auto" style={{ color: 'var(--text-3)' }}>
-          Clic en barra: check-in (azul) / check-out (verde)
+          Arrastra para mover · clic para detalle
         </span>
       </div>
 
@@ -549,7 +711,7 @@ export default function GanttCalendar() {
             <div className="gantt-room-label">Habitación</div>
             {dates.map(d => {
               const iso = toISO(d);
-              const isToday = iso === today;
+              const isToday   = iso === today;
               const isWeekend = d.getDay() === 0 || d.getDay() === 6;
               return (
                 <div key={iso} className={`gantt-day-cell ${isToday ? 'today' : ''}`}
@@ -582,14 +744,16 @@ export default function GanttCalendar() {
                     </div>
                     {roomStatusBadge(room.status)}
                   </div>
-                  <div className="relative flex flex-1">
+                  <div className="relative flex flex-1" onDragLeave={handleDragLeave}>
                     {dates.map(d => {
-                      const iso = toISO(d);
+                      const iso       = toISO(d);
                       const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                      const isOver    = dragOverCell?.roomId === room.id && dragOverCell?.date === iso;
                       return (
                         <div key={iso}
                           className={`gantt-grid-cell ${isWeekend ? 'weekend' : ''}`}
-                          onDragOver={handleDragOver}
+                          style={isOver ? { background: 'color-mix(in srgb, var(--accent) 18%, transparent)' } : undefined}
+                          onDragOver={e => handleDragOver(e, room.id, iso)}
                           onDrop={e => handleDrop(e, room.id, iso)}
                         />
                       );
@@ -600,7 +764,6 @@ export default function GanttCalendar() {
                       const guestName = res.guests
                         ? `${res.guests.first_name} ${res.guests.last_name || ''}`
                         : 'Huésped';
-                      const clickable = res.status === 'confirmed' || res.status === 'checked_in';
                       return (
                         <div
                           key={res.id}
@@ -609,8 +772,9 @@ export default function GanttCalendar() {
                             left: style.left,
                             width: style.width,
                             background: style.color,
-                            opacity: dragging === res.id ? 0.5 : 1,
-                            cursor: clickable ? 'pointer' : 'grab',
+                            opacity: dragging === res.id ? 0.4 : 1,
+                            cursor: 'pointer',
+                            userSelect: 'none',
                           }}
                           draggable
                           onDragStart={e => handleDragStart(e, res)}
@@ -651,38 +815,31 @@ export default function GanttCalendar() {
               {STATUS_LABELS[tooltip.res.status] || tooltip.res.status}
             </span>
           </div>
-          {(tooltip.res.status === 'confirmed' || tooltip.res.status === 'checked_in') && (
-            <div className="mt-1 text-[10px]" style={{ color: 'var(--text-3)' }}>
-              Clic para {tooltip.res.status === 'confirmed' ? 'check-in' : 'check-out'}
-            </div>
-          )}
+          <div className="mt-1 text-[10px]" style={{ color: 'var(--text-3)' }}>
+            Clic para ver detalle
+          </div>
         </div>
       )}
 
       {/* Modals */}
       {showNewModal && (
-        <NewReservationModal
-          rooms={rooms}
-          onClose={() => setShowNewModal(false)}
+        <NewReservationModal rooms={rooms} onClose={() => setShowNewModal(false)} onDone={load} authHeaders={authHeaders} />
+      )}
+      {detailRes && (
+        <ReservationDetailModal
+          reservation={detailRes}
+          onClose={() => setDetailRes(null)}
           onDone={load}
+          onCheckIn={res => setCheckInRes(res)}
+          onCheckOut={res => setCheckOutRes(res)}
           authHeaders={authHeaders}
         />
       )}
       {checkInRes && (
-        <CheckInModal
-          reservation={checkInRes}
-          onClose={() => setCheckInRes(null)}
-          onDone={load}
-          authHeaders={authHeaders}
-        />
+        <CheckInModal reservation={checkInRes} onClose={() => setCheckInRes(null)} onDone={load} authHeaders={authHeaders} />
       )}
       {checkOutRes && (
-        <CheckOutModal
-          reservation={checkOutRes}
-          onClose={() => setCheckOutRes(null)}
-          onDone={load}
-          authHeaders={authHeaders}
-        />
+        <CheckOutModal reservation={checkOutRes} onClose={() => setCheckOutRes(null)} onDone={load} authHeaders={authHeaders} />
       )}
     </div>
   );

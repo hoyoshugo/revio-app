@@ -85,7 +85,7 @@ router.get('/gantt/availability', requireAuth, async (req, res) => {
       supabase.from('rooms').select('*, room_types(id,name,base_price)')
         .eq('property_id', pid).eq('is_active', true).order('number'),
       supabase.from('reservations')
-        .select('*, guests(id,first_name,last_name,email,phone)')
+        .select('*, guests(id,first_name,last_name,email,phone), rooms(id,number,name)')
         .eq('property_id', pid)
         .neq('status', 'cancelled')
         .lte('check_in', date_to)
