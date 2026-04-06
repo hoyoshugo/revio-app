@@ -225,7 +225,81 @@ const TESTS = [
     }
   },
   {
-    name: '15. Anthropic API',
+    name: '15. Inventory Items (GET)',
+    category: 'Inventory',
+    test: async () => {
+      const token = await getClientToken();
+      const r = await fetch(`${API}/api/inventory/items`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      if (!Array.isArray(d.items)) throw new Error('items not array');
+      return `${d.items.length} items en inventario`;
+    }
+  },
+  {
+    name: '16. Inventory Alerts (GET)',
+    category: 'Inventory',
+    test: async () => {
+      const token = await getClientToken();
+      const r = await fetch(`${API}/api/inventory/alerts`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      if (!Array.isArray(d.alerts)) throw new Error('alerts not array');
+      return `${d.total} alertas de stock bajo`;
+    }
+  },
+  {
+    name: '17. Inventory Report (GET)',
+    category: 'Inventory',
+    test: async () => {
+      const token = await getClientToken();
+      const r = await fetch(`${API}/api/inventory/report`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      if (!d.totales) throw new Error('sin totales en reporte');
+      return `${d.totales.items} items | valor $${d.totales.valor_total.toLocaleString()}`;
+    }
+  },
+  {
+    name: '18. Inventory Create + Movement + Delete',
+    category: 'Inventory',
+    test: async () => {
+      const token = await getClientToken();
+      const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+
+      // Crear item
+      const cr = await fetch(`${API}/api/inventory/items`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ nombre: 'Test Item CI', categoria: 'Test', stock_actual: 10, stock_minimo: 2, precio_costo: 5000 })
+      });
+      if (!cr.ok) throw new Error(`Create HTTP ${cr.status}`);
+      const { item } = await cr.json();
+      if (!item?.id) throw new Error('no item id on create');
+
+      // Registrar movimiento (salida)
+      const mr = await fetch(`${API}/api/inventory/movements`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ item_id: item.id, tipo: 'salida', cantidad: 3, motivo: 'test CI' })
+      });
+      if (!mr.ok) throw new Error(`Movement HTTP ${mr.status}`);
+      const { stock_nuevo } = await mr.json();
+      if (stock_nuevo !== 7) throw new Error(`stock esperado 7, got ${stock_nuevo}`);
+
+      // Soft delete
+      const dr = await fetch(`${API}/api/inventory/items/${item.id}`, { method: 'DELETE', headers });
+      if (!dr.ok) throw new Error(`Delete HTTP ${dr.status}`);
+
+      return `CRUD OK: stock 10 -> 7 tras salida`;
+    }
+  },
+  {
+    name: '19. Anthropic API',
     category: 'AI',
     test: async () => {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
