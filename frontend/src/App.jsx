@@ -14,6 +14,7 @@ const RegisterPage       = React.lazy(() => import('./pages/Register/RegisterPag
 const OnboardingWizard   = React.lazy(() => import('./pages/Onboarding/OnboardingWizard.jsx'));
 const LegalPage          = React.lazy(() => import('./pages/Legal/LegalPage.jsx'));
 const BookingPage        = React.lazy(() => import('./pages/BookingEngine/BookingPage.jsx'));
+const EcosystemVisualizer = React.lazy(() => import('./pages/Ecosystem/EcosystemVisualizer.jsx'));
 
 function PageLoader() {
   return (
@@ -79,6 +80,9 @@ export default function App() {
 
             {/* ── Public booking engine ── */}
             <Route path="/book/:slug" element={<BookingPage />} />
+
+            {/* ── Ecosystem visualizer ── */}
+            <Route path="/ecosystem" element={<EcosystemVisualizer />} />
 
             {/* ── Superadmin (auth separada) ── */}
             <Route

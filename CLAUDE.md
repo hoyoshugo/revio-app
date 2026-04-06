@@ -71,10 +71,11 @@ Si el usuario ya dio una instrucción específica al abrir la sesión, ejecuta p
 
 Siempre invocar `dev-context-loader` primero, luego el orquestador o el skill directo:
 
+### Skills globales del enjambre (28)
 | Tarea | Skill |
 |-------|-------|
-| Feature multi-capa / módulo completo | `skill-creator:dev-swarm` |
-| Endpoints, rutas Express, lógica ESM | `skill-creator:dev-backend` |
+| Feature multi-capa / modulo completo | `skill-creator:dev-swarm` |
+| Endpoints, rutas Express, logica ESM | `skill-creator:dev-backend` |
 | UI, React 18, Vite 5, Tailwind | `skill-creator:dev-frontend` |
 | Supabase, SQL, migraciones, RLS | `skill-creator:dev-database` |
 | Claude API, hotelAgent.js, streaming | `skill-creator:dev-ai-agent` |
@@ -85,11 +86,40 @@ Siempre invocar `dev-context-loader` primero, luego el orquestador o el skill di
 | Sync reservas, scheduler, cron jobs | `skill-creator:dev-data-pipeline` |
 | Auth JWT, permisos, OWASP | `skill-creator:dev-security` |
 | Railway, Docker, nixpacks | `skill-creator:dev-devops` |
-| Jest, Supertest, mocks, QA | `skill-creator:dev-testing` |
+| Vitest, Supertest, Playwright, QA | `skill-creator:dev-testing` |
 | Textos UI, mensajes error, copy WA | `skill-creator:dev-ux-copy` |
-| **App móvil de huéspedes** | `skill-creator:dev-mobile-orchestrator` → `dev-capacitor` |
-| Jest, Supertest, mocks, QA | `skill-creator:dev-testing` |
-| Textos UI, mensajes error, copy WA | `skill-creator:dev-ux-copy` |
+| **App movil de huespedes** | `skill-creator:dev-mobile-orchestrator` → `dev-capacitor` |
+
+### Skills especializados de Revio (en .claude/skills/)
+| Modulo | Estado | Skill local |
+|--------|--------|-------------|
+| Vision global del ecosistema | activo | `ecosystem-master` |
+| PMS Hotelero (35% hecho) | P1 | `revio-pms` |
+| Inventarios (20% hecho) | P1-urgente | `revio-inventory` |
+| Wallets / NFC (55% hecho) | P1 | `revio-nfc` |
+| Contable / DIAN | P2 | `revio-accounting` |
+| Marketing IA | P2 | `revio-marketing` |
+| Financiero | P2 | `revio-financial` |
+| DevOps / Railway | activo | `revio-devops` |
+| Seguridad | activo | `revio-security` |
+| QA / Testing | activo | `revio-qa` |
+| Coordinacion del enjambre | activo | `swarm-coordinator` |
+
+### Roadmap real (auditado 2026-04-05)
+```
+Base de codigo: 32.365 lineas (backend 12.989 + frontend 19.376)
+
+HOY:    Vender Revenue Agent (90% completo)
+S1:     inventory.js backend (1.5 semanas -- URGENTE)
+S1-S2:  POS Terminal frontend completo
+S2-S6:  PMS tarifas + DIAN + channel manager
+S3-S5:  NFC: hardware real + PWA meseros
+S6-S10: Marketing IA (iniciar Meta review HOY)
+ULTIMO: Contable DIAN (iniciar habilitacion HOY)
+
+BLOQUEANTES: DIAN habilitacion (4-8 sem), WhatsApp OTP (manual)
+VER: ROADMAP.md para analisis completo
+```
 
 ## Contexto del proyecto
 
