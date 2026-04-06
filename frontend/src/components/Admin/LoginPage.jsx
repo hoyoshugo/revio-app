@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { RevioIsotipo } from '../ui/Logo.jsx';
 import ThemeToggle from '../ui/ThemeToggle.jsx';
 import { Eye, EyeOff } from 'lucide-react';
+
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function LoginPage() {
   const [email, setEmail]       = useState('');
@@ -20,11 +21,17 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const { data } = await axios.post('/api/dashboard/login', { email, password });
-      login(data.token, data.user);
+      const res = await fetch(`${API}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error de autenticación');
+      login(data.token, data.user, null, data.properties);
       navigate('/panel');
     } catch (err) {
-      setError(err.response?.data?.error || 'Error de conexión');
+      setError(err.message || 'Error de conexión');
     } finally {
       setLoading(false);
     }

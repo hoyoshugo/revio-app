@@ -6,7 +6,7 @@ import {
   Activity, BookOpen, AlertTriangle, Settings,
   Beaker, Bot, Receipt, TrendingUp, Users, BedDouble,
   ShoppingCart, Wallet, Wrench, CalendarDays, Sparkles,
-  ChevronLeft, ChevronRight, Building2
+  ChevronLeft, ChevronRight, Building2, Package
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import ThemeToggle from '../ui/ThemeToggle.jsx';
@@ -33,6 +33,7 @@ import ConnectionsPanel from './ConnectionsPanel.jsx';
 
 // New PMS components (lazy loaded)
 const GanttCalendar     = lazy(() => import('./GanttCalendar.jsx'));
+const GuestDetail       = lazy(() => import('./GuestDetail.jsx'));
 const POSTerminal       = lazy(() => import('./POSTerminal.jsx'));
 const WalletPanel       = lazy(() => import('./WalletPanel.jsx'));
 const HousekeepingBoard = lazy(() => import('./HousekeepingBoard.jsx'));
@@ -43,6 +44,7 @@ const RoomsManager      = lazy(() => import('./RoomsManager.jsx'));
 const Reports           = lazy(() => import('./Reports.jsx'));
 const ChannelManager    = lazy(() => import('./ChannelManager.jsx'));
 const SettingsPage      = lazy(() => import('./Settings.jsx'));
+const Inventory         = lazy(() => import('./Inventory.jsx'));
 import NotificationsBell from './NotificationsBell.jsx';
 
 const navGroups = [
@@ -68,6 +70,7 @@ const navGroups = [
     items: [
       { to: '/pos', label: 'POS Terminal', icon: ShoppingCart },
       { to: '/wallets', label: 'Billeteras NFC', icon: Wallet },
+      { to: '/inventory', label: 'Inventario', icon: Package },
       { to: '/payments', label: 'Pagos', icon: CreditCard },
       { to: '/revenue', label: 'Revenue Intel', icon: TrendingUp },
     ]
@@ -379,11 +382,13 @@ export default function Dashboard() {
               <Route path="/gantt" element={<GanttCalendar property={property} />} />
               <Route path="/rooms" element={<RoomsManager property={property} />} />
               <Route path="/guests" element={<GuestsPanel property={property} />} />
+              <Route path="/guests/:id" element={<GuestDetail />} />
               <Route path="/housekeeping" element={<HousekeepingBoard property={property} />} />
 
               {/* Revenue */}
               <Route path="/pos" element={<POSTerminal property={property} />} />
               <Route path="/wallets" element={<WalletPanel property={property} />} />
+              <Route path="/inventory" element={<Inventory />} />
               <Route path="/payments" element={<PaymentsPanel property={property} />} />
               <Route path="/revenue" element={<RevenueIntelligence property={property} />} />
 
