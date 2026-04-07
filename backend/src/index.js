@@ -39,6 +39,9 @@ import reviewsRoutes from './routes/reviews.js';
 import propertiesRoutes from './routes/properties.js';
 import inventoryRoutes from './routes/inventory.js';
 import modulesRoutes from './routes/modules.js';
+import syncRoutes from './routes/sync.js';
+import { syncAllProperties } from './services/icalSync.js';
+import cron from 'node-cron';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { startScheduler } from './services/scheduler.js';
 import { runPendingMigrations } from './services/dbMigrations.js';
@@ -123,6 +126,21 @@ app.use('/api/reviews', reviewsRoutes);
 app.use('/api/properties', propertiesRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/modules', modulesRoutes);
+app.use('/api/sync', syncRoutes);
+
+// Cron OTA iCal sync — cada 15 minutos
+cron.schedule('*/15 * * * *', async () => {
+  try {
+    await syncAllProperties();
+  } catch (err) {
+    console.error(JSON.stringify({
+      level: 'error', event: 'cron_ical_sync_failed', error: err.message,
+    }));
+  }
+}, { timezone: 'America/Bogota' });
+console.log(JSON.stringify({
+  level: 'info', event: 'ical_sync_cron_started', interval: '15min',
+}));
 
 // Health check
 app.get('/health', (req, res) => {
