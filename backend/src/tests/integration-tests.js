@@ -386,6 +386,23 @@ const TESTS = [
     }
   },
   {
+    name: '26b. Analytics Events (tabla Supabase)',
+    category: 'AI',
+    test: async () => {
+      // Verifica que la tabla analytics_events existe en Supabase
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+      const { error } = await supabase.from('analytics_events').select('id').limit(1);
+      if (error) {
+        if (error.code === 'PGRST205' || error.message?.includes('analytics_events')) {
+          throw new Error('Tabla analytics_events NO existe — ejecutar migration_012_analytics.sql');
+        }
+        throw new Error(error.message);
+      }
+      return 'tabla OK';
+    }
+  },
+  {
     name: '27. Anthropic API',
     category: 'AI',
     test: async () => {
