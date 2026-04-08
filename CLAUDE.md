@@ -44,7 +44,11 @@
 3. ✅ property_knowledge 40 entradas en Supabase (2026-04-04)
 4. ✅ Arquitectura multitenancy v2.0 (2026-04-05)
 5. ✅ fly.io proxy desplegado — LobbyPMS operativo (2026-04-05)
-6. WhatsApp → reconectar +573234392420 en Meta Business Manager → WhatsApp → Phone Numbers
+6. WhatsApp → reconectar +573234392420
+   - PRIMERA VEZ: Meta Business Manager → Phone Numbers → +57 323 4392420 → Reconnect → OTP por SMS
+     Mientras estás ahí: Settings → Two-step verification → Reset PIN → guardar como WHATSAPP_PIN en backend/.env
+   - PRÓXIMAS VECES: si WHATSAPP_PIN está en .env, ejecutar (sin OTP, < 30 seg):
+     `powershell -File C:\Users\hoyos\.claude\scripts\reconnect-whatsapp-with-pin.ps1`
 ```
 
 ## Tests rápidos

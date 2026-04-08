@@ -7,6 +7,18 @@ import {
   detectUncertainty, requestLearning
 } from '../services/learningEngine.js';
 import { shouldEscalate, createEscalation, isAiPaused } from '../services/escalation.js';
+import {
+  getMoonPhase,
+  getBioluminescenceDates,
+  getColombiaHolidays,
+  isLongWeekend,
+  saveContact,
+  requestApproval,
+  sendReservationReport,
+  detectLanguage,
+  getCaribbeanSchedules,
+} from '../services/agentUtils.js';
+import { buildSystemPrompt } from '../services/systemPromptBuilder.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = 'claude-sonnet-4-6';
