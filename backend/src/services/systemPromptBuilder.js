@@ -4,6 +4,7 @@ import {
   getColombiaHolidays,
   isLongWeekend,
 } from './agentUtils.js';
+import { getRoutes } from '../integrations/transport/caribbeanTreasures.js';
 import { supabase } from '../models/supabase.js';
 
 /**
@@ -34,6 +35,17 @@ export async function buildSystemPrompt(propertyId, tenantId, options = {}) {
     .filter(h => h.date >= today)
     .slice(0, 5);
   const longWeekend = isLongWeekend();
+
+  // Transporte Caribbean Treasures (rutas activas en tiempo real)
+  let transportInfo = '';
+  try {
+    const ct = await getRoutes();
+    if (ct.success && ct.routes.length) {
+      transportInfo = ct.routes
+        .map(r => `  • ${r.origin} → ${r.destination}: $${r.price.toLocaleString()} COP (${r.departureTime})`)
+        .join('\n');
+    }
+  } catch { /* fallback silencioso */ }
 
   const propName = kb.general?.nombre || 'la propiedad';
 
@@ -82,12 +94,17 @@ POLÍTICAS
 - Cancelación: ${kb.policies?.cancelacion || 'Consultar política según tarifa reservada'}
 
 ═══════════════════════════════════════
-TRANSPORTE
+TRANSPORTE — INTEGRADO CON CARIBBEAN TREASURES
 ═══════════════════════════════════════
 ${kb.transport?.aliado_principal ? `Aliado principal: ${kb.transport.aliado_principal}` : ''}
-${kb.transport?.aliado_secundario ? `Aliado secundario: ${kb.transport.aliado_secundario}` : ''}
 ${kb.transport?.instrucciones ? `Cómo llegar: ${kb.transport.instrucciones}` : ''}
-${kb.transport?.caribbean_booking ? `Reserva transporte: ${kb.transport.caribbean_booking}` : ''}
+
+RUTAS ACTIVAS HOY (live desde Caribbean Treasures):
+${transportInfo || '(API no disponible — consultar visit-sanbernardoislands.com)'}
+
+IMPORTANTE: Puedes RESERVAR el transporte directamente para el huésped vía
+nuestra integración con Caribbean Treasures. Confirma siempre fecha, número
+de pasajeros y origen antes de reservar.
 
 ═══════════════════════════════════════
 ACTIVIDADES

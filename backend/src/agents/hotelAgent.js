@@ -19,6 +19,11 @@ import {
   getCaribbeanSchedules,
 } from '../services/agentUtils.js';
 import { buildSystemPrompt } from '../services/systemPromptBuilder.js';
+import {
+  getTransportOptions,
+  formatTransportForAgent,
+  createTransportReservation,
+} from '../integrations/transport/caribbeanTreasures.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = 'claude-sonnet-4-6';

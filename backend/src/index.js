@@ -42,6 +42,7 @@ import modulesRoutes from './routes/modules.js';
 import syncRoutes from './routes/sync.js';
 import cancellationCasesRoutes from './routes/cancellationCases.js';
 import prefacturaRoutes from './routes/prefactura.js';
+import transportRoutes from './routes/transport.js';
 import { syncAllProperties } from './services/icalSync.js';
 import cron from 'node-cron';
 import { generalLimiter } from './middleware/rateLimiter.js';
@@ -131,6 +132,7 @@ app.use('/api/modules', modulesRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/cancellation-cases', cancellationCasesRoutes);
 app.use('/api/prefactura', prefacturaRoutes);
+app.use('/api/transport', transportRoutes);
 
 // Cron OTA iCal sync — cada 15 minutos
 cron.schedule('*/15 * * * *', async () => {

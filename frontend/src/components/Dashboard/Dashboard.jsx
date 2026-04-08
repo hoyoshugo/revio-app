@@ -45,6 +45,7 @@ const Reports           = lazy(() => import('./Reports.jsx'));
 const ChannelManager    = lazy(() => import('./ChannelManager.jsx'));
 const SettingsPage      = lazy(() => import('./Settings.jsx'));
 const Inventory         = lazy(() => import('./Inventory.jsx'));
+const TransportPanel    = lazy(() => import('./TransportPanel.jsx'));
 import NotificationsBell from './NotificationsBell.jsx';
 
 const navGroups = [
@@ -71,6 +72,7 @@ const navGroups = [
       { to: '/pos', label: 'POS Terminal', icon: ShoppingCart },
       { to: '/wallets', label: 'Billeteras NFC', icon: Wallet },
       { to: '/inventory', label: 'Inventario', icon: Package },
+      { to: '/transport', label: 'Transporte', icon: Package },
       { to: '/payments', label: 'Pagos', icon: CreditCard },
       { to: '/revenue', label: 'Revenue Intel', icon: TrendingUp },
     ]
@@ -389,6 +391,7 @@ export default function Dashboard() {
               <Route path="/pos" element={<POSTerminal property={property} />} />
               <Route path="/wallets" element={<WalletPanel property={property} />} />
               <Route path="/inventory" element={<Inventory />} />
+              <Route path="/transport" element={<TransportPanel />} />
               <Route path="/payments" element={<PaymentsPanel property={property} />} />
               <Route path="/revenue" element={<RevenueIntelligence property={property} />} />
 
