@@ -10,6 +10,7 @@
  */
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { supabase } from '../models/supabase.js';
 import {
   listConnections,
   saveSetting,
@@ -42,9 +43,10 @@ router.get('/:propertyId', async (req, res) => {
       gemini_config:    { name: 'Gemini (Google)', category: 'IA', icon: '✨' },
       groq_config:      { name: 'Llama (Groq)', category: 'IA', icon: '⚡' },
       meta_config:      { name: 'Meta (Instagram/FB)', category: 'Redes Sociales', icon: '📱' },
-      booking_config:   { name: 'Booking.com', category: 'OTAs', icon: '🏩' },
-      airbnb_config:    { name: 'Airbnb', category: 'OTAs', icon: '🏠' },
+      booking_config:   { name: 'Booking.com (API)', category: 'OTAs', icon: '🏩' },
+      airbnb_config:    { name: 'Airbnb (API)', category: 'OTAs', icon: '🏠' },
       cloudbeds_config: { name: 'Cloudbeds', category: 'PMS', icon: '☁️' },
+      ota_ical_urls:    { name: 'OTAs vía iCal', category: 'OTAs', icon: '📅' },
     };
 
     const enriched = connections.map(c => ({
@@ -77,6 +79,7 @@ router.post('/:propertyId', async (req, res) => {
       'lobbypms_token', 'wompi_config', 'whatsapp_config',
       'anthropic_config', 'openai_config', 'gemini_config', 'groq_config',
       'meta_config', 'booking_config', 'airbnb_config', 'cloudbeds_config',
+      'ota_ical_urls', // { booking_url, airbnb_url, hostelworld_url, vrbo_url, expedia_url }
       'agent', // config del agente IA
     ];
 
@@ -213,6 +216,30 @@ router.post('/:propertyId/test', async (req, res) => {
           headers: { Authorization: `Bearer ${groqCfg.api_key}` }
         });
         result = { success: r.ok, message: r.ok ? 'Groq API ✅' : `Error HTTP ${r.status}` };
+        break;
+      }
+
+      case 'ota_ical_urls': {
+        const { getSetting } = await import('../services/connectionService.js');
+        const { testICalUrl, syncPropertyICal } = await import('../services/icalSync.js');
+        const urls = await getSetting(propertyId, 'ota_ical_urls');
+        if (!urls || typeof urls !== 'object') {
+          result = { success: false, message: 'No hay URLs iCal configuradas' };
+          break;
+        }
+        const { data: prop } = await supabase.from('properties').select('slug').eq('id', propertyId).single();
+        const channels = ['booking_url', 'airbnb_url', 'hostelworld_url', 'vrbo_url', 'expedia_url'];
+        const tests = [];
+        for (const ch of channels) {
+          if (!urls[ch]) continue;
+          const test = await testICalUrl(urls[ch], ch.replace('_url', ''));
+          tests.push(`${ch.replace('_url', '')}: ${test.success ? `${test.count} reservas` : test.error}`);
+        }
+        // Disparar sync real (no bloqueante)
+        syncPropertyICal(prop?.slug || 'unknown', propertyId).catch(e => console.error('sync bg error:', e.message));
+        result = tests.length
+          ? { success: tests.every(t => !t.includes('error')), message: '📅 ' + tests.join(' · ') }
+          : { success: false, message: 'No hay URLs iCal configuradas' };
         break;
       }
     }

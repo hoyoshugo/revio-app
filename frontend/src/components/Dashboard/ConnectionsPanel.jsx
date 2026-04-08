@@ -91,26 +91,46 @@ const INTEGRATIONS = [
     helpUrl: 'https://console.groq.com',
     note: 'Groq ofrece velocidad extrema con modelos open-source.',
   },
-  // OTAs
+  // OTAs vía iCal — funciona SIEMPRE, no requiere partner agreement
   {
-    key: 'booking_config', name: 'Booking.com', category: 'OTAs', icon: '🏩',
+    key: 'ota_ical_urls', name: 'OTAs vía iCal (recomendado)', category: 'OTAs', icon: '📅',
+    fields: [
+      { name: 'booking_url',     label: 'URL iCal Booking.com',  type: 'text', placeholder: 'https://admin.booking.com/hotel/hoteladmin/ical.html?...' },
+      { name: 'airbnb_url',      label: 'URL iCal Airbnb',       type: 'text', placeholder: 'https://www.airbnb.com/calendar/ical/12345.ics?s=...' },
+      { name: 'hostelworld_url', label: 'URL iCal Hostelworld',  type: 'text', placeholder: 'https://...' },
+      { name: 'vrbo_url',        label: 'URL iCal VRBO',         type: 'text', placeholder: 'https://www.vrbo.com/icalendar/...ics' },
+      { name: 'expedia_url',     label: 'URL iCal Expedia',      type: 'text', placeholder: 'https://...' },
+    ],
+    buildValue: (f) => ({
+      booking_url:     f.booking_url     || '',
+      airbnb_url:      f.airbnb_url      || '',
+      hostelworld_url: f.hostelworld_url || '',
+      vrbo_url:        f.vrbo_url        || '',
+      expedia_url:     f.expedia_url     || '',
+    }),
+    helpUrl: 'https://partner.booking.com/en-us/help/policies-payments/connectivity/exporting-bookings-via-ical',
+    note: 'Pega los enlaces iCal exportados desde cada OTA. Sincronización automática cada 15 minutos.',
+  },
+  // OTAs vía API (Connectivity Partner — solo enterprise)
+  {
+    key: 'booking_config', name: 'Booking.com (API Connectivity)', category: 'OTAs', icon: '🏩',
     fields: [
       { name: 'api_key', label: 'Connectivity API Key', type: 'password', placeholder: 'Tu API key de partner' },
       { name: 'hotel_id', label: 'Hotel ID', type: 'text', placeholder: '1234567' },
     ],
     buildValue: (f) => ({ api_key: f.api_key, hotel_id: f.hotel_id }),
     helpUrl: 'https://partner.booking.com',
-    note: 'Requiere aprobación como Connectivity Partner de Booking.com.',
+    note: 'Requiere aprobación como Connectivity Partner de Booking.com (proceso enterprise). Para la mayoría de hostales basta con usar iCal.',
   },
   {
-    key: 'airbnb_config', name: 'Airbnb', category: 'OTAs', icon: '🏠',
+    key: 'airbnb_config', name: 'Airbnb (API Software Partner)', category: 'OTAs', icon: '🏠',
     fields: [
       { name: 'api_key', label: 'API Key', type: 'password', placeholder: 'Tu API key de partner' },
       { name: 'listing_id', label: 'Listing ID', type: 'text', placeholder: '123456789' },
     ],
     buildValue: (f) => ({ api_key: f.api_key, listing_id: f.listing_id }),
     helpUrl: 'https://www.airbnb.com/partner',
-    note: 'Requiere aprobación como Software Partner de Airbnb.',
+    note: 'Requiere aprobación como Software Partner de Airbnb. Para la mayoría de hostales basta con usar iCal.',
   },
 ];
 
