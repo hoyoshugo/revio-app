@@ -4,9 +4,9 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Settings, Building2, Users, Plug, Bell, Bot,
+  Settings, Building2, Users, Plug, Bell, Bot, Package,
   Save, Plus, Trash2, Edit2, Check, X, RefreshCw,
-  Eye, EyeOff, ChevronDown, ChevronUp, AlertCircle, CheckCircle
+  Eye, EyeOff, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Lock
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import AiProviderSelector from './AiProviderSelector.jsx';
@@ -1154,11 +1154,162 @@ function TabAgent({ properties, token }) {
 }
 
 // ============================================================
+// TAB MÓDULOS — vista del cliente (solo lectura de sus módulos)
+// ============================================================
+function TabModules({ token }) {
+  const [modules, setModules] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const r = await fetch(`${API}/api/modules`, { headers: { Authorization: `Bearer ${token}` } });
+        if (r.ok) {
+          const d = await r.json();
+          setModules(d.modules || []);
+        }
+      } catch (e) { console.error(e); }
+      setLoading(false);
+    }
+    load();
+  }, [token]);
+
+  if (loading) return <div className="text-gray-500 p-4">Cargando módulos...</div>;
+
+  const STATUS = {
+    production:  { label: 'Producción', badge: 'bg-green-900/50 border-green-700 text-green-300',   bar: 'bg-green-500' },
+    beta:        { label: 'Beta',        badge: 'bg-blue-900/50 border-blue-700 text-blue-300',       bar: 'bg-blue-500' },
+    development: { label: 'Desarrollo',  badge: 'bg-yellow-900/50 border-yellow-700 text-yellow-300', bar: 'bg-yellow-500' },
+    planned:     { label: 'Planificado', badge: 'bg-gray-800 border-gray-700 text-gray-400',         bar: 'bg-gray-500' },
+  };
+
+  const activeCount = modules.filter(m => m.tenant_active).length;
+  const available = modules.filter(m => m.tenant_active);
+  const notIncluded = modules.filter(m => !m.tenant_active);
+
+  return (
+    <div className="space-y-5">
+      {/* Header con stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-3">
+          <div className="text-2xl font-bold text-green-400">{activeCount}</div>
+          <div className="text-xs text-gray-500">Módulos activos</div>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-3">
+          <div className="text-2xl font-bold text-gray-400">{modules.length - activeCount}</div>
+          <div className="text-xs text-gray-500">Disponibles para activar</div>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-3">
+          <div className="text-2xl font-bold text-blue-400">
+            {modules.filter(m => m.status === 'production' || m.status === 'beta').length}
+          </div>
+          <div className="text-xs text-gray-500">En producción/beta</div>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-3">
+          <div className="text-2xl font-bold text-purple-400">
+            {modules.filter(m => m.is_sellable).length}
+          </div>
+          <div className="text-xs text-gray-500">Vendibles</div>
+        </div>
+      </div>
+
+      {/* Módulos activos */}
+      {available.length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            ✅ Tu plan incluye ({available.length})
+          </h3>
+          <div className="space-y-2">
+            {available.map(m => {
+              const st = STATUS[m.status] || STATUS.planned;
+              return (
+                <div key={m.id} className="bg-gray-900 border border-green-800/50 rounded-xl p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 flex-1">
+                      <span className="text-2xl">{m.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm text-white">{m.name}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full border ${st.badge}`}>{st.label}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-green-900/50 border border-green-700 text-green-300">
+                            Activo
+                          </span>
+                        </div>
+                        {m.description && <div className="text-xs text-gray-500 mt-1">{m.description}</div>}
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                            <div className={`h-full ${st.bar}`} style={{ width: `${m.completion_pct}%` }} />
+                          </div>
+                          <span className="text-xs text-gray-500">{m.completion_pct}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Módulos disponibles para contratar */}
+      {notIncluded.length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            🔒 Disponibles para agregar a tu plan
+          </h3>
+          <div className="space-y-2">
+            {notIncluded.map(m => {
+              const st = STATUS[m.status] || STATUS.planned;
+              return (
+                <div key={m.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 opacity-80 hover:opacity-100 transition-opacity">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 flex-1">
+                      <span className="text-2xl grayscale">{m.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm text-gray-300">{m.name}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full border ${st.badge}`}>{st.label}</span>
+                          {m.is_sellable && m.base_price_cop > 0 && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-900/50 border border-purple-700 text-purple-300">
+                              ${m.base_price_cop.toLocaleString()} COP/mes
+                            </span>
+                          )}
+                        </div>
+                        {m.description && <div className="text-xs text-gray-500 mt-1">{m.description}</div>}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => window.open('mailto:soporte@revio.co?subject=Activar módulo ' + m.name)}
+                      disabled={!m.is_sellable || m.status === 'planned'}
+                      className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-800 disabled:text-gray-600 rounded-lg whitespace-nowrap"
+                    >
+                      {m.is_sellable ? '+ Solicitar' : 'Próximamente'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="text-xs text-gray-500 bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <Lock className="w-3 h-3 inline mr-1" />
+        La activación y desactivación de módulos la gestiona el equipo de Revio.
+        Para agregar nuevos módulos contacta a <span className="text-blue-400">soporte@revio.co</span>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // COMPONENTE PRINCIPAL
 // ============================================================
 const TABS = [
   { id: 'general',       label: 'General',        icon: Settings },
   { id: 'properties',   label: 'Propiedades',     icon: Building2 },
+  { id: 'modules',      label: 'Módulos',         icon: Package },
   { id: 'users',        label: 'Usuarios',        icon: Users },
   { id: 'connections',  label: 'Conexiones',      icon: Plug },
   { id: 'notifications',label: 'Notificaciones',  icon: Bell },
@@ -1222,6 +1373,7 @@ export default function ConfigPanel() {
       <div>
         {activeTab === 'general'        && <TabGeneral properties={properties} token={token} />}
         {activeTab === 'properties'     && <TabProperties properties={properties} token={token} onRefresh={() => setRefreshKey(k => k + 1)} />}
+        {activeTab === 'modules'        && <TabModules token={token} />}
         {activeTab === 'users'          && <TabUsers properties={properties} token={token} />}
         {activeTab === 'connections'    && <TabConnections properties={properties} token={token} />}
         {activeTab === 'notifications'  && <TabNotifications properties={properties} token={token} />}

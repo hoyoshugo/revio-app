@@ -9,6 +9,7 @@ import {
   ChevronLeft, ChevronRight, Building2, Package
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useModules, RequireModule } from '../../hooks/useModules.jsx';
 import ThemeToggle from '../ui/ThemeToggle.jsx';
 
 // Existing components
@@ -52,43 +53,45 @@ const navGroups = [
   {
     label: 'Principal',
     items: [
-      { to: '/panel', label: 'Panel', icon: LayoutDashboard, end: true },
+      { to: '/panel',         label: 'Panel',         icon: LayoutDashboard, end: true },
       { to: '/conversations', label: 'Conversaciones', icon: MessageSquare },
-      { to: '/ota-inbox', label: 'Inbox OTA', icon: Inbox },
+      { to: '/ota-inbox',     label: 'Inbox OTA',      icon: Inbox },
     ]
   },
   {
     label: 'PMS',
+    module: 'pms',
     items: [
-      { to: '/gantt', label: 'Calendario', icon: CalendarDays },
-      { to: '/rooms', label: 'Habitaciones', icon: BedDouble },
-      { to: '/guests', label: 'Huéspedes', icon: Users },
+      { to: '/gantt',        label: 'Calendario',   icon: CalendarDays },
+      { to: '/rooms',        label: 'Habitaciones', icon: BedDouble },
+      { to: '/guests',       label: 'Huéspedes',    icon: Users },
       { to: '/housekeeping', label: 'Housekeeping', icon: Wrench },
     ]
   },
   {
     label: 'Revenue',
     items: [
-      { to: '/pos', label: 'POS Terminal', icon: ShoppingCart },
-      { to: '/wallets', label: 'Billeteras NFC', icon: Wallet },
-      { to: '/inventory', label: 'Inventario', icon: Package },
-      { to: '/transport', label: 'Transporte', icon: Package },
-      { to: '/payments', label: 'Pagos', icon: CreditCard },
-      { to: '/revenue', label: 'Revenue Intel', icon: TrendingUp },
+      { to: '/pos',       label: 'POS Terminal',    icon: ShoppingCart,  module: 'nfc_pos' },
+      { to: '/wallets',   label: 'Billeteras NFC',  icon: Wallet,        module: 'nfc_pos' },
+      { to: '/inventory', label: 'Inventario',      icon: Package,       module: 'inventory' },
+      { to: '/transport', label: 'Transporte',      icon: Package },
+      { to: '/payments',  label: 'Pagos',           icon: CreditCard },
+      { to: '/revenue',   label: 'Revenue Intel',   icon: TrendingUp },
     ]
   },
   {
     label: 'Agente IA',
     items: [
-      { to: '/ai', label: 'AI Concierge', icon: Sparkles },
-      { to: '/sandbox', label: 'Ensayo', icon: Beaker },
-      { to: '/knowledge', label: 'Aprendizaje IA', icon: BookOpen },
-      { to: '/property-knowledge', label: 'Info Propiedad', icon: Bot },
-      { to: '/escalations', label: 'Escalaciones', icon: AlertTriangle },
+      { to: '/ai',                 label: 'AI Concierge',     icon: Sparkles },
+      { to: '/sandbox',            label: 'Ensayo',           icon: Beaker },
+      { to: '/knowledge',          label: 'Aprendizaje IA',   icon: BookOpen },
+      { to: '/property-knowledge', label: 'Info Propiedad',   icon: Bot },
+      { to: '/escalations',        label: 'Escalaciones',     icon: AlertTriangle },
     ]
   },
   {
     label: 'Canales',
+    module: 'channel_manager',
     items: [
       { to: '/channels', label: 'Channel Manager', icon: Building2 },
     ]
@@ -169,6 +172,22 @@ function BillingPage() {
 
 export default function Dashboard() {
   const { user, logout, properties, currentProperty, switchProperty } = useAuth();
+  const { hasModule, loaded: modulesLoaded } = useModules();
+
+  // Filtrar grupos y items del menú según módulos activos del tenant
+  const visibleNavGroups = React.useMemo(() => {
+    if (!modulesLoaded) return navGroups;
+    return navGroups
+      .map(group => {
+        // Si el grupo entero tiene un module requerido, chequear
+        if (group.module && !hasModule(group.module)) return null;
+        // Filtrar items individuales
+        const items = group.items.filter(item => !item.module || hasModule(item.module));
+        if (items.length === 0) return null;
+        return { ...group, items };
+      })
+      .filter(Boolean);
+  }, [modulesLoaded, hasModule]);
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -241,7 +260,7 @@ export default function Dashboard() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
-          {navGroups.map(group => (
+          {visibleNavGroups.map(group => (
             <div key={group.label}>
               {!collapsed && (
                 <div
@@ -306,7 +325,7 @@ export default function Dashboard() {
               </button>
             </div>
             <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
-              {navGroups.map(group => (
+              {visibleNavGroups.map(group => (
                 <div key={group.label}>
                   <div className="px-2.5 mb-1 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-3)' }}>
                     {group.label}
@@ -381,16 +400,16 @@ export default function Dashboard() {
               <Route path="/ota-inbox" element={<OtaInbox property={property} />} />
 
               {/* PMS */}
-              <Route path="/gantt" element={<GanttCalendar property={property} />} />
-              <Route path="/rooms" element={<RoomsManager property={property} />} />
+              <Route path="/gantt" element={<RequireModule moduleId="pms"><GanttCalendar property={property} /></RequireModule>} />
+              <Route path="/rooms" element={<RequireModule moduleId="pms"><RoomsManager property={property} /></RequireModule>} />
               <Route path="/guests" element={<GuestsPanel property={property} />} />
               <Route path="/guests/:id" element={<GuestDetail />} />
-              <Route path="/housekeeping" element={<HousekeepingBoard property={property} />} />
+              <Route path="/housekeeping" element={<RequireModule moduleId="pms"><HousekeepingBoard property={property} /></RequireModule>} />
 
               {/* Revenue */}
-              <Route path="/pos" element={<POSTerminal property={property} />} />
-              <Route path="/wallets" element={<WalletPanel property={property} />} />
-              <Route path="/inventory" element={<Inventory />} />
+              <Route path="/pos" element={<RequireModule moduleId="nfc_pos"><POSTerminal property={property} /></RequireModule>} />
+              <Route path="/wallets" element={<RequireModule moduleId="nfc_pos"><WalletPanel property={property} /></RequireModule>} />
+              <Route path="/inventory" element={<RequireModule moduleId="inventory"><Inventory /></RequireModule>} />
               <Route path="/transport" element={<TransportPanel />} />
               <Route path="/payments" element={<PaymentsPanel property={property} />} />
               <Route path="/revenue" element={<RevenueIntelligence property={property} />} />
@@ -403,7 +422,7 @@ export default function Dashboard() {
               <Route path="/escalations" element={<EscalationsPanel property={property} />} />
 
               {/* Channels */}
-              <Route path="/channels" element={<ChannelManager />} />
+              <Route path="/channels" element={<RequireModule moduleId="channel_manager"><ChannelManager /></RequireModule>} />
 
               {/* Reports */}
               <Route path="/bookings" element={<BookingsList property={property} />} />

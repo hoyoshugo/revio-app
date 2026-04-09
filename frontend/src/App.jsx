@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { SuperAdminProvider, useSuperAdmin } from './context/SuperAdminContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
+import { ModulesProvider } from './hooks/useModules.jsx';
 
 // Lazy imports for code splitting
 const LoginPage          = React.lazy(() => import('./components/Admin/LoginPage.jsx'));
@@ -119,17 +120,19 @@ export default function App() {
               path="/*"
               element={
                 <AuthProvider>
-                  <Routes>
-                    <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
-                    <Route
-                      path="/*"
-                      element={
-                        <ProtectedRoute>
-                          <Dashboard />
-                        </ProtectedRoute>
-                      }
-                    />
-                  </Routes>
+                  <ModulesProvider>
+                    <Routes>
+                      <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
+                      <Route
+                        path="/*"
+                        element={
+                          <ProtectedRoute>
+                            <Dashboard />
+                          </ProtectedRoute>
+                        }
+                      />
+                    </Routes>
+                  </ModulesProvider>
                 </AuthProvider>
               }
             />
