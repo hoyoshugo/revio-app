@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabase } from '../models/supabase.js';
 import { requireAuth } from '../middleware/auth.js';
 import { sendWhatsAppMessage } from '../services/agentUtils.js';
+import { evaluateRefund, executeApprovedRefund } from '../services/refundPolicy.js';
 
 const router = Router();
 
@@ -115,6 +116,29 @@ router.patch('/:id', requireAuth, async (req, res) => {
     }
 
     res.json({ success: true, case: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/cancellation-cases/evaluate — motor de políticas (no persiste)
+router.post('/evaluate', requireAuth, async (req, res) => {
+  try {
+    const tenantId = await getTenantId(req.user);
+    const recommendation = await evaluateRefund({ tenantId, ...req.body });
+    res.json(recommendation);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/cancellation-cases/:id/execute — ejecutar refund aprobado
+router.post('/:id/execute', requireAuth, async (req, res) => {
+  try {
+    const { approvalNote } = req.body;
+    const result = await executeApprovedRefund(req.params.id, req.user.email, approvalNote);
+    if (!result.success) return res.status(400).json(result);
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

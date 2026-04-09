@@ -15,10 +15,9 @@ import {
   saveContact,
   requestApproval,
   sendReservationReport,
-  detectLanguage,
   getCaribbeanSchedules,
 } from '../services/agentUtils.js';
-import { buildSystemPrompt } from '../services/systemPromptBuilder.js';
+import { buildSystemPrompt as buildDynamicSystemPrompt } from '../services/systemPromptBuilder.js';
 import {
   getTransportOptions,
   formatTransportForAgent,
@@ -255,6 +254,94 @@ const TOOLS = [
       },
       required: ['property', 'info_type']
     }
+  },
+  {
+    name: 'check_moon_phase',
+    description: 'Verifica la fase lunar actual para saber si es posible ofrecer el tour de plancton bioluminiscente. El tour SOLO se puede hacer con luna oculta. Devuelve la fase actual y las próximas fechas válidas.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        date: { type: 'string', description: 'Fecha YYYY-MM-DD (opcional, default hoy)' },
+        days_ahead: { type: 'number', description: 'Cuántos días mirar adelante (default 14)' }
+      }
+    }
+  },
+  {
+    name: 'save_guest_contact',
+    description: 'Guarda los datos del huésped en el CRM para seguimiento posterior por WhatsApp/email. Llamar SIEMPRE que el cliente proporcione su nombre+teléfono o nombre+email.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        phone: { type: 'string', description: 'Con código país, ej +573001234567' },
+        email: { type: 'string' },
+        language: { type: 'string', description: 'es|en|fr|de|pt' },
+        source: { type: 'string', description: 'whatsapp|instagram|facebook|booking|airbnb|web' }
+      },
+      required: ['name']
+    }
+  },
+  {
+    name: 'request_approval',
+    description: 'Solicita aprobación al gerente para un upgrade, descuento especial, actividad gratis o cualquier oferta fuera de política. NO ofrezcas nada gratis al huésped sin haber recibido aprobación primero. Tipos: upgrade, discount, free_activity, refund, special_offer, invoice.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['upgrade', 'discount', 'free_activity', 'refund', 'special_offer', 'invoice'] },
+        description: { type: 'string', description: 'Descripción clara de lo que se pide' },
+        guest_name: { type: 'string' },
+        guest_contact: { type: 'string' },
+        amount_cop: { type: 'number', description: 'Monto en COP si aplica' }
+      },
+      required: ['type', 'description', 'guest_name']
+    }
+  },
+  {
+    name: 'get_transport_options',
+    description: 'Consulta opciones de transporte disponibles (Caribbean Treasures) entre un origen y la isla para una fecha. Úsalo cuando el cliente pregunta cómo llegar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        origin: { type: 'string', description: 'Cartagena, Rincón del Mar, Tintipán, Tolú' },
+        destination: { type: 'string', description: 'Islas de San Bernardo o Isla Palma' },
+        date: { type: 'string', description: 'YYYY-MM-DD' },
+        passengers: { type: 'number', description: 'Número de pasajeros' }
+      },
+      required: ['origin', 'destination']
+    }
+  },
+  {
+    name: 'reserve_transport',
+    description: 'Crea una reserva de transporte con Caribbean Treasures. Úsalo SOLO después de haber confirmado fecha, pasajeros y ruta con el huésped.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        route_code: { type: 'string', description: 'CTG-ISL | RIN-ISL | ISL-CTG | RIN-CTG' },
+        date: { type: 'string' },
+        passengers: { type: 'number' },
+        guest_name: { type: 'string' },
+        guest_email: { type: 'string' },
+        guest_phone: { type: 'string' },
+        revio_reservation_id: { type: 'string', description: 'ID de la reserva Revio asociada (si existe)' }
+      },
+      required: ['route_code', 'date', 'passengers', 'guest_name']
+    }
+  },
+  {
+    name: 'create_cancellation_case',
+    description: 'Crea un caso de cancelación con número de seguimiento. Úsalo cuando el cliente solicita cancelar. Evalúa primero las políticas y luego crea el caso. El caso va al gerente para aprobación del reembolso.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        reservation_id: { type: 'string' },
+        guest_name: { type: 'string' },
+        guest_email: { type: 'string' },
+        guest_phone: { type: 'string' },
+        reason: { type: 'string', description: 'Motivo declarado por el huésped' },
+        refund_amount_cop: { type: 'number', description: 'Monto calculado según política' }
+      },
+      required: ['guest_name', 'reason']
+    }
   }
 ];
 
@@ -355,6 +442,114 @@ async function executeTool(toolName, toolInput, conversation, propertyId) {
         return { isla_palma: propertyData['isla-palma'], tayrona: propertyData.tayrona };
       }
       return propertyData[propertySlug] || { error: 'Propiedad no encontrada' };
+    }
+
+    case 'check_moon_phase': {
+      const date = toolInput.date ? new Date(toolInput.date) : new Date();
+      const current = getMoonPhase(date);
+      const next = getBioluminescenceDates(date, toolInput.days_ahead || 14);
+      return {
+        current_phase: current.phase,
+        emoji: current.emoji,
+        bioluminescence_today: current.suitable_bioluminescence,
+        next_valid_dates: next.slice(0, 5).map(d => d.date),
+        note: current.suitable_bioluminescence
+          ? 'HOY el tour de bioluminiscencia SÍ es posible (luna oculta).'
+          : 'HOY el tour de bioluminiscencia NO es posible. La luna interfiere con el plancton. Sugiere una de las fechas válidas próximas.',
+      };
+    }
+
+    case 'save_guest_contact': {
+      const tenantId = conversation.tenant_id || null;
+      if (!tenantId) return { success: false, error: 'tenant_id no disponible en conversación' };
+      const contact = await saveContact(tenantId, {
+        name: toolInput.name,
+        phone: toolInput.phone,
+        email: toolInput.email,
+        language: toolInput.language || conversation.guest_language || 'es',
+        source: toolInput.source || conversation.channel || 'web',
+      });
+      return { success: !!contact, contact_id: contact?.id };
+    }
+
+    case 'request_approval': {
+      const tenantId = conversation.tenant_id || null;
+      if (!tenantId) return { success: false, error: 'tenant_id no disponible' };
+      const approval = await requestApproval(tenantId, propertyId, toolInput.type, {
+        description: toolInput.description,
+        guestName: toolInput.guest_name,
+        guestContact: toolInput.guest_contact,
+        amountCop: toolInput.amount_cop,
+      });
+      return {
+        success: !!approval,
+        case_id: approval?.id,
+        status: 'pending_approval',
+        note: 'Solicitud enviada al gerente. IMPORTANTE: no confirmes al huésped que se aprobó — espera respuesta del equipo.',
+      };
+    }
+
+    case 'get_transport_options': {
+      const options = await getTransportOptions(
+        toolInput.origin,
+        toolInput.destination,
+        toolInput.date,
+        toolInput.passengers || 1
+      );
+      return {
+        options: options.direct,
+        count: options.direct?.length || 0,
+        formatted: formatTransportForAgent(options, toolInput.origin, toolInput.date),
+      };
+    }
+
+    case 'reserve_transport': {
+      // Resolver routeId desde routeCode
+      const { getRoutes } = await import('../integrations/transport/caribbeanTreasures.js');
+      const { routes } = await getRoutes();
+      const route = routes.find(r => r.code === toolInput.route_code);
+      if (!route) return { success: false, error: `Ruta ${toolInput.route_code} no encontrada` };
+
+      const result = await createTransportReservation({
+        routeId: route.id,
+        date: toolInput.date,
+        passengers: toolInput.passengers,
+        guestName: toolInput.guest_name,
+        guestEmail: toolInput.guest_email,
+        guestPhone: toolInput.guest_phone,
+        hotelId: 1, // Mística Isla Palma es hotel #1 en Caribbean Treasures
+        revioReservationId: toolInput.revio_reservation_id,
+      });
+      return result;
+    }
+
+    case 'create_cancellation_case': {
+      const tenantId = conversation.tenant_id || null;
+      if (!tenantId) return { success: false, error: 'tenant_id no disponible' };
+      const caseNumber = `CAN-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+      const { data, error } = await supabase
+        .from('cancellation_cases')
+        .insert({
+          case_number: caseNumber,
+          tenant_id: tenantId,
+          property_id: propertyId,
+          reservation_id: toolInput.reservation_id,
+          guest_name: toolInput.guest_name,
+          guest_email: toolInput.guest_email,
+          guest_phone: toolInput.guest_phone,
+          cancellation_reason: toolInput.reason,
+          refund_amount_cop: toolInput.refund_amount_cop || 0,
+          refund_status: 'pending',
+        })
+        .select()
+        .single();
+      if (error) return { success: false, error: error.message };
+      return {
+        success: true,
+        case_number: caseNumber,
+        status: 'pending_review',
+        note: `Caso creado. Comparte el número ${caseNumber} con el huésped para seguimiento. El gerente decidirá el reembolso en 24-48h.`,
+      };
     }
 
     default:

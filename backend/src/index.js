@@ -43,6 +43,7 @@ import syncRoutes from './routes/sync.js';
 import cancellationCasesRoutes from './routes/cancellationCases.js';
 import prefacturaRoutes from './routes/prefactura.js';
 import transportRoutes from './routes/transport.js';
+import paymentLinkRoutes from './routes/paymentLink.js';
 import { syncAllProperties } from './services/icalSync.js';
 import cron from 'node-cron';
 import { generalLimiter } from './middleware/rateLimiter.js';
@@ -133,6 +134,7 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/cancellation-cases', cancellationCasesRoutes);
 app.use('/api/prefactura', prefacturaRoutes);
 app.use('/api/transport', transportRoutes);
+app.use('/api/payment-link', paymentLinkRoutes);
 
 // Cron OTA iCal sync — cada 15 minutos
 cron.schedule('*/15 * * * *', async () => {
@@ -146,6 +148,29 @@ cron.schedule('*/15 * * * *', async () => {
 }, { timezone: 'America/Bogota' });
 console.log(JSON.stringify({
   level: 'info', event: 'ical_sync_cron_started', interval: '15min',
+}));
+
+// Cron auditoría semanal de plataformas (domingos 08:00 Bogotá)
+cron.schedule('0 8 * * 0', async () => {
+  try {
+    const { runPlatformAudit } = await import('./services/platformAudit.js');
+    const { supabase: sb } = await import('./models/supabase.js');
+    const { data: props } = await sb.from('properties').select('id, tenant_id').eq('is_active', true);
+    for (const p of props || []) {
+      await runPlatformAudit(p.tenant_id, p.id).catch(e =>
+        console.error('platform_audit_error', p.id, e.message));
+    }
+    console.log(JSON.stringify({
+      level: 'info', event: 'cron_platform_audit_completed', count: props?.length || 0,
+    }));
+  } catch (err) {
+    console.error(JSON.stringify({
+      level: 'error', event: 'cron_platform_audit_failed', error: err.message,
+    }));
+  }
+}, { timezone: 'America/Bogota' });
+console.log(JSON.stringify({
+  level: 'info', event: 'platform_audit_cron_started', schedule: 'domingos 08:00 Bogotá',
 }));
 
 // Health check
