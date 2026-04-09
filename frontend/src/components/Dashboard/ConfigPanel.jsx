@@ -605,12 +605,22 @@ function TabConnections({ properties, token }) {
     setSaving(section);
     const p = properties.find(p => p.slug === slug);
     try {
+      // Save connections as a whole
       const res = await fetch(`${API}/api/settings`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ property_id: p?.id, key: 'connections', value: form })
       });
       if (!res.ok) throw new Error((await res.json()).error);
+
+      // Also sync iCal URLs to dedicated key (used by cron sync service)
+      if (form.ical) {
+        await fetch(`${API}/api/settings`, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ property_id: p?.id, key: 'ota_ical_urls', value: form.ical })
+        });
+      }
       toast(`Credenciales de ${section} guardadas`);
     } catch (err) { toast(err.message, false); }
     finally { setSaving(null); }
@@ -636,11 +646,25 @@ function TabConnections({ properties, token }) {
             onChange={f('pms', 'type')}
             options={[
               { value: 'lobbypms',        label: '🏨 LobbyPMS — Integración completa (LATAM)' },
-              { value: 'cloudbeds',       label: '☁️ Cloudbeds — API REST v1.2' },
-              { value: 'mews',            label: '🌐 Mews — Open API' },
-              { value: 'little_hotelier', label: '🏡 Little Hotelier — Webhook' },
-              { value: 'clock',           label: '🕐 Clock PMS — Webhook' },
-              { value: 'custom',          label: '⚙️ Otro / Custom — Endpoint propio' },
+              { value: 'cloudbeds',       label: '☁️ Cloudbeds — API REST v1.2 (Global)' },
+              { value: 'mews',            label: '🔷 Mews — Open API (Global)' },
+              { value: 'little_hotelier', label: '🏩 Little Hotelier (Global)' },
+              { value: 'clock',           label: '🕐 Clock PMS (Global)' },
+              { value: 'beds24',          label: '🛏️ Beds24 — Ideal hostales y B&Bs' },
+              { value: 'hostaway',        label: '🏠 Hostaway — Alquileres vacacionales' },
+              { value: 'lodgify',         label: '🏡 Lodgify — Vacation rentals' },
+              { value: 'rms',             label: '☁️ RMS Cloud (AU/NZ/Global)' },
+              { value: 'hotelogix',       label: '🌐 Hotelogix (India/Global)' },
+              { value: 'opera',           label: '🔴 Oracle Opera (Enterprise — próximamente)' },
+              { value: 'loggro',          label: '🇨🇴 Loggro — PMS colombiano con DIAN' },
+              { value: 'odoo',            label: '🟣 Odoo Hotel Management' },
+              { value: 'siigo',           label: '📊 Siigo módulo hotel (Colombia)' },
+              { value: 'stayntouch',      label: '📱 StayNtouch — Mobile-first PMS' },
+              { value: 'guestline',       label: '🏨 Guestline (UK/EU)' },
+              { value: 'protel',          label: '⚙️ Protel (Global)' },
+              { value: 'maestro',         label: '🎵 Maestro PMS (US/CA)' },
+              { value: 'world_office',    label: '🌍 World Office (Colombia)' },
+              { value: 'custom',          label: '🔧 Otro / Custom — Endpoint propio' },
             ]}
           />
         </Field>
@@ -694,19 +718,33 @@ function TabConnections({ properties, token }) {
         </div>
       </ConnBlock>
 
-      <ConnBlock title="Wompi (pagos)" icon="💳" guideId="wompi" onGuide={openGuide}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <Field label="Llave pública">
-            <Input value={g('wompi', 'public_key')} onChange={f('wompi', 'public_key')} placeholder="pub_prod_..." />
-          </Field>
-          <Field label="Llave privada">
-            <SecretInput value={g('wompi', 'private_key')} onChange={f('wompi', 'private_key')} placeholder="prv_prod_..." />
-          </Field>
+      <ConnBlock title="Pasarelas de pago" icon="💳" guideId="wompi" onGuide={openGuide}>
+        <div className="space-y-4">
+          {[
+            { key: 'wompi', label: '💳 Wompi (Colombia)', fields: [{ k: 'public_key', l: 'Llave pública', ph: 'pub_prod_...' }, { k: 'private_key', l: 'Llave privada', ph: 'prv_prod_...', secret: true }] },
+            { key: 'payu', label: '💰 PayU (LATAM)', fields: [{ k: 'merchant_id', l: 'Merchant ID', ph: '123456' }, { k: 'account_id', l: 'Account ID', ph: '654321' }, { k: 'api_key', l: 'API Key', ph: 'API Key...', secret: true }] },
+            { key: 'bold', label: '⚡ Bold (Colombia)', fields: [{ k: 'api_key', l: 'API Key', ph: 'bold_api_...', secret: true }] },
+            { key: 'stripe', label: '💜 Stripe (Internacional)', fields: [{ k: 'public_key', l: 'Publishable Key', ph: 'pk_live_...' }, { k: 'secret_key', l: 'Secret Key', ph: 'sk_live_...', secret: true }] },
+            { key: 'mercadopago', label: '🟡 MercadoPago (LATAM)', fields: [{ k: 'public_key', l: 'Public Key', ph: 'APP_USR-...' }, { k: 'access_token', l: 'Access Token', ph: 'APP_USR-...', secret: true }] },
+            { key: 'paypal', label: '🔵 PayPal', fields: [{ k: 'client_id', l: 'Client ID', ph: 'AAAA...' }, { k: 'secret', l: 'Secret', ph: 'BBBB...', secret: true }] },
+            { key: 'addi', label: '🛍️ ADDI (cuotas sin interés)', fields: [{ k: 'ally_slug', l: 'Ally Slug', ph: 'mi-hotel' }, { k: 'client_id', l: 'Client ID', ph: '...' }, { k: 'client_secret', l: 'Client Secret', ph: '...', secret: true }] },
+          ].map(({ key, label, fields }) => (
+            <div key={key} className="border border-gray-800 rounded-lg p-3 space-y-2">
+              <h4 className="text-xs font-semibold text-gray-400">{label}</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {fields.map(({ k, l, ph, secret }) => (
+                  <Field key={k} label={l}>
+                    {secret
+                      ? <SecretInput value={g(key, k)} onChange={f(key, k)} placeholder={ph} />
+                      : <Input value={g(key, k)} onChange={f(key, k)} placeholder={ph} />
+                    }
+                  </Field>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
-        <div className="flex items-center justify-between">
-          <TestBtn service="wompi" slug={slug} token={token} />
-          <SaveBtn onClick={() => save('Wompi')} saving={saving === 'Wompi'} label="Guardar" />
-        </div>
+        <SaveBtn onClick={() => save('Pagos')} saving={saving === 'Pagos'} label="Guardar pasarelas" />
       </ConnBlock>
 
       <ConnBlock title="WhatsApp Business" icon="💬" guideId="whatsapp" onGuide={openGuide}>
@@ -724,7 +762,32 @@ function TabConnections({ properties, token }) {
         </div>
       </ConnBlock>
 
-      <ConnBlock title="OTAs" icon="🌐" guideId="booking" onGuide={openGuide}>
+      <ConnBlock title="OTAs — Sincronización iCal (recomendado)" icon="📅" guideId="booking" onGuide={openGuide} defaultOpen>
+        <p className="text-xs text-gray-500 mb-3">
+          Pega los enlaces iCal exportados desde cada OTA. Sincronización automática cada 15 minutos.
+          Funciona sin partner agreement — ideal para cualquier propiedad.
+        </p>
+        <div className="space-y-2">
+          {[
+            { k: 'booking_url',     l: '🏩 iCal Booking.com',    ph: 'https://admin.booking.com/hotel/hoteladmin/ical.html?...' },
+            { k: 'airbnb_url',      l: '🏠 iCal Airbnb',          ph: 'https://www.airbnb.com/calendar/ical/12345.ics?s=...' },
+            { k: 'hostelworld_url', l: '🌍 iCal Hostelworld',     ph: 'https://...' },
+            { k: 'vrbo_url',        l: '🏡 iCal VRBO',            ph: 'https://www.vrbo.com/icalendar/...ics' },
+            { k: 'expedia_url',     l: '✈️ iCal Expedia',          ph: 'https://...' },
+          ].map(({ k, l, ph }) => (
+            <Field key={k} label={l}>
+              <Input value={g('ical', k)} onChange={f('ical', k)} placeholder={ph} />
+            </Field>
+          ))}
+        </div>
+        <SaveBtn onClick={() => save('iCal OTAs')} saving={saving === 'iCal OTAs'} label="Guardar URLs iCal" />
+      </ConnBlock>
+
+      <ConnBlock title="OTAs — API Directa (enterprise)" icon="🌐" guideId="booking" onGuide={openGuide}>
+        <p className="text-xs text-gray-500 mb-3">
+          Para propiedades con partner agreement aprobado por cada OTA.
+          La mayoría puede usar solo iCal (arriba).
+        </p>
         <div className="space-y-5">
           {[
             { key: 'booking', label: 'Booking.com', fields: [{ k: 'username', l: 'Usuario' }, { k: 'password', l: 'Contraseña', secret: true }, { k: 'hotel_id', l: 'Hotel ID' }] },
@@ -743,9 +806,6 @@ function TabConnections({ properties, token }) {
                     }
                   </Field>
                 ))}
-              </div>
-              <div className="flex items-center justify-between">
-                <TestBtn service={key} slug={slug} token={token} />
               </div>
             </div>
           ))}

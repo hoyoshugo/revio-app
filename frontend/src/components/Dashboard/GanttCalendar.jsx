@@ -764,6 +764,7 @@ export default function GanttCalendar() {
                       const guestName = res.guests
                         ? `${res.guests.first_name} ${res.guests.last_name || ''}`
                         : 'Huésped';
+                      const isTerminal = ['cancelled', 'checked_out', 'no_show'].includes(res.status);
                       return (
                         <div
                           key={res.id}
@@ -772,12 +773,12 @@ export default function GanttCalendar() {
                             left: style.left,
                             width: style.width,
                             background: style.color,
-                            opacity: dragging === res.id ? 0.4 : 1,
-                            cursor: 'pointer',
+                            opacity: dragging === res.id ? 0.4 : isTerminal ? 0.6 : 1,
+                            cursor: isTerminal ? 'not-allowed' : 'pointer',
                             userSelect: 'none',
                           }}
-                          draggable
-                          onDragStart={e => handleDragStart(e, res)}
+                          draggable={!isTerminal}
+                          onDragStart={e => !isTerminal && handleDragStart(e, res)}
                           onDragEnd={handleDragEnd}
                           onClick={() => handleBarClick(res)}
                           onMouseEnter={e => setTooltip({ res, x: e.clientX, y: e.clientY })}

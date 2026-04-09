@@ -165,6 +165,10 @@ CREATE POLICY "scheduled_reports_service_all" ON scheduled_reports FOR ALL USING
 -- SEED: plantillas de mensajes automáticos para Mística
 -- ═══════════════════════════════════════
 
+-- Índice único para garantizar idempotencia del seed
+CREATE UNIQUE INDEX IF NOT EXISTS idx_automated_messages_unique_trigger
+  ON automated_messages(tenant_id, property_id, trigger_type);
+
 INSERT INTO automated_messages (tenant_id, property_id, name, trigger_type, trigger_hours_offset, channel, message_template, is_active)
 SELECT
   t.id AS tenant_id,
@@ -193,7 +197,7 @@ CROSS JOIN (VALUES
 ) AS msg(name, trigger_type, offset_hours, tpl)
 WHERE t.contact_email = 'admin@misticahostels.com'
   AND p.tenant_id = t.id
-ON CONFLICT DO NOTHING;
+ON CONFLICT (tenant_id, property_id, trigger_type) DO NOTHING;
 
 COMMENT ON TABLE contacts            IS 'CRM multi-tenant: contactos de todos los canales con dedupe por phone+email';
 COMMENT ON TABLE automated_messages  IS 'Plantillas de mensajes automáticos disparados por triggers (booking_confirmed, pre_arrival, etc)';

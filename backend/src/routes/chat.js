@@ -6,6 +6,7 @@ import lobby from '../integrations/lobbyPMS.js';
 import wompi from '../integrations/wompi.js';
 import whatsapp from '../integrations/whatsapp.js';
 import { chatLimiter } from '../middleware/rateLimiter.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -241,7 +242,7 @@ async function scheduleBookingCommunications(booking, property) {
 // ============================================================
 // GET /api/chat/history/:sessionId — Historial de conversación
 // ============================================================
-router.get('/history/:sessionId', async (req, res) => {
+router.get('/history/:sessionId', requireAuth, async (req, res) => {
   const { sessionId } = req.params;
   try {
     const conversation = await db.getOrCreateConversation(sessionId, null);

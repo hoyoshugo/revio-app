@@ -44,6 +44,11 @@ import cancellationCasesRoutes from './routes/cancellationCases.js';
 import prefacturaRoutes from './routes/prefactura.js';
 import transportRoutes from './routes/transport.js';
 import paymentLinkRoutes from './routes/paymentLink.js';
+import contactsRoutes from './routes/contacts.js';
+import automatedMessagesRoutes from './routes/automatedMessages.js';
+import approvalRequestsRoutes from './routes/approvalRequests.js';
+import platformAuditsRoutes from './routes/platformAudits.js';
+import scheduledReportsRoutes from './routes/scheduledReports.js';
 import { syncAllProperties } from './services/icalSync.js';
 import cron from 'node-cron';
 import { generalLimiter } from './middleware/rateLimiter.js';
@@ -135,6 +140,11 @@ app.use('/api/cancellation-cases', cancellationCasesRoutes);
 app.use('/api/prefactura', prefacturaRoutes);
 app.use('/api/transport', transportRoutes);
 app.use('/api/payment-link', paymentLinkRoutes);
+app.use('/api/contacts', contactsRoutes);
+app.use('/api/automated-messages', automatedMessagesRoutes);
+app.use('/api/approval-requests', approvalRequestsRoutes);
+app.use('/api/platform-audits', platformAuditsRoutes);
+app.use('/api/scheduled-reports', scheduledReportsRoutes);
 
 // Cron OTA iCal sync — cada 15 minutos
 cron.schedule('*/15 * * * *', async () => {

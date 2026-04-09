@@ -8,7 +8,7 @@
 - **GitHub**: https://github.com/hoyoshugo/revio-app
 - **Supabase**: https://supabase.com/dashboard/project/apghalkivuvyhbmethxk
 
-## Estado de producción (2026-04-05) — v2.2
+## Estado de producción (2026-04-09) — v2.3
 ```
 ✅ Backend (uptime OK)  ✅ Auth (superadmin + cliente)  ✅ Dashboard  ✅ Wompi x2
 ✅ Agente IA → OPERATIVO con Claude claude-sonnet-4-6
@@ -26,15 +26,23 @@
 ✅ Token localStorage: normalizado a revio_token (fallback mystica_token)
 ✅ IP Monitor → detecta IP en startup, guarda en Supabase, alerta WhatsApp
 ✅ SuperAdmin → Servidor panel con IP actual, instrucciones whitelist, setup CF proxy
+✅ POS Terminal → standalone /pos route + 4 revenue centers + 20 productos (Isla Palma)
+✅ Inventory → backend CRUD + movimientos + alertas + reportes (9 endpoints)
+✅ PMS Gantt → drag-drop optimista + modal detalle + check-in/out/cancelar
+✅ Rooms seed → 3 room_types + 8 rooms (Isla Palma)
+✅ Advanced features → contacts, automated_messages, approval_requests, platform_audits, scheduled_reports
 ```
 
-## Tests (15/15 pasando — prod) — 2026-04-05
+## Tests (26/26 pasando — prod) — 2026-04-09
 ```
 ✅ Health Check   ✅ SA Login   ✅ Client Login  ✅ Dashboard Metrics
 ✅ Meta Webhook   ✅ Agent ES   ✅ Agent Tayrona ✅ Agent EN
 ✅ Wompi Isla     ✅ Wompi Tayrona  ✅ WA Token  ✅ WA Phone (DISCONNECTED)
-✅ Anthropic
-✅ LobbyPMS Isla   ✅ LobbyPMS Tayrona  (vía fly.io proxy — IP estática permanente)
+✅ LobbyPMS Isla  ✅ LobbyPMS Tayrona  (vía fly.io proxy)
+✅ POS Revenue Centers  ✅ POS Products  ✅ POS Orders
+✅ Inventory Items  ✅ Inventory Alerts  ✅ Inventory Report  ✅ Inventory CRUD
+✅ PMS Room Types  ✅ PMS Gantt Availability  ✅ PMS Reservations
+✅ Analytics Events (tabla Supabase)  ✅ Anthropic API
 ```
 
 ## Acciones manuales pendientes (prioridad)
@@ -98,8 +106,8 @@ Siempre invocar `dev-context-loader` primero, luego el orquestador o el skill di
 | Modulo | Estado | Skill local |
 |--------|--------|-------------|
 | Vision global del ecosistema | activo | `ecosystem-master` |
-| PMS Hotelero (35% hecho) | P1 | `revio-pms` |
-| Inventarios (20% hecho) | P1-urgente | `revio-inventory` |
+| PMS Hotelero (50% hecho) | P1 | `revio-pms` |
+| Inventarios (60% hecho) | P1 | `revio-inventory` |
 | Wallets / NFC (55% hecho) | P1 | `revio-nfc` |
 | Contable / DIAN | P2 | `revio-accounting` |
 | Marketing IA | P2 | `revio-marketing` |
@@ -109,20 +117,23 @@ Siempre invocar `dev-context-loader` primero, luego el orquestador o el skill di
 | QA / Testing | activo | `revio-qa` |
 | Coordinacion del enjambre | activo | `swarm-coordinator` |
 
-### Roadmap real (auditado 2026-04-05)
+### Roadmap real (auditado 2026-04-09)
 ```
-Base de codigo: 32.365 lineas (backend 12.989 + frontend 19.376)
+Backend routes: 41 archivos (~7,500 LOC)  |  Frontend: 75 JSX (~19,400 LOC)
+API endpoints: 41 route groups  |  Migraciones: 15 SQL  |  Tests: 26/26
 
-HOY:    Vender Revenue Agent (90% completo)
-S1:     inventory.js backend (1.5 semanas -- URGENTE)
-S1-S2:  POS Terminal frontend completo
-S2-S6:  PMS tarifas + DIAN + channel manager
-S3-S5:  NFC: hardware real + PWA meseros
-S6-S10: Marketing IA (iniciar Meta review HOY)
-ULTIMO: Contable DIAN (iniciar habilitacion HOY)
+✅ HECHO: Inventory backend completo (9 endpoints)
+✅ HECHO: POS Terminal standalone + seed Isla Palma
+✅ HECHO: PMS Gantt drag-drop + modal detalle
+✅ HECHO: 5 CRUD rutas avanzadas (contacts, automated_messages, etc.)
 
-BLOQUEANTES: DIAN habilitacion (4-8 sem), WhatsApp OTP (manual)
-VER: ROADMAP.md para analisis completo
+SIGUIENTE:
+S1-S2:  PMS tarifas dinámicas + channel manager bidireccional
+S2-S3:  NFC hardware real + PWA meseros
+S3-S6:  Marketing IA (Meta API review pendiente)
+S6+:    Contable DIAN (habilitación 4-8 sem)
+
+BLOQUEANTES: DIAN habilitación (burocrático), WhatsApp reconectar (manual)
 ```
 
 ## Contexto del proyecto
@@ -143,7 +154,7 @@ VER: ROADMAP.md para analisis completo
 backend/
   src/
     agents/hotelAgent.js      ← Motor principal del agente IA
-    routes/                   ← chat, bookings, payments, dashboard, ota, social, settings, superadmin
+    routes/                   ← 41 archivos: chat, bookings, payments, dashboard, ota, social, settings, superadmin, rooms, reservations, pos, inventory, contacts, approvalRequests, automatedMessages, platformAudits, scheduledReports...
     services/                 ← scheduler, learningEngine, escalation, accessControl, healthMonitor
     integrations/             ← whatsapp, lobbypms, wompi, booking, airbnb, instagram, facebook...
     middleware/               ← auth.js (clientes), superadminAuth.js (Mística Tech)
@@ -175,13 +186,21 @@ frontend/
 4. **Sin contraseñas hasheadas** — el sistema usa plaintext por diseño (arquitectura actual del cliente)
 5. **Variables de entorno** — nunca hardcodear valores de producción; usar `process.env.X || 'default_dev'`
 
-## Migraciones pendientes
+## Migraciones
 
-Ejecutar en Supabase SQL Editor en este orden:
-1. `backend/supabase/migration_003_escalations.sql`
-2. `backend/supabase/migration_005_settings.sql`
-3. `backend/supabase/migration_006_saas_tables.sql`
-4. `backend/supabase/migration_007_health_reports.sql` ← creado por system-guardian
+Todas ejecutadas manualmente en Supabase SQL Editor. Orden aplicado:
+1. `migration_002_ota_noshows.sql` — ota_messages, ota_reservations, ota_no_shows
+2. `migration_003_escalations.sql` — health_checks, knowledge_base, escalations
+3. `migration_005_settings.sql` — settings key-value
+4. `migration_006_saas_tables.sql` — tenants, tenant_plans, tenant_subscriptions
+5. `migration_007_health_reports.sql` — system_health_reports
+6. `migration_008_inventory.sql` — inventory_items, inventory_movements
+7. `migration_008_billing_discounts.sql` — tenant_discounts, promo_codes
+8. `migration_009_pos_tables.sql` — revenue_centers, products, pos_orders, pos_order_items
+9. `migration_010_full_pms_fixed.sql` — room_types, rooms, guests, reservations, housekeeping_tasks, events, wallets
+10. `migration_011_modules.sql` — revio_modules, tenant_modules
+11. `migration_012_analytics.sql` — analytics_events
+12. `migration_013_advanced_features_fixed.sql` — contacts, automated_messages, cancellation_cases, approval_requests, platform_audits, scheduled_reports
 
 ## Comandos útiles
 

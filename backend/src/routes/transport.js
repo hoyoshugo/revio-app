@@ -12,6 +12,9 @@ import {
 
 const router = Router();
 
+// Nota: las rutas GET son públicas por diseño — consumidas por el agente IA
+// (hotelAgent.js) que no porta JWT. Solo /reserve requiere auth.
+
 // GET /api/transport/routes
 router.get('/routes', async (_req, res) => {
   res.json(await getRoutes());
