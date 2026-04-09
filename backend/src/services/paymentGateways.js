@@ -117,6 +117,36 @@ export const PAYMENT_GATEWAYS = {
     note: 'Transferencias internacionales — bajo costo FX',
     createLink: async () => null,
   },
+
+  sistecredito: {
+    name: 'Sistecrédito',
+    icon: '💳',
+    countries: ['CO'],
+    currencies: ['COP'],
+    available: false,
+    note: 'Crédito a cuotas para hoteles — requiere convenio comercial',
+    createLink: async () => null,
+  },
+
+  credibanco: {
+    name: 'Credibanco',
+    icon: '🏦',
+    countries: ['CO'],
+    currencies: ['COP'],
+    available: false,
+    note: 'Red de adquirencia Visa Colombia — requiere cuenta comercio',
+    createLink: async () => null,
+  },
+
+  redeban: {
+    name: 'Redeban',
+    icon: '🏦',
+    countries: ['CO'],
+    currencies: ['COP'],
+    available: false,
+    note: 'Red de adquirencia Mastercard Colombia — requiere cuenta comercio',
+    createLink: async () => null,
+  },
 };
 
 /**
