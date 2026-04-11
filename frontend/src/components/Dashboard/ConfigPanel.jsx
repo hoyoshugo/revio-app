@@ -153,6 +153,8 @@ function TabGeneral({ properties, token }) {
     const p = properties.find(p => p.id === propertyId);
     if (p) setForm({
       name: p.name || '',
+      group_name: p.group_name || '',
+      group_description: p.group_description || '',
       brand_name: p.brand_name || '',
       brand_logo_url: p.brand_logo_url || '',
       brand_primary_color: p.brand_primary_color || '#1a1a2e',
@@ -193,19 +195,39 @@ function TabGeneral({ properties, token }) {
         </Field>
       )}
 
+      <SectionCard title="Grupo hotelero (white-label)">
+        <Field
+          label="Nombre del grupo / cadena hotelera"
+          hint="Este nombre identifica tu conjunto de propiedades ante los huéspedes (ej: si tienes 3 hoteles bajo la misma marca)."
+        >
+          <Input
+            value={form.group_name}
+            onChange={f('group_name')}
+            placeholder="Ej: Mística Hostels, Cadena Boutique XYZ"
+          />
+        </Field>
+        <Field label="Descripción breve del grupo (opcional)">
+          <Input
+            value={form.group_description}
+            onChange={f('group_description')}
+            placeholder="Cadena de hostales boutique en el Caribe colombiano"
+          />
+        </Field>
+      </SectionCard>
+
       <SectionCard title="Identidad del establecimiento">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Nombre del establecimiento">
             <Input value={form.name} onChange={f('name')} placeholder="Hotel Ejemplo Centro" />
           </Field>
           <Field label="Nombre de marca (white-label)">
-            <Input value={form.brand_name} onChange={f('brand_name')} placeholder="Mística" />
+            <Input value={form.brand_name} onChange={f('brand_name')} placeholder="Marca" />
           </Field>
           <Field label="URL del logo" hint="URL pública de imagen (PNG/SVG recomendado)">
             <Input value={form.brand_logo_url} onChange={f('brand_logo_url')} placeholder="https://..." />
           </Field>
           <Field label="Dirección / Ubicación">
-            <Input value={form.location} onChange={f('location')} placeholder="Isla Palma, San Bernardo" />
+            <Input value={form.location} onChange={f('location')} placeholder="Ciudad, región" />
           </Field>
         </div>
       </SectionCard>

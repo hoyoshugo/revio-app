@@ -35,20 +35,36 @@ const AI_PROVIDERS = [
 ];
 
 const PAYMENT_PROVIDERS = [
-  { key: 'wompi',       name: 'Wompi',         brand: 'Colombia', icon: '💳', guide: 'wompi',
+  { key: 'wompi',       name: 'Wompi',         brand: 'Colombia',  icon: '💳', guide: 'wompi',
     fields: [
       { k: 'public_key',  label: 'Llave pública',  placeholder: 'pub_prod_...', secret: false },
-      { k: 'private_key', label: 'Llave privada',  placeholder: 'prv_prod_...', secret: true },
+      { k: 'private_key', label: 'Llave privada',  placeholder: 'prv_prod_...', secret: true  },
     ] },
-  { key: 'mercadopago', name: 'Mercado Pago',  brand: 'LATAM',    icon: '🛒', guide: 'mercado_pago',
+  { key: 'mercadopago', name: 'Mercado Pago',  brand: 'LATAM',     icon: '🛒', guide: 'mercado_pago',
     fields: [
-      { k: 'access_token', label: 'Access Token',  placeholder: 'APP_USR-...', secret: true },
+      { k: 'access_token', label: 'Access Token',  placeholder: 'APP_USR-...', secret: true  },
       { k: 'public_key',   label: 'Public Key',    placeholder: 'APP_USR-...', secret: false },
     ] },
-  { key: 'stripe',      name: 'Stripe',        brand: 'Global',   icon: '💰', guide: 'stripe',
+  { key: 'stripe',      name: 'Stripe',        brand: 'Global',    icon: '💰', guide: 'stripe',
     fields: [
       { k: 'public_key',  label: 'Publishable Key', placeholder: 'pk_live_...', secret: false },
-      { k: 'secret_key',  label: 'Secret Key',      placeholder: 'sk_live_...', secret: true },
+      { k: 'secret_key',  label: 'Secret Key',      placeholder: 'sk_live_...', secret: true  },
+    ] },
+  { key: 'wise',        name: 'Wise',          brand: 'Global',    icon: '💸', guide: 'wise',
+    fields: [
+      { k: 'api_token',  label: 'API Token',  placeholder: 'wise_token_...', secret: true  },
+      { k: 'profile_id', label: 'Profile ID', placeholder: '12345678',        secret: false },
+    ] },
+  { key: 'paypal',      name: 'PayPal',        brand: 'Internacional', icon: '🅿️', guide: 'paypal',
+    fields: [
+      { k: 'client_id',     label: 'Client ID',     placeholder: 'A21AA...', secret: false },
+      { k: 'client_secret', label: 'Client Secret', placeholder: 'EL...',    secret: true  },
+    ] },
+  { key: 'payu',        name: 'PayU',          brand: 'LATAM',      icon: '🏦', guide: 'payu',
+    fields: [
+      { k: 'api_key',     label: 'API Key',     placeholder: '...', secret: true  },
+      { k: 'api_login',   label: 'API Login',   placeholder: '...', secret: false },
+      { k: 'merchant_id', label: 'Merchant ID', placeholder: '...', secret: false },
     ] },
 ];
 

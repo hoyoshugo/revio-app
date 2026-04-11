@@ -423,31 +423,6 @@ const GUIDES = {
     ],
   },
 
-  payu: {
-    name: 'PayU',
-    icon: '💰',
-    category: 'Pagos',
-    color: '#f59e0b',
-    status: 'not_configured',
-    estimatedTime: '20 min',
-    description: 'Pasarela de pagos LATAM. Alternativa a Wompi para clientes internacionales (USD/EUR).',
-    docUrl: 'https://developers.payulatam.com',
-    videoUrl: null,
-    mysticaNote: null,
-    credentials: [
-      { label: 'Merchant ID', envKey: 'PAYU_MERCHANT_ID', example: '508029' },
-      { label: 'API Key', envKey: 'PAYU_API_KEY', example: '4Vj8eK4...' },
-      { label: 'API Login', envKey: 'PAYU_API_LOGIN', example: 'pRRXKOl...' },
-    ],
-    steps: [
-      { n: 1, title: 'Crea cuenta en PayU Colombia', body: 'Ve a colombia.payu.com → "Solicitar integración". Datos: empresa, NIT, cuenta bancaria en COP.', tip: null },
-      { n: 2, title: 'Obtén credenciales técnicas', body: 'En tu panel PayU → Configuración → Credenciales técnicas. Copia el Merchant ID, API Key y API Login.', tip: null },
-      { n: 3, title: 'Configura en Revio', body: 'En Configuración → Conexiones → PayU, ingresa las tres credenciales.', tip: null },
-    ],
-    troubleshooting: [],
-    notes: ['PayU acepta USD — útil para huéspedes internacionales que pagan en dólares.'],
-  },
-
   // ══════════════════════════════════════════
   // REDES SOCIALES
   // ══════════════════════════════════════════
@@ -862,6 +837,84 @@ const GUIDES = {
     ],
     troubleshooting: [],
     notes: ['Stripe funciona en más de 40 países. Ideal para cobros internacionales.'],
+  },
+
+  wise: {
+    name: 'Wise',
+    icon: '💸',
+    category: 'Pagos',
+    color: '#9fe870',
+    status: 'not_configured',
+    estimatedTime: '8 min',
+    description: 'Transferencias internacionales con tasa de cambio real. Ideal para recibir pagos en USD/EUR a COP.',
+    docUrl: 'https://wise.com/user/account#api-tokens',
+    credentials: [
+      { label: 'API Token',  envKey: 'WISE_API_TOKEN', example: 'wise_token_...' },
+      { label: 'Profile ID', envKey: 'WISE_PROFILE_ID', example: '12345678' },
+    ],
+    steps: [
+      { n: 1, title: 'Crea cuenta de negocio en Wise',    body: 'Ve a wise.com/user/account y crea una cuenta de negocio (no personal).', tip: 'La cuenta personal no permite generar API tokens de escritura.' },
+      { n: 2, title: 'Configuración → API tokens',         body: 'En el dashboard, ve a tu perfil → "Configuración" → "API tokens".', tip: null },
+      { n: 3, title: 'Add new token',                       body: 'Haz clic en "Add new token".', tip: null },
+      { n: 4, title: 'Selecciona permisos Read + Transfers',body: 'Marca los permisos "Read" y "Transfers" para que Revio pueda consultar y crear transferencias.', tip: null },
+      { n: 5, title: 'Copia el token generado',             body: 'Cópialo ahora mismo — Wise no te lo vuelve a mostrar.', tip: null },
+      { n: 6, title: 'Copia tu Profile ID',                 body: 'Tu Profile ID está en la URL cuando estás en tu perfil: wise.com/send#/p/{ESTE-ES-TU-ID}', tip: null },
+      { n: 7, title: 'Pega en Revio',                       body: 'Pega ambos valores (API Token + Profile ID) en los campos aquí y guarda.', tip: null },
+    ],
+    troubleshooting: [],
+    notes: ['Wise ofrece la mejor tasa de cambio del mercado (spread mínimo). Ideal para huéspedes que pagan en moneda extranjera.'],
+  },
+
+  paypal: {
+    name: 'PayPal',
+    icon: '🅿️',
+    category: 'Pagos',
+    color: '#003087',
+    status: 'not_configured',
+    estimatedTime: '6 min',
+    description: 'Procesador de pagos global. Muy usado por huéspedes internacionales de USA, Europa y Asia.',
+    docUrl: 'https://developer.paypal.com/dashboard/applications/live',
+    credentials: [
+      { label: 'Client ID',     envKey: 'PAYPAL_CLIENT_ID',     example: 'A21AA...' },
+      { label: 'Client Secret', envKey: 'PAYPAL_CLIENT_SECRET', example: 'EL...'    },
+    ],
+    steps: [
+      { n: 1, title: 'PayPal Developer',              body: 'Ve a developer.paypal.com e inicia sesión con tu cuenta de PayPal Business.', tip: null },
+      { n: 2, title: 'Apps & Credentials',             body: 'Haz clic en "Apps & Credentials" en el menú superior.', tip: null },
+      { n: 3, title: 'Modo Live',                      body: 'Asegúrate de estar en modo "Live" (no Sandbox). Usa el toggle arriba a la derecha.', tip: 'Si usas Sandbox, los pagos son de prueba y no se procesan de verdad.' },
+      { n: 4, title: 'Create App',                     body: 'Haz clic en "Create App".', tip: null },
+      { n: 5, title: 'Nombre de la app',               body: 'Ponle un nombre (ej: "Revio Hotel") y haz clic en "Create App".', tip: null },
+      { n: 6, title: 'Copia Client ID + Secret',       body: 'En la página de la app verás el "Client ID" y el "Secret". Cópialos.', tip: null },
+      { n: 7, title: 'Pega en Revio',                  body: 'Pega ambos valores en los campos aquí y guarda.', tip: null },
+    ],
+    troubleshooting: [],
+    notes: ['PayPal Business es gratuito. Solo pagas comisión por transacción exitosa.'],
+  },
+
+  payu: {
+    name: 'PayU',
+    icon: '🏦',
+    category: 'Pagos',
+    color: '#85c440',
+    status: 'not_configured',
+    estimatedTime: '10 min',
+    description: 'Procesador de pagos líder en LATAM (Colombia, México, Brasil, Argentina, Chile, Perú).',
+    docUrl: 'https://developers.payulatam.com',
+    credentials: [
+      { label: 'API Key',     envKey: 'PAYU_API_KEY',     example: '...' },
+      { label: 'API Login',   envKey: 'PAYU_API_LOGIN',   example: '...' },
+      { label: 'Merchant ID', envKey: 'PAYU_MERCHANT_ID', example: '...' },
+    ],
+    steps: [
+      { n: 1, title: 'PayU Developers',          body: 'Ve a developers.payulatam.com e inicia sesión.', tip: null },
+      { n: 2, title: 'Mi cuenta → Configuración',body: 'En el menú ve a "Mi cuenta" → "Configuración técnica".', tip: null },
+      { n: 3, title: 'Credenciales de producción',body: 'Busca la sección "Credenciales de producción".', tip: 'No uses las de prueba — no cobran de verdad.' },
+      { n: 4, title: 'Copia los 3 valores',       body: 'Copia el "API Key", el "API Login" y el "Merchant ID".', tip: null },
+      { n: 5, title: 'Sin cuenta PayU',           body: 'Si no tienes cuenta, regístrate en payulatam.com y espera aprobación (1-3 días).', tip: null },
+      { n: 6, title: 'Pega en Revio',             body: 'Pega los tres valores en los campos aquí y guarda.', tip: null },
+    ],
+    troubleshooting: [],
+    notes: ['PayU acepta todas las franquicias colombianas: Visa, Mastercard, PSE, Efecty, Baloto.'],
   },
 
   // ─── OTA iCal aliases (reutilizan las guías base) ──────────

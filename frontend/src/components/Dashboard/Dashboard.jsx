@@ -23,6 +23,7 @@ import OtaInbox from './OtaInbox.jsx';
 import CancellationsPanel from './CancellationsPanel.jsx';
 import WeeklyReport from '../Reports/WeeklyReport.jsx';
 import HealthMonitor from './HealthMonitor.jsx';
+const MonitorPage = lazy(() => import('./MonitorPage.jsx'));
 import KnowledgeBase from './KnowledgeBase.jsx';
 import PropertyKnowledgePanel from './PropertyKnowledgePanel.jsx';
 import PropertyInfoPanel from './PropertyInfoPanel.jsx';
@@ -80,6 +81,7 @@ const navGroups = [
   },
   {
     label: 'Revenue',
+    module: 'nfc_pos',
     items: [
       { to: '/pos',       label: 'POS Terminal',   icon: ShoppingCart, module: 'nfc_pos' },
       { to: '/wallets',   label: 'Billeteras NFC', icon: Wallet,       module: 'nfc_pos' },
@@ -92,8 +94,9 @@ const navGroups = [
   },
   {
     label: 'Canales',
+    module: 'channel_manager',
     items: [
-      { to: '/channel-manager', label: 'Channel Manager', icon: Building2 },
+      { to: '/channel-manager', label: 'Channel Manager',   icon: Building2, module: 'channel_manager' },
       { to: '/channels',        label: 'Channels (legacy)', icon: Building2, module: 'channel_manager' },
     ],
   },
@@ -175,15 +178,23 @@ export default function Dashboard() {
   const { user, logout, properties, currentProperty, switchProperty } = useAuth();
   const { hasModule, loaded: modulesLoaded } = useModules();
 
-  // Filtrar grupos y items del menú según módulos activos del tenant
+  // Whitelist de módulos con UI terminada (los demás existen en DB pero
+  // no aparecen en el sidebar hasta que su UI esté lista).
+  // Items sin `module` declarado son siempre visibles (core del Agente IA).
+  const RELEASED_MODULES = ['revenue_agent'];
+
+  const canShowModule = (moduleKey) =>
+    RELEASED_MODULES.includes(moduleKey) && (hasModule?.(moduleKey) !== false);
+
+  // Filtrar grupos y items del menú según módulos released + tenant_modules activos
   const visibleNavGroups = React.useMemo(() => {
     if (!modulesLoaded) return navGroups;
     return navGroups
       .map(group => {
-        // Si el grupo entero tiene un module requerido, chequear
-        if (group.module && !hasModule(group.module)) return null;
+        // Si el grupo entero tiene un module requerido, chequear whitelist
+        if (group.module && !canShowModule(group.module)) return null;
         // Filtrar items individuales
-        const items = group.items.filter(item => !item.module || hasModule(item.module));
+        const items = group.items.filter(item => !item.module || canShowModule(item.module));
         if (items.length === 0) return null;
         return { ...group, items };
       })
@@ -239,9 +250,9 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* Property selector */}
+        {/* Property selector + group_name */}
         {!collapsed && (
-          <div className="px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+          <div className="px-3 py-2 flex-shrink-0 space-y-1" style={{ borderBottom: '1px solid var(--border)' }}>
             <select
               value={currentProperty?.id || 'all'}
               onChange={e => {
@@ -256,6 +267,11 @@ export default function Dashboard() {
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
+            {currentProperty?.group_name && (
+              <div className="text-[10px] px-1" style={{ color: 'var(--text-3)' }}>
+                Grupo: {currentProperty.group_name}
+              </div>
+            )}
           </div>
         )}
 
@@ -436,7 +452,8 @@ export default function Dashboard() {
 
               {/* System */}
               <Route path="/connections" element={<ConnectionsPanel property={property} />} />
-              <Route path="/health" element={<HealthMonitor />} />
+              <Route path="/health"        element={<MonitorPage />} />
+              <Route path="/health/legacy" element={<HealthMonitor />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/settings" element={<ConfigPanel property={property} />} />
               <Route path="/settings/*" element={<ConfigPanel property={property} />} />
