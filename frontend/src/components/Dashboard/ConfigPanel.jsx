@@ -1459,7 +1459,7 @@ const TABS = [
   { id: 'properties',   label: 'Propiedades',     icon: Building2 },
   { id: 'modules',      label: 'Módulos',         icon: Package },
   { id: 'users',        label: 'Usuarios',        icon: Users },
-  { id: 'connections',  label: 'Conexiones',      icon: Plug },
+  { id: 'connections',  label: 'Integraciones',   icon: Plug },
   { id: 'notifications',label: 'Notificaciones',  icon: Bell },
   { id: 'agent',        label: 'Agente IA',       icon: Bot }
 ];
