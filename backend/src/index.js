@@ -187,6 +187,26 @@ console.log(JSON.stringify({
   level: 'info', event: 'platform_audit_cron_started', schedule: 'domingos 08:00 Bogotá',
 }));
 
+// Cron currency rates — cada 2 horas
+cron.schedule('0 */2 * * *', async () => {
+  try {
+    const { refreshAllRates } = await import('./services/currencyService.js');
+    const result = await refreshAllRates();
+    if (result.success) {
+      console.log(JSON.stringify({
+        level: 'info', event: 'currency_rates_refreshed_cron', count: result.count,
+      }));
+    }
+  } catch (err) {
+    console.error(JSON.stringify({
+      level: 'error', event: 'cron_currency_failed', error: err.message,
+    }));
+  }
+}, { timezone: 'America/Bogota' });
+console.log(JSON.stringify({
+  level: 'info', event: 'currency_cron_started', schedule: 'cada 2 horas',
+}));
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({

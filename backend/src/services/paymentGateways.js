@@ -168,20 +168,32 @@ export async function createPaymentLink(gateway, amount, currency, reference, te
 
 /**
  * Devuelve los gateways efectivamente configurados para una propiedad.
+ * Lee de settings.connections (el patrón multi-tenant usado por Revio).
  */
 export async function getAvailableGateways(propertyId) {
   const ids = Object.keys(PAYMENT_GATEWAYS);
-  const { data: connections } = await supabase
-    .from('property_connections')
-    .select('connection_type, credentials, settings, status')
+  const { data: setting } = await supabase
+    .from('settings')
+    .select('value')
     .eq('property_id', propertyId)
-    .in('connection_type', ids)
-    .eq('is_active', true)
-    .eq('status', 'connected');
+    .eq('key', 'connections')
+    .maybeSingle();
 
-  return (connections || []).map(c => ({
-    id: c.connection_type,
-    ...PAYMENT_GATEWAYS[c.connection_type],
-    configured: true,
-  }));
+  const connections = setting?.value || {};
+  const configured = [];
+
+  for (const gatewayId of ids) {
+    const cfg = connections[gatewayId];
+    if (!cfg) continue;
+    // Wompi: público+privado, PayU: merchant+account, etc.
+    const hasCredentials = Object.values(cfg).some(v => v && String(v).trim().length > 0);
+    if (hasCredentials) {
+      configured.push({
+        id: gatewayId,
+        ...PAYMENT_GATEWAYS[gatewayId],
+        configured: true,
+      });
+    }
+  }
+  return configured;
 }

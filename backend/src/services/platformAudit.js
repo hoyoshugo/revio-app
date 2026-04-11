@@ -11,18 +11,22 @@ export async function runPlatformAudit(tenantId, propertyId) {
     level: 'info', event: 'platform_audit_started', tenantId, propertyId,
   }));
 
-  const { data: connections } = await supabase
-    .from('property_connections')
-    .select('*')
+  // Lee credenciales de la propiedad desde settings.connections
+  const { data: setting } = await supabase
+    .from('settings')
+    .select('value')
     .eq('property_id', propertyId)
-    .eq('is_active', true);
+    .eq('key', 'connections')
+    .maybeSingle();
 
+  const connections = setting?.value || {};
   const results = [];
 
-  // Google Business
-  const googleConn = connections?.find(c => c.connection_type === 'google_business');
-  if (googleConn?.settings?.place_id && process.env.GOOGLE_API_KEY) {
-    const reviews = await getGoogleReviews(googleConn.settings.place_id, process.env.GOOGLE_API_KEY);
+  // Google Business — lee de connections.google
+  const googleConn = connections.google;
+  const googlePlaceId = googleConn?.place_id || process.env[`GOOGLE_LOCATION_ID_${propertyId}`];
+  if (googlePlaceId && process.env.GOOGLE_API_KEY) {
+    const reviews = await getGoogleReviews(googlePlaceId, process.env.GOOGLE_API_KEY);
     if (reviews.length > 0) {
       const audit = await analyzeReviews('google', reviews);
       const avgRating = reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length;
