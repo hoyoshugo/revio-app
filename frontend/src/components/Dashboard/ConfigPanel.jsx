@@ -195,7 +195,7 @@ function TabGeneral({ properties, token }) {
       <SectionCard title="Identidad del establecimiento">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Nombre del establecimiento">
-            <Input value={form.name} onChange={f('name')} placeholder="Mística Isla Palma" />
+            <Input value={form.name} onChange={f('name')} placeholder="Hotel Ejemplo Centro" />
           </Field>
           <Field label="Nombre de marca (white-label)">
             <Input value={form.brand_name} onChange={f('brand_name')} placeholder="Mística" />
@@ -317,7 +317,7 @@ function TabProperties({ properties, token, onRefresh }) {
     <div className="bg-gray-800/50 rounded-xl border border-mystica-blue/30 p-4 space-y-4">
       <h4 className="text-sm font-medium text-mystica-blue">{editing ? 'Editar propiedad' : 'Nueva propiedad'}</h4>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <Field label="Nombre *"><Input value={form.name} onChange={f('name')} placeholder="Mística Isla Palma" /></Field>
+        <Field label="Nombre *"><Input value={form.name} onChange={f('name')} placeholder="Hotel Ejemplo Centro" /></Field>
         <Field label="Slug único *" hint="Solo letras, números y guiones"><Input value={form.slug} onChange={f('slug')} placeholder="isla-palma" disabled={!!editing} /></Field>
         <Field label="Ubicación"><Input value={form.location} onChange={f('location')} placeholder="Isla Palma, Cartagena" /></Field>
         <Field label="WhatsApp"><Input value={form.whatsapp_number} onChange={f('whatsapp_number')} placeholder="+573234392420" /></Field>
@@ -580,21 +580,73 @@ function ConnBlock({ title, icon, children, defaultOpen = false, guideId, onGuid
   );
 }
 
+function HealthBadge({ status }) {
+  const map = {
+    connected:      { emoji: '🟢', label: 'Conectado',       color: '#22c55e' },
+    unchecked:      { emoji: '🟡', label: 'Sin verificar',    color: '#f59e0b' },
+    error:          { emoji: '⚫', label: 'Error',            color: '#ef4444' },
+    not_configured: { emoji: '🔴', label: 'No configurado',   color: '#6b7280' },
+  };
+  const s = map[status] || map.not_configured;
+  return (
+    <span
+      className="text-[10px] px-2 py-0.5 rounded-full border font-medium"
+      style={{ color: s.color, borderColor: s.color, background: s.color + '15' }}
+    >
+      {s.emoji} {s.label}
+    </span>
+  );
+}
+
 function TabConnections({ properties, token }) {
-  const [slug, setSlug] = useState(properties[0]?.slug || 'isla-palma');
+  const [slug, setSlug] = useState(properties[0]?.slug || '');
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [health, setHealth] = useState({});
+  const [verifying, setVerifying] = useState(false);
   const { openGuide, GuideModal } = useIntegrationGuide();
 
+  const currentProperty = properties.find(p => p.slug === slug) || properties[0];
+  const currentPropertyId = currentProperty?.id;
+
   useEffect(() => {
-    // Cargar settings de conexiones para esta propiedad
     const p = properties.find(p => p.slug === slug);
     if (!p) return;
     fetch(`${API}/api/settings?property_id=${p.id}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
       .then(data => setForm(data.settings?.connections || {}))
       .catch(() => {});
+    // Cargar estado de salud
+    fetch(`${API}/api/integration-health?property_id=${p.id}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : { health: {} })
+      .then(data => setHealth(data.health || {}))
+      .catch(() => {});
   }, [slug, token, properties]);
+
+  async function verifyNow() {
+    if (!currentPropertyId) return;
+    setVerifying(true);
+    try {
+      const r = await fetch(`${API}/api/integration-health/ping`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property_id: currentPropertyId }),
+      });
+      if (r.ok) {
+        // Refetch state
+        const h = await fetch(`${API}/api/integration-health?property_id=${currentPropertyId}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (h.ok) { const d = await h.json(); setHealth(d.health || {}); }
+        toast('Integraciones verificadas');
+      }
+    } catch (e) { toast('Error al verificar: ' + e.message, false); }
+    setVerifying(false);
+  }
+
+  const healthOf = (key) => {
+    const h = health[key];
+    if (!h) return 'unchecked';
+    return h.status || 'unchecked';
+  };
 
   const f = (section, key) => (val) => setForm(prev => ({
     ...prev,
@@ -622,6 +674,8 @@ function TabConnections({ properties, token }) {
         });
       }
       toast(`Credenciales de ${section} guardadas`);
+      // Auto-verify tras guardar
+      verifyNow().catch(() => {});
     } catch (err) { toast(err.message, false); }
     finally { setSaving(null); }
   }
@@ -637,6 +691,39 @@ function TabConnections({ properties, token }) {
             options={properties.map(p => ({ value: p.slug, label: p.name }))} />
         </Field>
       )}
+
+      {/* Estado de integraciones */}
+      <div
+        className="flex items-center justify-between gap-3 p-3 rounded-xl"
+        style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+      >
+        <div className="flex items-center gap-3 flex-wrap flex-1">
+          <span className="text-xs font-semibold" style={{ color: 'var(--text-2)' }}>Estado de integraciones:</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px]" style={{ color: 'var(--text-2)' }}>LobbyPMS</span>
+            <HealthBadge status={healthOf('lobbypms')} />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px]" style={{ color: 'var(--text-2)' }}>Wompi</span>
+            <HealthBadge status={healthOf('wompi')} />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px]" style={{ color: 'var(--text-2)' }}>WhatsApp</span>
+            <HealthBadge status={healthOf('whatsapp')} />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px]" style={{ color: 'var(--text-2)' }}>Anthropic</span>
+            <HealthBadge status={healthOf('anthropic')} />
+          </div>
+        </div>
+        <button
+          onClick={verifyNow}
+          disabled={verifying}
+          className="rv-btn-primary px-3 py-1.5 text-xs disabled:opacity-50 flex-shrink-0"
+        >
+          {verifying ? 'Verificando...' : 'Verificar ahora'}
+        </button>
+      </div>
 
       <ConnBlock title="Sistema de gestión (PMS)" icon="🏨" defaultOpen
         guideId={(g('pms', 'type') || 'lobbypms')} onGuide={openGuide}>

@@ -393,55 +393,70 @@ async function executeTool(toolName, toolInput, conversation, propertyId) {
     }
 
     case 'get_property_info': {
-      const propertyData = {
-        'isla-palma': {
-          name: 'Mística Isla Palma',
-          location: 'Isla Palma, Archipiélago San Bernardo, Cartagena',
-          how_to_get_url: 'https://www.misticaisland.com/how-to-get',
-          activities_url: 'https://www.misticaisland.com/activities',
-          menu_url: 'https://www.misticaisland.com/services',
-          faq_url: 'https://www.misticaisland.com/faq',
-          maps_url: 'https://maps.app.goo.gl/fFhJpQWSHnhgRHxp6',
-          booking_url: 'https://booking.misticaisland.com',
-          includes: ['Desayuno incluido', 'WiFi gratuito'],
-          restrictions: ['Niños menores de 7 años solo en Cabaña del Árbol o Las Aldea'],
-          activities: [
-            'Snorkel en arrecifes de coral',
-            'Kayak y paddleboard',
-            'Paseos en lancha',
-            'Avistamiento de aves',
-            'Senderismo en la isla',
-            'Relajación en hamacas sobre el mar',
-            'Puesta de sol mágica'
-          ]
-        },
-        tayrona: {
-          name: 'Mística Tayrona',
-          location: 'Bahía Cinto, Parque Nacional Natural Tayrona',
-          how_to_get_url: 'https://www.mhostels.co/how-to-get',
-          activities_url: 'https://www.mhostels.co/activities',
-          menu_url: 'https://www.mhostels.co/services',
-          faq_url: 'https://www.mhostels.co/faq',
-          maps_url: 'https://maps.app.goo.gl/9Prr7GFDqfFRYgyQA',
-          booking_url: 'https://booking.misticatayrona.com',
-          includes: ['Desayuno incluido', 'WiFi gratuito'],
-          restrictions: [],
-          activities: [
-            'Senderismo en el Parque Tayrona',
-            'Snorkel en bahías cristalinas',
-            'Avistamiento de monos y aves',
-            'Playa El Cabo y Cabo San Juan',
-            'Camping bajo las estrellas',
-            'Meditación al amanecer',
-            'Tours a la Sierra Nevada'
-          ]
-        }
-      };
+      // Lee info de la propiedad desde property_knowledge (multi-tenant).
+      // NO contiene datos hardcodeados de ningún cliente.
+      try {
+        const targetId = propertyId;
+        if (!targetId) return { error: 'property_id no disponible' };
 
-      if (toolInput.property === 'both') {
-        return { isla_palma: propertyData['isla-palma'], tayrona: propertyData.tayrona };
+        const { data: rows } = await supabase
+          .from('property_knowledge')
+          .select('category, key, value')
+          .eq('property_id', targetId)
+          .eq('is_active', true);
+
+        const grouped = {};
+        for (const row of rows || []) {
+          if (!grouped[row.category]) grouped[row.category] = {};
+          grouped[row.category][row.key] = row.value;
+        }
+
+        if (!Object.keys(grouped).length) {
+          return { error: 'Propiedad sin información configurada. Pide al administrador que complete la Info Propiedad en Settings.' };
+        }
+
+        return {
+          name: grouped.general?.nombre || 'Propiedad',
+          type: grouped.general?.tipo || null,
+          location: grouped.general?.ubicacion || null,
+          gps: grouped.general?.gps || null,
+          languages: grouped.general?.idiomas || null,
+          includes: grouped.general?.incluye || null,
+          environment: grouped.general?.entorno || null,
+          policies: {
+            checkin: grouped.policies?.checkin,
+            checkout: grouped.policies?.checkout,
+            cancellation: grouped.policies?.cancelacion,
+            pets: grouped.policies?.mascotas,
+            children: grouped.policies?.restriccion_ninos,
+          },
+          activities: {
+            listing: grouped.activities?.listado,
+            critical_note: grouped.activities?.nota_critica,
+            bioluminescence_rule: grouped.activities?.bioluminiscencia_regla,
+            url: grouped.activities?.link,
+          },
+          transport: {
+            how_to_arrive: grouped.transport?.como_llegar,
+            primary_partner: grouped.transport?.aliado_principal,
+            secondary_partner: grouped.transport?.aliado_secundario,
+            url: grouped.transport?.link,
+          },
+          food: grouped.food?.descripcion || null,
+          contact: {
+            hours: grouped.contact?.horario,
+            whatsapp: grouped.contact?.whatsapp,
+            web: grouped.contact?.web,
+            booking_engine: grouped.contact?.booking_engine,
+          },
+          faq: {
+            cash: grouped.faq?.efectivo,
+            wifi: grouped.faq?.wifi,
+          },
+        };
+      } catch (e) {
+        return { error: 'Error al cargar info de propiedad: ' + e.message };
       }
-      return propertyData[propertySlug] || { error: 'Propiedad no encontrada' };
     }
 
     case 'check_moon_phase': {
@@ -517,7 +532,7 @@ async function executeTool(toolName, toolInput, conversation, propertyId) {
         guestName: toolInput.guest_name,
         guestEmail: toolInput.guest_email,
         guestPhone: toolInput.guest_phone,
-        hotelId: 1, // Mística Isla Palma es hotel #1 en Caribbean Treasures
+        hotelId: 1, // demo tenant mapeado como hotel #1 en Caribbean Treasures
         revioReservationId: toolInput.revio_reservation_id,
       });
       return result;
@@ -613,7 +628,7 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
   }
 
   // Obtener datos de la propiedad para el system prompt
-  let property = { name: 'Mística Hostels', slug: 'general' };
+  let property = { name: 'la propiedad', slug: 'general' };
   try {
     const properties = await db.getAllProperties();
     if (properties.length === 1) property = properties[0];

@@ -142,7 +142,7 @@ export default function OnboardingWizard() {
               <input value={tenant.business_name}
                 onChange={e => setTenant(f => ({ ...f, business_name: e.target.value, slug: autoSlug(e.target.value) }))}
                 className="w-full bg-gray-800 text-white rounded-lg px-3 py-2 text-sm border border-gray-700 focus:outline-none focus:border-cyan-500"
-                placeholder="Mística Hostels" />
+                placeholder="Hoteles Ejemplo S.A.S." />
             </div>
             <div>
               <label className="block text-xs text-gray-400 mb-1">Slug (identificador único) *</label>

@@ -25,6 +25,7 @@ import WeeklyReport from '../Reports/WeeklyReport.jsx';
 import HealthMonitor from './HealthMonitor.jsx';
 import KnowledgeBase from './KnowledgeBase.jsx';
 import PropertyKnowledgePanel from './PropertyKnowledgePanel.jsx';
+import PropertyInfoPanel from './PropertyInfoPanel.jsx';
 import RevenueIntelligence from './RevenueIntelligence.jsx';
 import EscalationsPanel from './EscalationsPanel.jsx';
 import ConfigPanel from './ConfigPanel.jsx';
@@ -49,14 +50,22 @@ const Inventory         = lazy(() => import('./Inventory.jsx'));
 const TransportPanel    = lazy(() => import('./TransportPanel.jsx'));
 import NotificationsBell from './NotificationsBell.jsx';
 
+// Cada ítem/grupo declara qué módulo requiere para ser visible.
+// El filtrado real lo hace `visibleNavGroups` según los módulos activos
+// del tenant (`tenant_modules` en Supabase, vía hook useModules).
+// Items sin `module` son siempre visibles (core del Agente IA).
 const navGroups = [
   {
-    label: 'Principal',
+    label: 'Agente IA',
     items: [
-      { to: '/panel',         label: 'Panel',         icon: LayoutDashboard, end: true },
-      { to: '/conversations', label: 'Conversaciones', icon: MessageSquare },
-      { to: '/ota-inbox',     label: 'Inbox OTA',      icon: Inbox },
-    ]
+      { to: '/panel',              label: 'Panel',          icon: LayoutDashboard, end: true },
+      { to: '/conversations',      label: 'Conversaciones', icon: MessageSquare },
+      { to: '/ai',                 label: 'AI Concierge',   icon: Sparkles },
+      { to: '/sandbox',            label: 'Ensayo',         icon: Beaker },
+      { to: '/knowledge',          label: 'Aprendizaje IA', icon: BookOpen },
+      { to: '/property-knowledge', label: 'Info Propiedad', icon: Bot },
+      { to: '/escalations',        label: 'Escalaciones',   icon: AlertTriangle },
+    ],
   },
   {
     label: 'PMS',
@@ -66,55 +75,46 @@ const navGroups = [
       { to: '/rooms',        label: 'Habitaciones', icon: BedDouble },
       { to: '/guests',       label: 'Huéspedes',    icon: Users },
       { to: '/housekeeping', label: 'Housekeeping', icon: Wrench },
-    ]
+    ],
   },
   {
     label: 'Revenue',
     items: [
-      { to: '/pos',       label: 'POS Terminal',    icon: ShoppingCart,  module: 'nfc_pos' },
-      { to: '/wallets',   label: 'Billeteras NFC',  icon: Wallet,        module: 'nfc_pos' },
-      { to: '/inventory', label: 'Inventario',      icon: Package,       module: 'inventory' },
-      { to: '/transport', label: 'Transporte',      icon: Package },
-      { to: '/payments',  label: 'Pagos',           icon: CreditCard },
-      { to: '/revenue',   label: 'Revenue Intel',   icon: TrendingUp },
-    ]
-  },
-  {
-    label: 'Agente IA',
-    items: [
-      { to: '/ai',                 label: 'AI Concierge',     icon: Sparkles },
-      { to: '/sandbox',            label: 'Ensayo',           icon: Beaker },
-      { to: '/knowledge',          label: 'Aprendizaje IA',   icon: BookOpen },
-      { to: '/property-knowledge', label: 'Info Propiedad',   icon: Bot },
-      { to: '/escalations',        label: 'Escalaciones',     icon: AlertTriangle },
-    ]
+      { to: '/pos',       label: 'POS Terminal',   icon: ShoppingCart, module: 'nfc_pos' },
+      { to: '/wallets',   label: 'Billeteras NFC', icon: Wallet,       module: 'nfc_pos' },
+      { to: '/inventory', label: 'Inventario',     icon: Package,      module: 'inventory' },
+      { to: '/transport', label: 'Transporte',     icon: Package,      module: 'transport' },
+      { to: '/payments',  label: 'Pagos',          icon: CreditCard,   module: 'payments' },
+      { to: '/revenue',   label: 'Revenue Intel',  icon: TrendingUp,   module: 'revenue_intel' },
+      { to: '/ota-inbox', label: 'Inbox OTA',      icon: Inbox,        module: 'channel_manager' },
+    ],
   },
   {
     label: 'Canales',
     module: 'channel_manager',
     items: [
       { to: '/channels', label: 'Channel Manager', icon: Building2 },
-    ]
+    ],
   },
   {
     label: 'Informes',
+    module: 'reports',
     items: [
-      { to: '/bookings', label: 'Reservas', icon: Calendar },
-      { to: '/occupancy', label: 'Ocupación', icon: BarChart2 },
+      { to: '/bookings',      label: 'Reservas',      icon: Calendar },
+      { to: '/occupancy',     label: 'Ocupación',     icon: BarChart2 },
       { to: '/cancellations', label: 'Cancelaciones', icon: XCircle },
-      { to: '/reports', label: 'Reportes', icon: BarChart2 },
-      { to: '/events', label: 'Eventos', icon: CalendarDays },
-    ]
+      { to: '/reports',       label: 'Reportes',      icon: BarChart2 },
+      { to: '/events',        label: 'Eventos',       icon: CalendarDays },
+    ],
   },
   {
     label: 'Sistema',
     items: [
-      { to: '/connections', label: 'Integraciones', icon: Settings },
-      { to: '/health', label: 'Monitor', icon: Activity },
-      { to: '/billing', label: 'Facturación', icon: Receipt },
-      { to: '/settings', label: 'Configuración', icon: Settings },
-    ]
-  }
+      { to: '/health',      label: 'Monitor',       icon: Activity },
+      { to: '/billing',     label: 'Facturación',   icon: Receipt,   module: 'billing' },
+      { to: '/settings',    label: 'Configuración', icon: Settings },
+    ],
+  },
 ];
 
 function NavItem({ to, label, icon: Icon, end, collapsed, onClick }) {
@@ -418,7 +418,8 @@ export default function Dashboard() {
               <Route path="/ai" element={<AIConcierge property={property} />} />
               <Route path="/sandbox" element={<SandboxPanel property={property} />} />
               <Route path="/knowledge" element={<KnowledgeBase property={property} />} />
-              <Route path="/property-knowledge" element={<PropertyKnowledgePanel propertyId={property?.id} />} />
+              <Route path="/property-knowledge" element={<PropertyInfoPanel />} />
+              <Route path="/property-knowledge/advanced" element={<PropertyKnowledgePanel propertyId={property?.id} />} />
               <Route path="/escalations" element={<EscalationsPanel property={property} />} />
 
               {/* Channels */}

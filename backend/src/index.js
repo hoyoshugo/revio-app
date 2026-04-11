@@ -46,6 +46,7 @@ import transportRoutes from './routes/transport.js';
 import paymentLinkRoutes from './routes/paymentLink.js';
 import webhooksRoutes from './routes/webhooks.js';
 import billingRoutes from './routes/billing.js';
+import integrationHealthRoutes from './routes/integrationHealth.js';
 import contactsRoutes from './routes/contacts.js';
 import automatedMessagesRoutes from './routes/automatedMessages.js';
 import approvalRequestsRoutes from './routes/approvalRequests.js';
@@ -144,6 +145,7 @@ app.use('/api/transport', transportRoutes);
 app.use('/api/payment-link', paymentLinkRoutes);
 app.use('/api/webhooks', webhooksRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/integration-health', integrationHealthRoutes);
 app.use('/api/contacts', contactsRoutes);
 app.use('/api/automated-messages', automatedMessagesRoutes);
 app.use('/api/approval-requests', approvalRequestsRoutes);
@@ -212,7 +214,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     version: '1.0.0',
-    service: 'Mística AI Agent',
+    service: 'Revio Agent',
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime())
   });
@@ -254,7 +256,7 @@ app.use((err, req, res, next) => {
 // INICIO
 // ============================================================
 app.listen(PORT, () => {
-  console.log(`🌊 Mística AI Agent corriendo en puerto ${PORT}`);
+  console.log(`🌊 Revio Agent corriendo en puerto ${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/health`);
   console.log(`   Widget: http://localhost:${PORT}/embed.js`);
   console.log(`   Env: ${process.env.NODE_ENV || 'development'}`);
@@ -322,7 +324,7 @@ function generateEmbedScript(apiUrl) {
       <div id="mystica-header">
         <div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;">🌊</div>
         <div id="mystica-header-info">
-          <h3>Mística AI</h3>
+          <h3>Revio Agent</h3>
           <p>Asistente virtual · En línea</p>
         </div>
       </div>

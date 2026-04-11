@@ -636,14 +636,14 @@ const VIDEO_DATA = [
     ],
   },
   {
-    id: 'testimonial-mystica',
-    title: 'Caso Mística Hostels',
+    id: 'testimonial-case',
+    title: 'Caso de éxito — Cadena boutique',
     subtitle: '35–40 segundos · Historia de éxito real',
-    file: 'testimonial-mystica.mp4',
+    file: 'testimonial-case.mp4',
     color: '#f59e0b',
     accent: '#ef4444',
     script: [
-      { t: '0–8s', screen: 'B-Roll: Imágenes de Mística Isla Palma / Tayrona. Playas, cabañas, huéspedes.', voice: 'Mística Hostels opera en algunos de los destinos más espectaculares de Colombia: Isla Palma y el Parque Tayrona.' },
+      { t: '0–8s', screen: 'B-Roll: Imágenes de hostales boutique en destinos playeros. Playas, cabañas, huéspedes.', voice: 'Una cadena boutique opera en algunos de los destinos más espectaculares de Colombia.' },
       { t: '8–18s', screen: 'Estadísticas antes/después. Reservas directas +38%. Tiempo de respuesta de 4h a 30s.', voice: 'Con Revio, redujeron el tiempo de respuesta de 4 horas a 30 segundos, y aumentaron las reservas directas un 38% en los primeros 60 días.' },
       { t: '18–28s', screen: 'Conversación real del agente. Huésped satisfecho reservando desde WhatsApp.', voice: 'El agente responde en español e inglés, conoce cada propiedad al detalle, y convierte consultas en pagos confirmados — las 24 horas.' },
       { t: '28–36s', screen: 'URL app.revio.co/register', voice: '¿Tu hostal también quiere estos resultados? Empieza hoy en app.revio.co — 14 días sin costo, sin tarjeta de crédito.' },

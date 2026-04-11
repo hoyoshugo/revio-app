@@ -51,7 +51,7 @@ export default function SuperAdminLogin() {
             >
               <Shield className="w-7 h-7" style={{ color: 'var(--warning)' }} />
             </div>
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--text-1)' }}>Mística Tech</h1>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--text-1)' }}>Revio Admin</h1>
             <p className="text-sm mt-1" style={{ color: 'var(--text-2)' }}>Panel de administración del SaaS</p>
           </div>
 

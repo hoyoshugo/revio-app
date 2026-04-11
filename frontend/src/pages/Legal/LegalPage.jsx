@@ -149,7 +149,7 @@ const DOCS = {
       },
       {
         h: 'Cookies Estrictamente Necesarias',
-        p: 'Estas cookies son esenciales para el funcionamiento de Revio y no pueden desactivarse: (1) mystica_token / sa_token: token de autenticación JWT, válido por 24 horas. (2) theme: preferencia de modo oscuro/claro. Sin estas cookies, no podemos ofrecer el servicio.',
+        p: 'Estas cookies son esenciales para el funcionamiento de Revio y no pueden desactivarse: (1) revio_token / sa_token: token de autenticación JWT, válido por 24 horas. (2) theme: preferencia de modo oscuro/claro. Sin estas cookies, no podemos ofrecer el servicio.',
       },
       {
         h: 'Cookies de Rendimiento',
