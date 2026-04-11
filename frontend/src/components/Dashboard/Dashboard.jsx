@@ -438,7 +438,9 @@ export default function Dashboard() {
               <Route path="/connections" element={<ConnectionsPanel property={property} />} />
               <Route path="/health" element={<HealthMonitor />} />
               <Route path="/billing" element={<BillingPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings" element={<ConfigPanel property={property} />} />
+              <Route path="/settings/*" element={<ConfigPanel property={property} />} />
+              <Route path="/settings/legacy" element={<SettingsPage />} />
               <Route path="/config" element={<ConfigPanel property={property} />} />
               <Route path="/config/*" element={<ConfigPanel property={property} />} />
             </Routes>
