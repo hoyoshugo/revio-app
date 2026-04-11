@@ -117,6 +117,10 @@ async function loadSalesIntensity(propertyId) {
 // ============================================================
 function buildSystemPrompt(property, dynamicKnowledge = '', salesIntensity = 'moderate') {
   const agentName = property.agent_name || `${property.name} AI`;
+  const groupLine = property.group_name
+    ? `\n## GRUPO HOTELERO\nPerteneces al grupo hotelero: **${property.group_name}**.${property.group_description ? ` ${property.group_description}` : ''}\nCuando un huésped pregunte por otras propiedades del grupo, puedes mencionarlas y ofrecer información.\n`
+    : '';
+
   return `Eres el agente de ventas virtual de ${property.name}, un alojamiento en ${property.country || 'Colombia'}. Tu nombre es "${agentName}".
 
 ## TU PERSONALIDAD
@@ -124,14 +128,15 @@ function buildSystemPrompt(property, dynamicKnowledge = '', salesIntensity = 'mo
 - Vendedora pero nunca agresiva — guías al huésped hacia la decisión correcta
 - Profesional y confiable — cada dato que das es verificado en tiempo real
 - Dominas el destino: conoces cada rincón, actividad y experiencia
-
+${groupLine}
 ## IDIOMAS
 Detecta automáticamente el idioma del mensaje del cliente y responde SIEMPRE en ese idioma:
 - Español → español
 - English → English
 - Français → français
 - Deutsch → Deutsch
-Soportas: es, en, fr, de
+- Português → português
+Soportas: es, en, fr, de, pt. Si el idioma del cliente no es ninguno de estos, responde en inglés.
 
 ## ESTRATEGIA DE VENTAS (OBLIGATORIA — EN ESTE ORDEN)
 1. **Primero vende el destino**: Describe la magia del lugar, las experiencias únicas, el entorno natural. Crea deseo antes de hablar de precios.
@@ -627,13 +632,23 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
     conversation.guest_language = detectedLang;
   }
 
-  // Obtener datos de la propiedad para el system prompt
+  // Obtener datos de la propiedad + group_name del tenant para el system prompt
   let property = { name: 'la propiedad', slug: 'general' };
   try {
-    const properties = await db.getAllProperties();
-    if (properties.length === 1) property = properties[0];
+    const { data: propertiesWithGroup } = await supabase
+      .from('properties')
+      .select('*, tenants(group_name, group_description)')
+      .eq('is_active', true);
+    const flat = (propertiesWithGroup || []).map(p => ({
+      ...p,
+      group_name: p.tenants?.group_name || null,
+      group_description: p.tenants?.group_description || null,
+    }));
+    if (flat.length === 1) property = flat[0];
     else if (conversationData.propertySlug) {
-      property = properties.find(p => p.slug === conversationData.propertySlug) || properties[0];
+      property = flat.find(p => p.slug === conversationData.propertySlug) || flat[0] || property;
+    } else if (propertyId) {
+      property = flat.find(p => p.id === propertyId) || property;
     }
   } catch { /* usa defaults */ }
 

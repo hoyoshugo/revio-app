@@ -121,10 +121,16 @@ router.get('/properties', requireAuth, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('properties')
-      .select('*')
+      .select('*, tenants(group_name, group_description)')
       .order('created_at', { ascending: true });
     if (error) throw error;
-    res.json(data || []);
+    // Aplanar group_name al nivel de la propiedad para conveniencia del frontend
+    const flat = (data || []).map(p => ({
+      ...p,
+      group_name: p.tenants?.group_name || null,
+      group_description: p.tenants?.group_description || null,
+    }));
+    res.json(flat);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

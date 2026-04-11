@@ -30,18 +30,24 @@ router.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Fetch all properties for the same tenant/property_id
+    // Fetch all properties + group_name del tenant
     const { data: properties } = await supabase
       .from('properties')
-      .select('id,name,slug,brand_name,brand_logo_url,location,plan,is_active')
+      .select('id,name,slug,brand_name,brand_logo_url,location,plan,is_active,tenant_id,tenants(group_name,group_description)')
       .eq('is_active', true)
       .order('name');
+
+    const flatProperties = (properties || []).map(p => ({
+      ...p,
+      group_name: p.tenants?.group_name || null,
+      group_description: p.tenants?.group_description || null,
+    }));
 
     const { password_hash, ...safeUser } = user;
     res.json({
       token,
       user: safeUser,
-      properties: properties || [],
+      properties: flatProperties,
       current_property: user.properties || null
     });
   } catch (err) {
@@ -117,10 +123,17 @@ router.get('/me', requireAuth, async (req, res) => {
 
     const { data: properties } = await supabase
       .from('properties')
-      .select('id,name,slug,brand_name,brand_logo_url,location,plan,is_active')
+      .select('id,name,slug,brand_name,brand_logo_url,location,plan,is_active,tenant_id,tenants(group_name,group_description)')
       .eq('is_active', true);
 
-    res.json({ user, properties: properties || [] });
+    // Aplanar group_name al nivel de propiedad
+    const flatProperties = (properties || []).map(p => ({
+      ...p,
+      group_name: p.tenants?.group_name || null,
+      group_description: p.tenants?.group_description || null,
+    }));
+
+    res.json({ user, properties: flatProperties });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
