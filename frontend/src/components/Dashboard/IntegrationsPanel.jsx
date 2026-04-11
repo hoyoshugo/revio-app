@@ -216,11 +216,11 @@ function GuideButton({ guideId, onGuide }) {
 // PANEL PRINCIPAL
 // ────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'ai',         label: 'IA',               icon: Brain },
-  { id: 'payments',   label: 'Pagos',            icon: CreditCard },
-  { id: 'pms',        label: 'PMS',              icon: Building2 },
-  { id: 'messaging',  label: 'Mensajería',       icon: MessageCircle },
-  { id: 'otas',       label: 'OTAs y Reseñas',   icon: Globe },
+  { id: 'ai',         label: 'IA',                icon: Brain },
+  { id: 'payments',   label: 'Pagos',             icon: CreditCard },
+  { id: 'pms',        label: 'PMS',               icon: Building2 },
+  { id: 'messaging',  label: 'Canales Directos',  icon: MessageCircle },
+  { id: 'otas',       label: 'OTAs y Reseñas',    icon: Globe },
 ];
 
 export default function IntegrationsPanel({ properties = [], token }) {
@@ -238,6 +238,7 @@ export default function IntegrationsPanel({ properties = [], token }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [draftWaitlistEmail, setDraftWaitlistEmail] = useState('');
 
   const { openGuide, GuideModal } = useIntegrationGuide();
 
@@ -509,67 +510,18 @@ export default function IntegrationsPanel({ properties = [], token }) {
 
   function renderOtasTab() {
     return (
-      <div className="space-y-5">
+      <div className="space-y-6">
+        {/* ── SUB-SECCIÓN 1: Reseñas IA ──────────────────── */}
         <div>
-          <h3 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-2)' }}>
-            OTAs de reservas — sincronización vía iCal
-          </h3>
-          <div className="space-y-2">
-            {OTA_CHANNELS.map(ch => {
-              const row = channelOf(ch.key);
-              return (
-                <div
-                  key={ch.key}
-                  className="rounded-xl p-3 space-y-2"
-                  style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
-                >
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{ch.icon}</span>
-                      <div className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>{ch.name}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <HealthBadge status={row.status || 'not_configured'} />
-                      <GuideButton guideId={ch.guide} onGuide={openGuide} />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <label className="text-xs" style={{ color: 'var(--text-2)' }}>URL iCal de tu propiedad</label>
-                      <input
-                        type="text"
-                        value={row.ical_url || ''}
-                        onChange={e => updateChannel(ch.key, { ical_url: e.target.value, channel_type: 'ota' })}
-                        placeholder="https://..."
-                        className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none"
-                        style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs" style={{ color: 'var(--text-2)' }}>URL de perfil público</label>
-                      <input
-                        type="text"
-                        value={row.profile_url || ''}
-                        onChange={e => updateChannel(ch.key, { profile_url: e.target.value, channel_type: 'ota' })}
-                        placeholder="https://..."
-                        className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none"
-                        style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
-                      />
-                    </div>
-                  </div>
-                  <div className="text-[10px] font-medium" style={{ color: 'var(--text-3)' }}>
-                    💬 Respuesta de mensajes: próximamente vía Channel Manager
-                  </div>
-                </div>
-              );
-            })}
+          <div className="mb-3">
+            <h3 className="text-sm font-bold" style={{ color: 'var(--text-1)' }}>
+              📝 Reseñas — IA redacta, tú publicas
+            </h3>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-2)' }}>
+              El agente lee las reseñas nuevas, genera la respuesta perfecta y te notifica
+              para que la publiques con un clic.
+            </p>
           </div>
-        </div>
-
-        <div>
-          <h3 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-2)' }}>
-            Plataformas de reseñas
-          </h3>
           <div className="space-y-2">
             {REVIEW_CHANNELS.map(ch => {
               const row = channelOf(ch.key);
@@ -597,8 +549,24 @@ export default function IntegrationsPanel({ properties = [], token }) {
                       style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
                     />
                   </div>
-                  <div className="text-[10px] font-medium" style={{ color: 'var(--text-3)' }}>
-                    Respuesta automática a reseñas: próximamente
+                  {ch.key === 'tripadvisor' && (
+                    <div className="space-y-1">
+                      <label className="text-xs" style={{ color: 'var(--text-2)' }}>TripAdvisor API Key (opcional)</label>
+                      <input
+                        type="password"
+                        value={connections[ch.key]?.api_key || ''}
+                        onChange={e => updateConnection(ch.key, 'api_key', e.target.value)}
+                        placeholder="Para Content API..."
+                        className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none"
+                        style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+                      />
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[9px] px-2 py-0.5 rounded-full font-medium"
+                      style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}>
+                      🤖 IA redacta · 👤 Tú publicas
+                    </span>
                   </div>
                 </div>
               );
@@ -607,7 +575,155 @@ export default function IntegrationsPanel({ properties = [], token }) {
               className="rounded-xl p-3 text-xs"
               style={{ background: 'var(--bg)', border: '1px dashed var(--border)', color: 'var(--text-2)' }}
             >
-              ℹ️ Google Reviews se configura junto con <strong>Google Business Profile</strong> en el tab Mensajería.
+              ℹ️ <strong>Google Reviews</strong> se configura junto con <strong>Google Business Profile</strong> en el tab Canales Directos.
+              <span className="ml-2 inline-block px-2 py-0.5 rounded-full"
+                style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}>
+                🤖 IA redacta · 👤 Tú publicas
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── SUB-SECCIÓN 2: OTAs ───────────────────────── */}
+        <div>
+          <div className="mb-3">
+            <h3 className="text-sm font-bold" style={{ color: 'var(--text-1)' }}>
+              🏨 OTAs — Optimización y visibilidad
+            </h3>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-2)' }}>
+              Mantén tus perfiles actualizados. La mensajería directa en OTAs estará
+              disponible cuando Revio complete la certificación como Connectivity Partner.
+            </p>
+          </div>
+          <div className="space-y-2">
+            {OTA_CHANNELS.map(ch => {
+              const row = channelOf(ch.key);
+              const configured = !!row.profile_url;
+              return (
+                <div
+                  key={ch.key}
+                  className="rounded-xl p-3 space-y-2"
+                  style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+                >
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{ch.icon}</span>
+                      <div className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>{ch.name}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium"
+                        style={{ color: configured ? '#22c55e' : '#6b7280', borderColor: configured ? '#22c55e' : '#6b7280', background: (configured ? '#22c55e' : '#6b7280') + '15' }}>
+                        {configured ? '✅ Configurado' : '⚫ Sin configurar'}
+                      </span>
+                      <GuideButton guideId={ch.guide} onGuide={openGuide} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-xs" style={{ color: 'var(--text-2)' }}>URL de tu perfil público</label>
+                      <input
+                        type="text"
+                        value={row.profile_url || ''}
+                        onChange={e => updateChannel(ch.key, { profile_url: e.target.value, channel_type: 'ota' })}
+                        placeholder="https://..."
+                        className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none"
+                        style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      {row.profile_url && (
+                        <a
+                          href={row.profile_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] px-3 py-2 rounded-lg flex items-center gap-1"
+                          style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+                        >
+                          🔗 Ver perfil
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[9px] px-2 py-0.5 rounded-full font-medium"
+                      style={{ background: 'color-mix(in srgb, #f59e0b 15%, transparent)', color: '#f59e0b' }}>
+                      💬 Mensajería directa: En certificación
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── SUB-SECCIÓN 3: Roadmap ────────────────────── */}
+        <div
+          className="rounded-2xl p-5 space-y-3"
+          style={{
+            background: 'color-mix(in srgb, var(--accent) 6%, var(--card))',
+            border: '1px solid color-mix(in srgb, var(--accent) 30%, var(--border))',
+          }}
+        >
+          <div>
+            <h3 className="text-sm font-bold" style={{ color: 'var(--text-1)' }}>
+              🗺️ Hoja de ruta — Mensajería en OTAs
+            </h3>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-2)' }}>
+              Mientras certificamos como Connectivity Partner, así avanza el roadmap:
+            </p>
+          </div>
+          <div className="space-y-2">
+            {[
+              { icon: '✅', title: 'FASE 1 (Actual)', desc: 'Canales directos: WhatsApp, Instagram, Facebook' },
+              { icon: '🔄', title: 'FASE 2 (Q3 2025)', desc: 'Aplicación Connectivity Partner Booking.com + Airbnb' },
+              { icon: '📋', title: 'FASE 3 (Q4 2025)', desc: 'Mensajería Booking.com vía API certificada' },
+              { icon: '🚀', title: 'FASE 4 (2026)', desc: 'Channel Manager propio + todas las OTAs' },
+            ].map((p, i) => (
+              <div key={i} className="flex items-start gap-2 px-3 py-2 rounded-lg"
+                style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                <span className="text-lg">{p.icon}</span>
+                <div>
+                  <div className="text-xs font-bold" style={{ color: 'var(--text-1)' }}>{p.title}</div>
+                  <div className="text-[11px]" style={{ color: 'var(--text-2)' }}>{p.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="pt-2">
+            <label className="text-xs block mb-1" style={{ color: 'var(--text-2)' }}>
+              📧 Notificarme cuando esté disponible
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={draftWaitlistEmail}
+                onChange={e => setDraftWaitlistEmail(e.target.value)}
+                placeholder="tu@email.com"
+                className="flex-1 rounded-lg px-3 py-2 text-sm"
+                style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+              />
+              <button
+                onClick={async () => {
+                  if (!draftWaitlistEmail.trim()) return;
+                  try {
+                    await fetch(`${API}/api/waitlist`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        email: draftWaitlistEmail.trim(),
+                        feature: 'ota_messaging',
+                        property_id: propertyId,
+                      }),
+                    });
+                    setDraftWaitlistEmail('');
+                    toast('Te avisaremos cuando esté disponible');
+                  } catch (e) { toast('Error: ' + e.message, false); }
+                }}
+                className="text-xs px-3 py-2 rounded-lg font-medium"
+                style={{ background: 'var(--accent)', color: '#fff' }}
+              >
+                Suscribirme
+              </button>
             </div>
           </div>
         </div>

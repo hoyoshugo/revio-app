@@ -50,6 +50,10 @@ const ChannelManagerHub = lazy(() => import('./ChannelManagerHub.jsx'));
 const SettingsPage      = lazy(() => import('./Settings.jsx'));
 const Inventory         = lazy(() => import('./Inventory.jsx'));
 const TransportPanel    = lazy(() => import('./TransportPanel.jsx'));
+const ReviewsPage       = lazy(() => import('./ReviewsPage.jsx'));
+const EnsayoPage        = lazy(() => import('./EnsayoPage.jsx'));
+const LearningPage      = lazy(() => import('./LearningPage.jsx'));
+const EscalationsPage   = lazy(() => import('./EscalationsPage.jsx'));
 import NotificationsBell from './NotificationsBell.jsx';
 
 // Cada ítem/grupo declara qué módulo requiere para ser visible.
@@ -64,9 +68,10 @@ const navGroups = [
       { to: '/conversations',      label: 'Conversaciones', icon: MessageSquare },
       { to: '/ai',                 label: 'AI Concierge',   icon: Sparkles },
       { to: '/sandbox',            label: 'Ensayo',         icon: Beaker },
-      { to: '/knowledge',          label: 'Aprendizaje IA', icon: BookOpen },
-      { to: '/property-knowledge', label: 'Info Propiedad', icon: Bot },
+      { to: '/learning',           label: 'Aprendizaje IA', icon: BookOpen },
       { to: '/escalations',        label: 'Escalaciones',   icon: AlertTriangle },
+      { to: '/reviews',            label: 'Reseñas',        icon: MessageSquare },
+      { to: '/property-knowledge', label: 'Info Propiedad', icon: Bot },
     ],
   },
   {
@@ -433,11 +438,16 @@ export default function Dashboard() {
 
               {/* AI */}
               <Route path="/ai" element={<AIConcierge property={property} />} />
-              <Route path="/sandbox" element={<SandboxPanel property={property} />} />
+              <Route path="/sandbox" element={<EnsayoPage />} />
+              <Route path="/sandbox/legacy" element={<SandboxPanel property={property} />} />
+              <Route path="/learning" element={<LearningPage />} />
+              <Route path="/learning/legacy" element={<KnowledgeBase property={property} />} />
               <Route path="/knowledge" element={<KnowledgeBase property={property} />} />
               <Route path="/property-knowledge" element={<PropertyInfoPanel />} />
               <Route path="/property-knowledge/advanced" element={<PropertyKnowledgePanel propertyId={property?.id} />} />
-              <Route path="/escalations" element={<EscalationsPanel property={property} />} />
+              <Route path="/escalations" element={<EscalationsPage />} />
+              <Route path="/escalations/legacy" element={<EscalationsPanel property={property} />} />
+              <Route path="/reviews" element={<ReviewsPage />} />
 
               {/* Channels */}
               <Route path="/channels" element={<RequireModule moduleId="channel_manager"><ChannelManager /></RequireModule>} />

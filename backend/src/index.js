@@ -49,6 +49,10 @@ import billingRoutes from './routes/billing.js';
 import integrationHealthRoutes from './routes/integrationHealth.js';
 import channelsRoutes from './routes/channels.js';
 import systemHealthRoutes from './routes/systemHealth.js';
+import reviewsAiRoutes from './routes/reviewsAi.js';
+import escalationsRoutes from './routes/escalations.js';
+import learningRoutes from './routes/learning.js';
+import ensayoRoutes from './routes/ensayo.js';
 import contactsRoutes from './routes/contacts.js';
 import automatedMessagesRoutes from './routes/automatedMessages.js';
 import approvalRequestsRoutes from './routes/approvalRequests.js';
@@ -150,6 +154,10 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/integration-health', integrationHealthRoutes);
 app.use('/api', channelsRoutes);
 app.use('/api/system', systemHealthRoutes);
+app.use('/api', reviewsAiRoutes);
+app.use('/api', escalationsRoutes);
+app.use('/api', learningRoutes);
+app.use('/api', ensayoRoutes);
 app.use('/api/contacts', contactsRoutes);
 app.use('/api/automated-messages', automatedMessagesRoutes);
 app.use('/api/approval-requests', approvalRequestsRoutes);
@@ -211,6 +219,24 @@ cron.schedule('0 */2 * * *', async () => {
 }, { timezone: 'America/Bogota' });
 console.log(JSON.stringify({
   level: 'info', event: 'currency_cron_started', schedule: 'cada 2 horas',
+}));
+
+// Cron reviews IA — cada 6 horas (00:00, 06:00, 12:00, 18:00 Bogotá)
+cron.schedule('0 */6 * * *', async () => {
+  try {
+    const { fetchAllPendingReviews } = await import('./services/reviewsAiService.js');
+    const results = await fetchAllPendingReviews();
+    console.log(JSON.stringify({
+      level: 'info', event: 'reviews_cron_completed', results,
+    }));
+  } catch (err) {
+    console.error(JSON.stringify({
+      level: 'error', event: 'cron_reviews_failed', error: err.message,
+    }));
+  }
+}, { timezone: 'America/Bogota' });
+console.log(JSON.stringify({
+  level: 'info', event: 'reviews_cron_started', schedule: 'cada 6 horas Bogotá',
 }));
 
 // Health check
