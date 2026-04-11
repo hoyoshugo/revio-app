@@ -16,6 +16,7 @@ import {
 import { saveContact } from '../services/agentUtils.js';
 import { processMessage } from '../agents/hotelAgent.js';
 import { isTenantEnabled } from '../services/tenantAccess.js';
+import { insertInboxMessage } from '../services/channelService.js';
 import { supabase } from '../models/supabase.js';
 
 const router = express.Router();
@@ -85,6 +86,20 @@ async function processMetaEvents(body) {
         phone: event.channel === 'whatsapp' ? event.senderId : null,
         source: event.channel,
         language: 'es',
+      });
+
+      // Inbox unificado: registrar el mensaje entrante
+      const normalizedChannel = event.channel.replace('_comment', '');
+      await insertInboxMessage({
+        property_id: property.id,
+        channel_key: normalizedChannel,
+        external_thread_id: event.messageId || event.commentId || null,
+        sender_name: event.senderName || null,
+        sender_id: event.senderId || null,
+        message_text: event.message || null,
+        direction: 'inbound',
+        status: 'unread',
+        raw_payload: event,
       });
 
       // Verificar tenant habilitado (pago o manual)

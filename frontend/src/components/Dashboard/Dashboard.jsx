@@ -45,6 +45,7 @@ const EventsPanel       = lazy(() => import('./EventsPanel.jsx'));
 const RoomsManager      = lazy(() => import('./RoomsManager.jsx'));
 const Reports           = lazy(() => import('./Reports.jsx'));
 const ChannelManager    = lazy(() => import('./ChannelManager.jsx'));
+const ChannelManagerHub = lazy(() => import('./ChannelManagerHub.jsx'));
 const SettingsPage      = lazy(() => import('./Settings.jsx'));
 const Inventory         = lazy(() => import('./Inventory.jsx'));
 const TransportPanel    = lazy(() => import('./TransportPanel.jsx'));
@@ -91,9 +92,9 @@ const navGroups = [
   },
   {
     label: 'Canales',
-    module: 'channel_manager',
     items: [
-      { to: '/channels', label: 'Channel Manager', icon: Building2 },
+      { to: '/channel-manager', label: 'Channel Manager', icon: Building2 },
+      { to: '/channels',        label: 'Channels (legacy)', icon: Building2, module: 'channel_manager' },
     ],
   },
   {
@@ -424,6 +425,7 @@ export default function Dashboard() {
 
               {/* Channels */}
               <Route path="/channels" element={<RequireModule moduleId="channel_manager"><ChannelManager /></RequireModule>} />
+              <Route path="/channel-manager" element={<ChannelManagerHub />} />
 
               {/* Reports */}
               <Route path="/bookings" element={<BookingsList property={property} />} />

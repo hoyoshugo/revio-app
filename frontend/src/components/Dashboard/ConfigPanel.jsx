@@ -11,6 +11,7 @@ import {
 import { useAuth } from '../../context/AuthContext.jsx';
 import AiProviderSelector from './AiProviderSelector.jsx';
 import { useIntegrationGuide } from './IntegrationGuide.jsx';
+import IntegrationsPanel from './IntegrationsPanel.jsx';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -1522,7 +1523,7 @@ export default function ConfigPanel() {
         {activeTab === 'properties'     && <TabProperties properties={properties} token={token} onRefresh={() => setRefreshKey(k => k + 1)} />}
         {activeTab === 'modules'        && <TabModules token={token} />}
         {activeTab === 'users'          && <TabUsers properties={properties} token={token} />}
-        {activeTab === 'connections'    && <TabConnections properties={properties} token={token} />}
+        {activeTab === 'connections'    && <IntegrationsPanel properties={properties} token={token} />}
         {activeTab === 'notifications'  && <TabNotifications properties={properties} token={token} />}
         {activeTab === 'agent'          && <TabAgent properties={properties} token={token} />}
       </div>
