@@ -1,7 +1,7 @@
 {
-  "name": "mystica-ai-agent-frontend",
-  "version": "1.0.0",
-  "description": "Dashboard y Chat Widget de Mística AI Agent",
+  "name": "revio-frontend",
+  "version": "2.0.0",
+  "description": "Revio — Revenue Intelligence para Hotelería LATAM (Dashboard + Chat Widget)",
   "type": "module",
   "scripts": {
     "dev": "vite",

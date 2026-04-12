@@ -1,7 +1,7 @@
 {
-  "name": "mystica-ai-agent-backend",
-  "version": "1.0.0",
-  "description": "Backend del Agente IA para Mística Hostels",
+  "name": "revio-backend",
+  "version": "2.0.0",
+  "description": "Revio — Revenue Intelligence para Hotelería LATAM",
   "main": "src/index.js",
   "type": "module",
   "scripts": {

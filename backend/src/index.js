@@ -309,8 +309,9 @@ function generateEmbedScript(apiUrl) {
 (function() {
   'use strict';
 
-  var MYSTICA_API = '${apiUrl}';
-  var config = window.MysticaConfig || {};
+  var REVIO_API = '${apiUrl}';
+  // Acepta window.RevioConfig (nuevo) o window.MysticaConfig (legacy)
+  var config = window.RevioConfig || window.MysticaConfig || {};
   var propertySlug = config.property || 'isla-palma';
   var lang = config.language || (navigator.language || 'es').substring(0, 2);
 
@@ -405,7 +406,7 @@ function generateEmbedScript(apiUrl) {
     if (initialized) return;
     initialized = true;
     try {
-      var res = await fetch(MYSTICA_API + '/api/chat/init', {
+      var res = await fetch(REVIO_API + '/api/chat/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ property_slug: propertySlug, language: lang })
@@ -427,7 +428,7 @@ function generateEmbedScript(apiUrl) {
     isLoading = true;
     var typing = showTyping();
     try {
-      var res = await fetch(MYSTICA_API + '/api/chat', {
+      var res = await fetch(REVIO_API + '/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text, session_id: sessionId, property_slug: propertySlug })

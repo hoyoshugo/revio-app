@@ -80,10 +80,38 @@ export default function EnsayoPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
-  function reset() {
+  async function reset() {
     setMessages([]);
     setDraft('');
+    // Auto-enviar __INIT__ para que el agente se presente como grupo
+    if (!propertyId) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/api/ensayo/chat`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          propertyId,
+          message: '__INIT__',
+          conversationHistory: [],
+          language,
+          guestProfile,
+          strictMode,
+        }),
+      });
+      const data = await r.json();
+      if (data.message) {
+        setMessages([{ role: 'assistant', content: data.message, metadata: data.metadata || null }]);
+      }
+    } catch (e) { console.error(e); }
+    setLoading(false);
   }
+
+  // Al montar, enviar presentación de grupo
+  useEffect(() => {
+    if (propertyId && messages.length === 0) reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propertyId]);
 
   async function send() {
     if (!draft.trim() || loading) return;
@@ -116,19 +144,31 @@ export default function EnsayoPage() {
     setLoading(false);
   }
 
-  async function markForLearning(msg, prevUserMsg) {
+  // Modal state para "Marcar para mejorar"
+  const [fixModal, setFixModal] = useState(null); // { msg, prevUserMsg }
+  const [fixDraft, setFixDraft] = useState('');
+
+  function openFixModal(msg, prevUserMsg) {
+    setFixModal({ msg, prevUserMsg });
+    setFixDraft('');
+  }
+
+  async function submitFix() {
+    if (!fixModal) return;
     try {
       await fetch(`${API}/api/learning/${propertyId}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source: 'ensayo',
-          original_question: prevUserMsg?.content || '',
-          agent_response: msg.content,
+          original_question: fixModal.prevUserMsg?.content || '',
+          agent_response: fixModal.msg.content,
+          suggested_fix: fixDraft.trim() || null,
           issue_type: 'incomplete',
         }),
       });
-      alert('Marcado para mejorar — disponible en Aprendizaje IA');
+      setFixModal(null);
+      setFixDraft('');
     } catch (e) { alert('Error: ' + e.message); }
   }
 
@@ -270,7 +310,7 @@ export default function EnsayoPage() {
                           <SourceBadge source={m.metadata.source} />
                           <ConfidenceBadge confidence={m.metadata.confidence} />
                           <button
-                            onClick={() => markForLearning(m, prevUser)}
+                            onClick={() => openFixModal(m, prevUser)}
                             className="text-[9px] px-1.5 py-0.5 rounded-full border flex items-center gap-1"
                             style={{ borderColor: 'var(--border)', color: 'var(--text-2)' }}
                           >
@@ -323,6 +363,70 @@ export default function EnsayoPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal: Marcar para mejorar */}
+      {fixModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setFixModal(null)}
+        >
+          <div
+            className="max-w-xl w-full rounded-2xl p-5 space-y-4"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div>
+              <h3 className="text-sm font-bold" style={{ color: 'var(--text-1)' }}>
+                🚩 Marcar respuesta para mejorar
+              </h3>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-2)' }}>
+                Escribe la respuesta correcta que el agente debería dar. Se guardará
+                en Aprendizaje IA y al aplicarla quedará disponible de inmediato.
+              </p>
+            </div>
+            {fixModal.prevUserMsg && (
+              <div className="rounded-lg p-3 text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                <div className="text-[10px] uppercase font-bold mb-1" style={{ color: 'var(--text-3)' }}>Pregunta del huésped</div>
+                <p style={{ color: 'var(--text-2)' }}>"{fixModal.prevUserMsg.content}"</p>
+              </div>
+            )}
+            <div className="rounded-lg p-3 text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+              <div className="text-[10px] uppercase font-bold mb-1" style={{ color: 'var(--text-3)' }}>Respuesta actual del agente</div>
+              <p style={{ color: 'var(--text-2)' }}>"{fixModal.msg.content.slice(0, 200)}..."</p>
+            </div>
+            <div>
+              <label className="text-xs block mb-1" style={{ color: 'var(--text-2)' }}>
+                ¿Qué debería decir el agente? (opcional — puedes dejarlo vacío y completarlo luego)
+              </label>
+              <textarea
+                value={fixDraft}
+                onChange={e => setFixDraft(e.target.value)}
+                rows={5}
+                placeholder="Escribe la respuesta exacta que el agente debería dar..."
+                className="w-full rounded-lg px-3 py-2 text-sm"
+                style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setFixModal(null)}
+                className="text-xs px-4 py-2 rounded-lg"
+                style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-2)' }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={submitFix}
+                className="text-xs px-4 py-2 rounded-lg font-medium"
+                style={{ background: 'var(--accent)', color: '#fff' }}
+              >
+                Guardar en Aprendizaje IA
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -170,7 +170,7 @@ const GUIDES = {
         n: 1,
         title: 'Accede a Meta Business Manager',
         body: 'Ve a business.facebook.com. Inicia sesión con la cuenta de Facebook asociada a tu empresa. Asegúrate de tener rol de Administrador.',
-        tip: 'Para Mística: usa la cuenta asociada a Meta Business ID 764980183700550.',
+        tip: 'Usa la cuenta asociada al Meta Business ID de tu empresa.',
       },
       {
         n: 2,
@@ -188,7 +188,7 @@ const GUIDES = {
         n: 4,
         title: 'Conecta tu número de WhatsApp Business',
         body: 'En WhatsApp → Configuration → Phone Numbers, haz clic en "Add phone number". Ingresa el número de tu negocio (+57XXXXXXXXX). Verifica con el código SMS que recibirás. El número NO puede estar activo en WhatsApp personal simultáneamente.',
-        tip: 'Para Mística: usar el número +573234392420 ya registrado.',
+        tip: 'Usa el número de WhatsApp Business ya registrado en Meta.',
       },
       {
         n: 5,
@@ -205,7 +205,7 @@ const GUIDES = {
       {
         n: 7,
         title: 'Configura el Webhook',
-        body: 'En tu App de Meta → WhatsApp → Configuration → Webhook. Haz clic en "Edit". Callback URL: https://[tu-backend]/api/chat/whatsapp. Verify Token: mystica_webhook_2026. Haz clic en "Verify and Save". Luego suscríbete a: messages, message_deliveries, message_reads.',
+        body: 'En tu App de Meta → WhatsApp → Configuration → Webhook. Haz clic en "Edit". Callback URL: https://[tu-backend]/api/chat/whatsapp. Verify Token: revio_webhook_2026. Haz clic en "Verify and Save". Luego suscríbete a: messages, message_deliveries, message_reads.',
         tip: 'El backend debe estar en producción (Railway) para que Meta pueda verificar el webhook.',
       },
       {
@@ -222,7 +222,7 @@ const GUIDES = {
       { error: 'Error 131030 (template required)', solution: 'Las conversaciones iniciadas por el negocio (outbound) requieren templates aprobados. Las respuestas (inbound) no necesitan templates.' },
     ],
     notes: [
-      'Verify Token de Revio: mystica_webhook_2026 — usar exactamente este valor.',
+      'Verify Token de Revio: revio_webhook_2026 — usar exactamente este valor.',
       'El token de Sistema de Usuarios (usuario del sistema) NO expira. Es el único método para producción.',
       'WhatsApp cobra por conversación: $0.0147 USD por conversación de servicio (24h window). Las respuestas dentro de la ventana de 24h son gratuitas.',
     ],
@@ -363,7 +363,7 @@ const GUIDES = {
     color: '#0ea5e9',
     status: 'connected',
     estimatedTime: '15 min (configuración webhooks)',
-    description: 'Pasarela de pagos colombiana. Acepta: tarjetas, PSE, Nequi, Daviplata, Bancolombia. Ambas propiedades de Mística están activas.',
+    description: 'Pasarela de pagos colombiana. Acepta: tarjetas, PSE, Nequi, Daviplata, Bancolombia.',
     docUrl: 'https://docs.wompi.co',
     videoUrl: null,
     mysticaNote: null,
@@ -390,7 +390,7 @@ const GUIDES = {
         n: 3,
         title: 'Obtén las llaves de producción',
         body: 'Una vez verificada la cuenta, ve al panel de Wompi → Desarrollo → Llaves API. Encontrarás: Llave pública (pub_prod_...) y Llave privada (prv_prod_...). Si tienes múltiples propiedades con diferentes NITs, crea una cuenta por propiedad.',
-        tip: 'Para Mística: Isla Palma y Tayrona tienen NITs diferentes, por lo que tienen llaves separadas.',
+        tip: 'Si tienes varias propiedades con NITs diferentes, cada una necesita sus propias llaves.',
       },
       {
         n: 4,
@@ -418,7 +418,7 @@ const GUIDES = {
     ],
     notes: [
       'Comisiones Wompi (2026): Tarjeta crédito 2.9% + $900 COP. PSE: $1.500 COP fijo. Nequi/Daviplata: $900 COP fijo.',
-      'Ambas cuentas de Mística están verificadas y activas (confirmado por API el 2026-04-04).',
+      'Verifica que tu cuenta Wompi esté activa haciendo ping desde Revio → Integraciones.',
       'Los pagos se liquidan automáticamente cada 24h en días hábiles a tu cuenta bancaria.',
     ],
   },
@@ -465,7 +465,7 @@ const GUIDES = {
         n: 4,
         title: 'Obtén el Instagram Account ID',
         body: 'En Graph API Explorer (developers.facebook.com/tools/explorer): selecciona tu App, elige el token de Usuario de Sistema, y ejecuta: GET /me/accounts. Para cada página, ejecuta: GET /{page-id}?fields=instagram_business_account. El ID retornado es tu Instagram Account ID.',
-        tip: 'Para Mística: el Meta Business ID es 764980183700550.',
+        tip: 'Tu Meta Business ID se encuentra en business.facebook.com → Configuración del Negocio → Información del negocio.',
       },
       {
         n: 5,
@@ -476,7 +476,7 @@ const GUIDES = {
       {
         n: 6,
         title: 'Configura el webhook',
-        body: 'En tu App Meta → Instagram → Webhooks. URL: https://[tu-backend]/api/social/webhook/meta. Verify Token: mystica_webhook_2026. Suscríbete a: messages, comments, messaging_postbacks.',
+        body: 'En tu App Meta → Instagram → Webhooks. URL: https://[tu-backend]/api/social/webhook/meta. Verify Token: revio_webhook_2026. Suscríbete a: messages, comments, messaging_postbacks.',
         tip: null,
       },
       {
@@ -546,7 +546,7 @@ const GUIDES = {
       {
         n: 6,
         title: 'Configura el webhook',
-        body: 'En Messenger → Settings → Webhooks. URL: https://[tu-backend]/api/social/webhook/meta. Verify Token: mystica_webhook_2026. Suscríbete a: messages, messaging_postbacks, messaging_deliveries.',
+        body: 'En Messenger → Settings → Webhooks. URL: https://[tu-backend]/api/social/webhook/meta. Verify Token: revio_webhook_2026. Suscríbete a: messages, messaging_postbacks, messaging_deliveries.',
         tip: null,
       },
       {
