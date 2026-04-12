@@ -33,7 +33,7 @@ function timeAgo(iso) {
 function EscalationCard({ esc, onResolve, onResume }) {
   const navigate = useNavigate();
   const isActive = !esc.resolved_at;
-  const channelIcon = CHANNEL_ICONS[esc.channel] || '🔗';
+  const channelIcon = CHANNEL_ICONS[esc.source || esc.channel] || '🔗';
 
   return (
     <div
@@ -56,7 +56,7 @@ function EscalationCard({ esc, onResolve, onResume }) {
             {isActive ? '🔴 ACTIVA' : '✅ RESUELTA'}
           </span>
           <span className="text-xs" style={{ color: 'var(--text-2)' }}>
-            {channelIcon} {esc.channel || 'web'}
+            {channelIcon} {esc.source || esc.channel || 'web'}
           </span>
         </div>
         <span className="text-[10px]" style={{ color: 'var(--text-3)' }}>
