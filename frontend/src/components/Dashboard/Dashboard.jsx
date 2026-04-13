@@ -51,6 +51,7 @@ const SettingsPage      = lazy(() => import('./Settings.jsx'));
 const Inventory         = lazy(() => import('./Inventory.jsx'));
 const TransportPanel    = lazy(() => import('./TransportPanel.jsx'));
 const ReviewsPage       = lazy(() => import('./ReviewsPage.jsx'));
+const PMSHub            = lazy(() => import('./PMSHub.jsx'));
 const EnsayoPage        = lazy(() => import('./EnsayoPage.jsx'));
 const LearningPage      = lazy(() => import('./LearningPage.jsx'));
 const EscalationsPage   = lazy(() => import('./EscalationsPage.jsx'));
@@ -78,10 +79,11 @@ const navGroups = [
     label: 'PMS',
     module: 'pms',
     items: [
-      { to: '/gantt',        label: 'Calendario',   icon: CalendarDays },
-      { to: '/rooms',        label: 'Habitaciones', icon: BedDouble },
-      { to: '/guests',       label: 'Huéspedes',    icon: Users },
-      { to: '/housekeeping', label: 'Housekeeping', icon: Wrench },
+      { to: '/pms',            label: 'PMS Hub',       icon: BedDouble, end: true },
+      { to: '/pms?tab=calendar',     label: 'Calendario',   icon: CalendarDays },
+      { to: '/pms?tab=reservations', label: 'Reservas',     icon: Calendar },
+      { to: '/pms?tab=housekeeping', label: 'Housekeeping', icon: Wrench },
+      { to: '/pms?tab=rates',       label: 'Tarifas',      icon: CreditCard },
     ],
   },
   {
@@ -186,7 +188,7 @@ export default function Dashboard() {
   // Whitelist de módulos con UI terminada (los demás existen en DB pero
   // no aparecen en el sidebar hasta que su UI esté lista).
   // Items sin `module` declarado son siempre visibles (core del Agente IA).
-  const RELEASED_MODULES = ['revenue_agent'];
+  const RELEASED_MODULES = ['revenue_agent', 'pms'];
 
   const canShowModule = (moduleKey) =>
     RELEASED_MODULES.includes(moduleKey) && (hasModule?.(moduleKey) !== false);
@@ -448,6 +450,7 @@ export default function Dashboard() {
               <Route path="/escalations" element={<EscalationsPage />} />
               <Route path="/escalations/legacy" element={<EscalationsPanel property={property} />} />
               <Route path="/reviews" element={<ReviewsPage />} />
+              <Route path="/pms" element={<RequireModule moduleId="pms"><PMSHub /></RequireModule>} />
 
               {/* Channels */}
               <Route path="/channels" element={<RequireModule moduleId="channel_manager"><ChannelManager /></RequireModule>} />
