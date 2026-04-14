@@ -23,7 +23,7 @@ priority: P1
 
 # Revio PMS — Sistema de Gestion Hotelera
 
-## Estado real (auditado 2026-04-05)
+## Estado real (auditado 2026-04-14)
 - GanttCalendar.jsx: 690 lineas (ya existe)
 - GuestDetail.jsx: 588 lineas (ya existe)
 - RoomsManager.jsx: 213 lineas (ya existe)
@@ -31,6 +31,10 @@ priority: P1
 - backend/src/routes/rooms.js: 159 lineas
 - backend/src/routes/guests.js: 77 lineas
 - **TOTAL EXISTENTE: 1907 lineas — 35% completo**
+
+## Estado de módulos completados
+
+✅ Gantt drag-drop + modal detalle + check-in/out/cancel: OPERATIVO
 
 ## Pendiente critico
 

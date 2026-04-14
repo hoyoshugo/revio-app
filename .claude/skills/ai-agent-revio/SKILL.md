@@ -23,9 +23,8 @@ project: revio
 ## Archivo principal
 `backend/src/agents/hotelAgent.js`
 
-## Estado actual: BLOQUEADO
-**Problema**: API key de Anthropic sin créditos (`credit balance too low`)
-**Solución**: Recargar en https://console.anthropic.com/settings/billing ($20 USD)
+## Estado actual: OPERATIVO
+✅ Anthropic API: OPERATIVO con créditos activos (local y Railway)
 
 ## Arquitectura del agente
 
@@ -131,8 +130,7 @@ const link = await createPaymentLink(roomData, guestInfo);
 // Responder con link
 ```
 
-**Problema actual**: LobbyPMS bloquea IP 200.189.27.14 (Railway)
-**Solución**: whitelist en LobbyPMS dashboard
+✅ LobbyPMS OPERATIVO vía fly.io proxy (IPs egreso: 64.34.84.154 / 204.93.227.88 — ambas en whitelist)
 
 ## Escalación a humano
 

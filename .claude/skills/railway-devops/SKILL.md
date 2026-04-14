@@ -203,3 +203,15 @@ Para api.revio.co: upgrade a Hobby ($5/mes)
 Luego: Settings → Domains → Add custom domain
 DNS: CNAME api → [cname].railway.app
 ```
+
+## Graceful Shutdown
+
+```javascript
+// backend/src/index.js — ya implementado
+process.on('SIGTERM', async () => {
+  console.log('[Server] SIGTERM recibido, cerrando...');
+  server.close(() => process.exit(0));
+});
+```
+
+Necesario para que Railway pueda reiniciar limpiamente sin interrumpir requests en vuelo.

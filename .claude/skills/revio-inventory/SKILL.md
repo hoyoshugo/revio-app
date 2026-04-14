@@ -1,8 +1,7 @@
 ---
 name: revio-inventory
 description: |
-  Modulo de inventarios Revio. 20% completo. Inventory.jsx (445L) ya existe.
-  FALTA: backend/src/routes/inventory.js (0 lineas, prioridad inmediata).
+  Modulo de inventarios Revio. 100% COMPLETO. Inventory.jsx (445L) y backend/src/routes/inventory.js (9 endpoints) operacionales.
   Activar cuando se trabaje en stock, proveedores, ordenes de compra, alertas.
 triggers:
   - inventario
@@ -20,12 +19,12 @@ priority: P1-inmediato
 
 # Revio Inventarios — Control de Stock
 
-## Estado real (auditado 2026-04-05)
+## Estado real (auditado 2026-04-14)
 - frontend/src/components/Dashboard/Inventory.jsx: **445 lineas (EXISTE)**
-- backend/src/routes/inventory.js: **0 lineas (FALTANTE)**
-- Estimado: 1.5 semanas para completar el modulo
+- backend/src/routes/inventory.js: **9 endpoints (COMPLETO)**
+- Estimado: 0 semanas — 100% COMPLETO
 
-## Lo que falta: backend/src/routes/inventory.js
+## Implementado: backend/src/routes/inventory.js
 
 ```javascript
 // backend/src/routes/inventory.js

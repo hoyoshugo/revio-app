@@ -31,8 +31,9 @@ author: 3H Enterprise SAS
 - Path: mystica-ai-agent/
 - URL: https://revio-app-production.up.railway.app
 - GitHub: github.com/hoyoshugo/revio-app
-- Estado: 15/15 tests pasando
+- Estado: 26/26 tests pasando (2026-04-14)
 - Stack: Node.js ESM + React 18 + Supabase + Railway
+- Version: v2.3
 
 ### 2. Caribbean Treasures Next.js
 - Path: caribbean-treasures-nextjs/
@@ -55,8 +56,8 @@ author: 3H Enterprise SAS
 | Modulo | Estado | Prioridad | Skill |
 |--------|--------|-----------|-------|
 | Revenue Agent | Produccion | P0 | revio-master |
-| PMS Hotelero | Diseno | P1 | revio-pms |
-| Inventarios | Desarrollo | P1 | revio-inventory |
+| PMS Hotelero | Avanzado 35% | P1 | revio-pms |
+| Inventarios | COMPLETO (9 endpoints) | P1 | revio-inventory |
 | Contable (Siigo) | Planificado | P2 | revio-accounting |
 | Financiero | Planificado | P2 | revio-financial |
 | Marketing IA | Planificado | P2 | revio-marketing |

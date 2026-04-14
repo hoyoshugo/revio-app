@@ -23,7 +23,7 @@ project: revio
 ```env
 SUPABASE_URL=https://apghalkivuvyhbmethxk.supabase.co
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_KEY=❌ PENDIENTE — ir a dashboard/settings/api → service_role key
+SUPABASE_SERVICE_KEY=✅ ACTUALIZADO (2026-04-04) — activo en Railway y producción
 ```
 
 Dashboard SQL: https://supabase.com/dashboard/project/apghalkivuvyhbmethxk/editor

@@ -247,3 +247,40 @@ const response = await client.messages.create({
   messages: [{ role: 'user', content: systemPrompt + userMessage }]
 });
 ```
+
+---
+
+## Meta API Rate Limiting
+
+- Meta Graph: 200 calls/hora por user token
+- Backoff exponencial + jitter para reintentos
+- Queue para manejar picos de tráfico
+
+## Webhook Authentication Patterns
+
+### Meta (Instagram/Facebook/WhatsApp)
+Validar firma SHA256 usando `META_APP_SECRET`:
+```js
+const signature = req.headers['x-hub-signature-256']?.replace('sha256=', '');
+const expected = crypto.createHmac('sha256', appSecret)
+  .update(req.rawBody).digest('hex');
+if (signature !== expected) throw new Error('Invalid signature');
+```
+
+### Wompi (Pagos)
+Validar con `WOMPI_EVENT_SECRET`:
+```js
+const signature = req.headers['x-event-checksum'];
+const expected = crypto.createHmac('sha256', WOMPI_EVENT_SECRET)
+  .update(req.rawBody).digest('hex');
+if (signature !== expected) throw new Error('Invalid signature');
+```
+
+**Patrón general**: Responder 200 inmediatamente, procesar webhook de forma asincrónica
+
+## Conversión de Monedas
+
+- API recomendada: **frankfurter.app** (gratuita, open source, BCE)
+- Cache en Supabase tabla `currency_rates` con TTL configurable
+- Fallback: usar última tasa cached si la API falla
+- Monedas soportadas: COP, USD, EUR, GBP, MXN, BRL, ARS, PEN, CLP, CAD, AUD

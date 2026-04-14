@@ -27,7 +27,7 @@ Las API keys de proveedores IA se guardan encriptadas en Supabase.
 ENCRYPTION_KEY=a3f8c2d1e4b5967843210fedcba9876543210fedcba9876543210fedcba98765432
 ```
 
-### Cómo funciona
+### Implementación AES-256-GCM (recomendada)
 ```js
 import crypto from 'crypto';
 
@@ -49,6 +49,28 @@ export function decrypt(encoded) {
   return decipher.update(Buffer.from(encrypted, 'hex')) + decipher.final('utf8');
 }
 ```
+
+### Alternativa: AES-256-CBC
+```js
+// Usable si se requiere compatibilidad con otros sistemas
+const ALGORITHM = 'aes-256-cbc';
+const KEY = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
+
+export function encrypt(text) {
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv(ALGORITHM, KEY, iv);
+  const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
+
+export function decrypt(text) {
+  const [ivHex, encHex] = text.split(':');
+  const decipher = crypto.createDecipheriv(ALGORITHM, KEY, Buffer.from(ivHex, 'hex'));
+  return Buffer.concat([decipher.update(Buffer.from(encHex, 'hex')), decipher.final()]).toString();
+}
+```
+
+**Recomendación**: Usar AES-256-GCM (incluye autenticación) en lugar de CBC.
 
 ## JWT
 
@@ -170,6 +192,21 @@ ENCRYPTION_KEY       → idem, 32 bytes hex
 WOMPI_PRIVATE_KEY_*  → Wompi dashboard
 META_APP_SECRET      → Meta Developers
 ```
+
+## OWASP Top 10 — Estado de Implementación
+
+| Categoria | Estado | Mitigacion |
+|-----------|--------|-----------|
+| A01 Broken Access Control | OK | RLS multi-tenant + JWT por tenant |
+| A02 Cryptographic Failures | OK | AES-256-GCM + HTTPS forced |
+| A03 Injection | OK | Supabase parameterized queries |
+| A04 Insecure Design | PENDIENTE | Requiere security review arquitectonico |
+| A05 Security Misconfiguration | OK | Helmet + CORS restringido |
+| A06 Vulnerable Components | PENDIENTE | npm audit periodico recomendado |
+| A07 Authentication Failures | OK | JWT + rate limiting + timingSafeEqual |
+| A08 Integrity Failures | OK | HMAC webhooks + validacion firmas |
+| A09 Logging Failures | PENDIENTE | Audit logs completo pendiente |
+| A10 SSRF | PENDIENTE | Validacion URLs en integraciones pendiente |
 
 ## Vulnerabilidades conocidas y mitigaciones
 

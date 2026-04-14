@@ -224,7 +224,7 @@ const TOOLS = [
       properties: {
         property: {
           type: 'string',
-          enum: ['isla-palma', 'tayrona']
+          description: 'El slug de la propiedad (ej: isla-palma, tayrona)'
         },
         guest_name: { type: 'string', description: 'Nombre completo del huésped' },
         guest_email: { type: 'string', description: 'Email del huésped' },
@@ -530,6 +530,17 @@ async function executeTool(toolName, toolInput, conversation, propertyId) {
       const route = routes.find(r => r.code === toolInput.route_code);
       if (!route) return { success: false, error: `Ruta ${toolInput.route_code} no encontrada` };
 
+      // Resolver hotelId dinámicamente desde la propiedad del tenant
+      let hotelId = 1; // fallback demo
+      try {
+        const { data: prop } = await supabase
+          .from('properties')
+          .select('ct_hotel_id')
+          .eq('id', propertyId)
+          .single();
+        if (prop?.ct_hotel_id) hotelId = prop.ct_hotel_id;
+      } catch { /* usa fallback */ }
+
       const result = await createTransportReservation({
         routeId: route.id,
         date: toolInput.date,
@@ -537,7 +548,7 @@ async function executeTool(toolName, toolInput, conversation, propertyId) {
         guestName: toolInput.guest_name,
         guestEmail: toolInput.guest_email,
         guestPhone: toolInput.guest_phone,
-        hotelId: 1, // demo tenant mapeado como hotel #1 en Caribbean Treasures
+        hotelId,
         revioReservationId: toolInput.revio_reservation_id,
       });
       return result;
@@ -614,7 +625,8 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
       es: '⏸️ Entiendo tu frustración. He conectado a un miembro de nuestro equipo que te atenderá personalmente en breve. Para urgencias: WhatsApp +573234392420 🌊',
       en: '⏸️ I understand your frustration. I\'ve connected a team member who will assist you personally shortly. For urgencies: WhatsApp +573234392420 🌊',
       fr: '⏸️ Je comprends votre frustration. J\'ai connecté un membre de notre équipe qui vous aidera personnellement. Urgences: WhatsApp +573234392420 🌊',
-      de: '⏸️ Ich verstehe Ihre Frustration. Ein Teammitglied wird sich persönlich um Sie kümmern. Dringend: WhatsApp +573234392420 🌊'
+      de: '⏸️ Ich verstehe Ihre Frustration. Ein Teammitglied wird sich persönlich um Sie kümmern. Dringend: WhatsApp +573234392420 🌊',
+      pt: '⏸️ Entendo sua frustração. Conectei um membro da nossa equipe que vai atendê-lo pessoalmente em breve. Urgências: WhatsApp +573234392420 🌊'
     };
     const lang = detectLanguage(userMessage);
     return {
@@ -682,18 +694,46 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
   let totalTokens = 0;
   let pendingBooking = null;
 
+  // Construir system prompt dinámico (luna, festivos, transporte live, multi-propiedad)
+  let systemPromptText;
+  try {
+    const tenantId = conversation.tenant_id || null;
+    // Verificar si el tenant tiene múltiples propiedades
+    const { data: tenantProps } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true);
+    const isMulti = (tenantProps || []).length > 1;
+    const allIds = (tenantProps || []).map(p => p.id);
+
+    systemPromptText = await buildDynamicSystemPrompt(propertyId, tenantId, {
+      isMultiProperty: isMulti,
+      allPropertyIds: allIds,
+      groupName: property.group_name,
+      groupDescription: property.group_description,
+    });
+    // Append knowledge base del learning engine + intensidad de ventas
+    systemPromptText += (SALES_INTENSITY_PROMPTS[salesIntensity] || SALES_INTENSITY_PROMPTS.moderate);
+    systemPromptText += knowledgeContext;
+  } catch (promptErr) {
+    console.warn('[Agent] Dynamic prompt failed, using static fallback:', promptErr.message);
+    systemPromptText = buildSystemPrompt(property, dynamicKnowledge, salesIntensity) + knowledgeContext;
+  }
+
   try {
     let response = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 1024,
-      system: buildSystemPrompt(property, dynamicKnowledge, salesIntensity) + knowledgeContext,
+      max_tokens: 2048,
+      system: systemPromptText,
       messages: claudeMessages,
       tools: TOOLS
     });
 
-    totalTokens += response.usage?.input_tokens + response.usage?.output_tokens || 0;
+    totalTokens += (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
 
-    // Bucle de herramientas
+    // Bucle de herramientas — acumula mensajes correctamente entre iteraciones
+    let accumulatedMessages = [...claudeMessages];
     while (response.stop_reason === 'tool_use') {
       const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');
       const toolResults = [];
@@ -714,22 +754,22 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
         });
       }
 
-      // Continuar el diálogo con los resultados
-      const updatedMessages = [
-        ...claudeMessages,
+      // Acumular mensajes para mantener contexto completo entre iteraciones
+      accumulatedMessages = [
+        ...accumulatedMessages,
         { role: 'assistant', content: response.content },
         { role: 'user', content: toolResults }
       ];
 
       response = await anthropic.messages.create({
         model: MODEL,
-        max_tokens: 1024,
-        system: buildSystemPrompt(property, dynamicKnowledge, salesIntensity) + knowledgeContext,
-        messages: updatedMessages,
+        max_tokens: 2048,
+        system: systemPromptText,
+        messages: accumulatedMessages,
         tools: TOOLS
       });
 
-      totalTokens += response.usage?.input_tokens + response.usage?.output_tokens || 0;
+      totalTokens += (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
     }
 
     // Extraer texto final
@@ -798,7 +838,8 @@ function detectLanguage(text) {
   const patterns = {
     en: /\b(hello|hi|hey|good|morning|evening|night|the|is|are|have|want|looking|book|room|available|please|thank|what|how|when|where)\b/,
     fr: /\b(bonjour|bonsoir|salut|je|vous|nous|est|sont|avez|voulez|cherche|réserver|chambre|disponible|merci|quoi|comment|quand|où)\b/,
-    de: /\b(hallo|guten|ich|sie|wir|ist|sind|haben|möchte|suche|buchen|zimmer|verfügbar|danke|was|wie|wann|wo)\b/
+    de: /\b(hallo|guten|ich|sie|wir|ist|sind|haben|möchte|suche|buchen|zimmer|verfügbar|danke|was|wie|wann|wo)\b/,
+    pt: /\b(olá|oi|bom dia|boa tarde|boa noite|eu|você|nós|quero|procuro|reservar|quarto|disponível|obrigad[oa]|como|quando|onde|preciso)\b/
   };
 
   for (const [lang, pattern] of Object.entries(patterns)) {
@@ -850,7 +891,8 @@ function getErrorMessage(lang) {
     es: 'Lo siento, tuve un problema técnico momentáneo. ¿Podrías repetir tu pregunta? Estoy aquí para ayudarte. 🌊',
     en: "I'm sorry, I had a momentary technical issue. Could you repeat your question? I'm here to help! 🌊",
     fr: "Désolé, j'ai eu un problème technique momentané. Pourriez-vous répéter votre question? Je suis là pour vous aider! 🌊",
-    de: 'Es tut mir leid, ich hatte ein kurzes technisches Problem. Könnten Sie Ihre Frage wiederholen? Ich bin hier um zu helfen! 🌊'
+    de: 'Es tut mir leid, ich hatte ein kurzes technisches Problem. Könnten Sie Ihre Frage wiederholen? Ich bin hier um zu helfen! 🌊',
+    pt: 'Desculpe, tive um problema técnico momentâneo. Poderia repetir sua pergunta? Estou aqui para ajudar! 🌊'
   };
   return msgs[lang] || msgs.es;
 }

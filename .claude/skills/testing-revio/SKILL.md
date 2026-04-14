@@ -79,7 +79,7 @@ curl https://revio-app-production.up.railway.app/api/dashboard/metrics \
 ```bash
 curl -H "Authorization: Bearer DIhD1TKF0PXyzKmblOgJuNGYMstASOv4Taej4O3w61AWnK9h8l8XK2LkRVDe" \
   "https://api.lobbypms.com/api/v2/available-rooms?dateFrom=2026-05-20&dateTo=2026-05-22"
-# Si falla con IP error → necesita whitelist 200.189.27.14
+# ✅ LobbyPMS operativo vía fly.io proxy (IPs egreso: 64.34.84.154 / 204.93.227.88 — ambas en whitelist)
 ```
 
 ### 8. Wompi merchant
@@ -148,7 +148,7 @@ Frontend:
 
 | Error | Estado | Solución |
 |-------|--------|---------|
-| Chat responde "problema técnico" | Anthropic sin créditos | Recargar billing |
-| LobbyPMS 403 | IP no whitelisted | Agregar 200.189.27.14 en LobbyPMS |
-| WhatsApp envío falla | Phone DISCONNECTED | Reconectar en Meta Business |
+| Chat responde "problema técnico" | ✅ RESUELTO (créditos activos) | Operativo |
+| LobbyPMS 403 | ✅ RESUELTO (fly.io proxy) | fly.io proxy activo (64.34.84.154 / 204.93.227.88) |
+| WhatsApp envío falla | Phase DISCONNECTED | Reconectar en Meta Business |
 | OTA poll crash | adapter sin getUnreadMessages | ✅ Corregido en commit 5c9526c |

@@ -8,7 +8,19 @@
 - **GitHub**: https://github.com/hoyoshugo/revio-app
 - **Supabase**: https://supabase.com/dashboard/project/apghalkivuvyhbmethxk
 
-## Estado de producción (2026-04-09) — v2.3
+## Estado de producción (2026-04-14) — v2.4 — auditoría completa de prompts
+
+### Cambios v2.3 → v2.4 (2026-04-14)
+- ✅ **hotelAgent.js**: ahora usa `systemPromptBuilder.js` dinámico (luna, festivos, transporte live, multi-propiedad)
+- ✅ **confirm_booking**: eliminado enum hardcodeado `['isla-palma','tayrona']` → multi-tenancy real
+- ✅ **Bug conteo de tokens**: precedencia de operador `||` corregida en ambas llamadas
+- ✅ **Idiomas**: agregado portugués (es/en/fr/de/pt completos en detección, escalación y errores)
+- ✅ **max_tokens**: 1024 → 2048 en ambas llamadas (evita truncado en multi-idioma)
+- ✅ **Tool loop**: acumulación correcta de mensajes entre iteraciones (ya no pierde contexto)
+- ✅ **hotelId hardcoded**: ahora se resuelve desde `properties.ct_hotel_id` (multi-tenant)
+- ✅ **Skills consolidados**: 26 → 23 únicos (deprecados: api-integration, revio-security, revio-devops)
+- ✅ **Skills actualizados**: ai-agent-revio, revio-inventory, revio-pms, supabase-revio, ecosystem-master, testing-revio
+
 ```
 ✅ Backend (uptime OK)  ✅ Auth (superadmin + cliente)  ✅ Dashboard  ✅ Wompi x2
 ✅ Agente IA → OPERATIVO con Claude claude-sonnet-4-6
