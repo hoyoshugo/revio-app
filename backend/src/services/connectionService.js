@@ -218,4 +218,48 @@ export async function listConnections(propertyId) {
   }));
 }
 
-/*
+/**
+ * Obtiene el mapeo de canales para una propiedad (channel_property_map).
+ */
+export async function getChannelMappings(propertyId) {
+  const { data, error } = await supabase
+    .from('channel_property_map')
+    .select('channel, external_id, external_name, scope, is_active')
+    .eq('property_id', propertyId);
+  if (error) return [];
+  return data || [];
+}
+
+/**
+ * Guarda o actualiza un mapeo de canal para una propiedad.
+ */
+export async function saveChannelMapping(propertyId, channel, externalId, externalName, scope = 'independent') {
+  const { data, error } = await supabase
+    .from('channel_property_map')
+    .upsert({
+      property_id: propertyId,
+      channel,
+      external_id: externalId,
+      external_name: externalName,
+      scope,
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'channel,external_id' })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export default {
+  getSetting,
+  saveSetting,
+  getLobbyPMSToken,
+  getWompiConfig,
+  getWhatsAppConfig,
+  getAIConfig,
+  listConnections,
+  getChannelMappings,
+  saveChannelMapping,
+};

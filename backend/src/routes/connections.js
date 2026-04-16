@@ -249,4 +249,40 @@ router.post('/:propertyId/test', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('[Connections] Error probando:', err.message);
-    res.status(500).json({ success: false, message: err.
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ============================================================
+// GET /api/connections/:propertyId/channels — Mapeo de canales Meta
+// ============================================================
+router.get('/:propertyId/channels', async (req, res) => {
+  try {
+    const mappings = await getChannelMappings(req.params.propertyId);
+    res.json({ channels: mappings });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// POST /api/connections/:propertyId/channels — Guardar mapeo de canal
+// Body: { channel, external_id, external_name, scope }
+// ============================================================
+router.post('/:propertyId/channels', async (req, res) => {
+  try {
+    const { channel, external_id, external_name, scope } = req.body;
+    if (!channel || !external_id) {
+      return res.status(400).json({ error: 'channel y external_id son requeridos' });
+    }
+    const data = await saveChannelMapping(
+      req.params.propertyId, channel, external_id,
+      external_name || external_id, scope || 'independent'
+    );
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+export default router;

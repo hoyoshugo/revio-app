@@ -187,4 +187,41 @@ export function parseMetaWebhook(body) {
         const c = change.value;
         events.push({
           channel: 'facebook_comment',
-          senderId
+          senderId: c.sender_id,
+          senderName: c.sender_name || 'usuario',
+          message: c.message,
+          commentId: c.comment_id,
+          postId: c.post_id,
+          timestamp: Date.now(),
+          pageId,
+        });
+      }
+    }
+
+    // DMs de Instagram/Facebook
+    for (const msg of (entry.messaging || [])) {
+      if (msg.message && !msg.message.is_echo) {
+        const channel = body.object === 'instagram' ? 'instagram' : 'facebook';
+        events.push({
+          channel,
+          senderId: msg.sender.id,
+          message: msg.message.text || '[media]',
+          messageId: msg.message.mid,
+          timestamp: msg.timestamp,
+          pageId,
+        });
+      }
+    }
+  }
+
+  return events;
+}
+
+// ── VERIFICAR WEBHOOK META ───────────────────────────────
+export function verifyMetaWebhook(mode, token, challenge) {
+  const verifyToken = process.env.META_VERIFY_TOKEN || process.env.META_WEBHOOK_VERIFY_TOKEN;
+  if (mode === 'subscribe' && token === verifyToken) {
+    return { valid: true, challenge };
+  }
+  return { valid: false };
+}
