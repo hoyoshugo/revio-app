@@ -8,7 +8,17 @@
 - **GitHub**: https://github.com/hoyoshugo/revio-app
 - **Supabase**: https://supabase.com/dashboard/project/apghalkivuvyhbmethxk
 
-## Estado de producción (2026-04-14) — v2.4 — auditoría completa de prompts
+## Estado de producción (2026-04-16) — v2.5 — multi-propiedad + canales Meta
+
+### Cambios v2.4 → v2.5 (2026-04-16)
+- ✅ **webhooks.js**: ruteo automático por page_id/phone_number_id vía `channel_property_map`
+- ✅ **metaUnified.js**: extrae `phoneNumberId` de metadata WA, maneja mensajes interactivos/botones
+- ✅ **connectionService.js**: nuevas funciones `getChannelMappings`, `saveChannelMapping`, campo `scope`
+- ✅ **connections.js**: endpoints `GET/POST /api/connections/:propertyId/channels` para mapeo de canales
+- ✅ **migration_014**: tabla `channel_property_map` + seed data (WA shared, FB pages independent)
+- ✅ **reconnect-whatsapp.js**: script de diagnóstico y fix para estado de número WA
+- ✅ **Facebook Pages suscritas**: Isla Palma (269851030441228) + Tayrona (538403142679507) → webhooks activos
+- ✅ **App-level webhooks**: instagram, whatsapp_business_account, page → todos suscritos
 
 ### Cambios v2.3 → v2.4 (2026-04-14)
 - ✅ **hotelAgent.js**: ahora usa `systemPromptBuilder.js` dinámico (luna, festivos, transporte live, multi-propiedad)
@@ -30,10 +40,12 @@
 ✅ fly.io Proxy → LIVE: https://revio-lobbypms-proxy.fly.dev (IP estática, auto-stop)
    IPs egreso fly.io: 64.34.84.154 / 204.93.227.88 — ambas en whitelist LobbyPMS
 ✅ LobbyPMS → OPERATIVO vía fly.io proxy (Isla Palma: 14 cat. | Tayrona: 3 cat.)
-⚠️  WhatsApp → número DISCONNECTED (reconectar en Meta Business Manager)
+⚠️  WhatsApp → número DISCONNECTED (rate limited, reconectar vía OTP en Meta Business Manager)
+✅ Facebook Pages → ambas suscritas a webhooks (Isla Palma + Tayrona)
+✅ channel_property_map → 3 registros (WA shared + 2 FB independent)
 ✅ Supabase  → service_role key correcto
 ✅ property_knowledge → 40 entradas (Isla Palma + Tayrona)
-✅ Arquitectura multitenancy v2.0 → todo en BD, sin credenciales hardcodeadas
+✅ Arquitectura multitenancy v2.5 → ruteo por page_id, sin credenciales hardcodeadas
 ✅ System prompt agente: genérico (multitenancy real)
 ✅ Token localStorage: normalizado a revio_token (fallback mystica_token)
 ✅ IP Monitor → detecta IP en startup, guarda en Supabase, alerta WhatsApp
@@ -65,10 +77,17 @@
 4. ✅ Arquitectura multitenancy v2.0 (2026-04-05)
 5. ✅ fly.io proxy desplegado — LobbyPMS operativo (2026-04-05)
 6. WhatsApp → reconectar +573234392420
-   - PRIMERA VEZ: Meta Business Manager → Phone Numbers → +57 323 4392420 → Reconnect → OTP por SMS
-     Mientras estás ahí: Settings → Two-step verification → Reset PIN → guardar como WHATSAPP_PIN en backend/.env
-   - PRÓXIMAS VECES: si WHATSAPP_PIN está en .env, ejecutar (sin OTP, < 30 seg):
-     `powershell -File C:\Users\hoyos\.claude\scripts\reconnect-whatsapp-with-pin.ps1`
+   - ESTADO: NOT_VERIFIED, rate limited por intentos previos (esperar 24h)
+   - OPCIÓN A (API): `node backend/scripts/reconnect-whatsapp.js --fix` (necesita WHATSAPP_PIN en .env)
+   - OPCIÓN B (manual): Meta Business Manager → WhatsApp Manager → Phone Numbers → click número → buscar opción Verificar/Reconectar → OTP por SMS
+   - OPCIÓN C (Developer Console): developers.facebook.com → App Revio → WhatsApp → Inicio rápido → re-registrar número
+   - NOTA: El endpoint /register NO funciona para cuentas SMB (Cloud API). Solo /request_code + /verify_code
+   - Después: guardar WHATSAPP_PIN en backend/.env para futuros re-registros automáticos
+7. Meta App Revio (ID: 1982322046004598) — configuración actual:
+   - App-level webhooks: instagram ✅, whatsapp_business_account ✅, page ✅
+   - Page subscriptions: Isla Palma (messages,messaging_postbacks) ✅, Tayrona (messages,messaging_postbacks) ✅
+   - WhatsApp webhook URL: https://revio-app-production.up.railway.app/api/webhooks/meta
+   - Verify token: revio-meta-verify-2026 (META_WEBHOOK_VERIFY_TOKEN en .env)
 ```
 
 ## Tests rápidos
@@ -159,7 +178,7 @@ BLOQUEANTES: DIAN habilitación (burocrático), WhatsApp reconectar (manual)
 - **AI:** Claude claude-sonnet-4-6 vía Anthropic SDK
 - **Pagos:** Wompi (Colombia)
 - **PMS:** LobbyPMS
-- **Mensajería:** WhatsApp Business API (Meta Graph v18.0)
+- **Mensajería:** WhatsApp + Instagram + Facebook (Meta Graph v22.0, webhook unificado)
 
 ### Estructura clave
 ```
@@ -202,45 +221,4 @@ frontend/
 
 Todas ejecutadas manualmente en Supabase SQL Editor. Orden aplicado:
 1. `migration_002_ota_noshows.sql` — ota_messages, ota_reservations, ota_no_shows
-2. `migration_003_escalations.sql` — health_checks, knowledge_base, escalations
-3. `migration_005_settings.sql` — settings key-value
-4. `migration_006_saas_tables.sql` — tenants, tenant_plans, tenant_subscriptions
-5. `migration_007_health_reports.sql` — system_health_reports
-6. `migration_008_inventory.sql` — inventory_items, inventory_movements
-7. `migration_008_billing_discounts.sql` — tenant_discounts, promo_codes
-8. `migration_009_pos_tables.sql` — revenue_centers, products, pos_orders, pos_order_items
-9. `migration_010_full_pms_fixed.sql` — room_types, rooms, guests, reservations, housekeeping_tasks, events, wallets
-10. `migration_011_modules.sql` — revio_modules, tenant_modules
-11. `migration_012_analytics.sql` — analytics_events
-12. `migration_013_advanced_features_fixed.sql` — contacts, automated_messages, cancellation_cases, approval_requests, platform_audits, scheduled_reports
-
-## Comandos útiles
-
-```bash
-# Arrancar backend
-cd backend && npm run dev
-
-# Arrancar frontend
-cd frontend && npm run dev
-
-# Build frontend
-cd frontend && npm run build
-
-# Verificar backend vivo
-curl http://localhost:3001/health
-
-# Login superadmin (obtener token)
-curl -X POST http://localhost:3001/api/sa/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@misticatech.co","password":"MisticaTech2026!"}'
-```
-
-## Reglas del guardian
-
-El skill `/system-guardian` debe ejecutarse:
-- ✅ Al iniciar cada sesión de Claude Code en este proyecto
-- ✅ Después de cambios grandes en el código (nuevas rutas, nuevas integraciones)
-- ✅ Cuando el usuario pida explícitamente una revisión
-- ✅ Ante cualquier error de producción reportado
-
-No aplicar fixes automáticamente sin confirmación del usuario. Mostrar el fix, preguntar si aplicar.
+2. `migration_003_escalations.s
