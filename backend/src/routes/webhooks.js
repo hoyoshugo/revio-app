@@ -1,6 +1,12 @@
 /**
  * Webhooks unificados — Meta (WhatsApp + Instagram + Facebook)
  * Todos los mensajes entrantes pasan por aquí y se procesan con el agente IA.
+ *
+ * v2.5 — Ruteo automático por page_id / phone_number_id usando channel_property_map.
+ *   - Facebook/IG: cada página tiene page_id único → mapeo directo a propiedad
+ *   - WhatsApp: número compartido → scope='shared', el agente pregunta propiedad
+ *   - Fallback: si no hay mapeo, usa la primera propiedad activa
+ *
  * GET  /api/webhooks/meta  → verificación hub.challenge
  * POST /api/webhooks/meta  → recibe eventos (mensajes, comentarios)
  */
@@ -20,6 +26,79 @@ import { insertInboxMessage } from '../services/channelService.js';
 import { supabase } from '../models/supabase.js';
 
 const router = express.Router();
+
+// ── Cache de mapeo channel_property_map (TTL 5 min) ────
+let _mapCache = null;
+let _mapCacheTs = 0;
+const MAP_CACHE_TTL = 5 * 60 * 1000;
+
+async function getChannelPropertyMap() {
+  if (_mapCache && Date.now() - _mapCacheTs < MAP_CACHE_TTL) return _mapCache;
+
+  const { data, error } = await supabase
+    .from('channel_property_map')
+    .select('channel, external_id, property_id, scope, external_name')
+    .eq('is_active', true);
+
+  if (error || !data) {
+    console.error('[Webhooks] Error cargando channel_property_map:', error?.message);
+    return _mapCache || [];
+  }
+
+  _mapCache = data;
+  _mapCacheTs = Date.now();
+  return data;
+}
+
+/**
+ * Resuelve la propiedad correcta para un evento Meta.
+ * 1. Busca por page_id en channel_property_map
+ * 2. Si scope='shared' (ej: WA compartido), devuelve isShared=true → agente pregunta
+ * 3. Fallback: primera propiedad activa
+ */
+async function resolvePropertyForEvent(event, allProperties) {
+  const map = await getChannelPropertyMap();
+
+  // Buscar por page_id del evento
+  const normalizedChannel = event.channel.replace('_comment', '');
+  const match = map.find(m =>
+    m.channel === normalizedChannel && m.external_id === String(event.pageId)
+  );
+
+  if (match) {
+    const prop = allProperties.find(p => p.id === match.property_id);
+    if (prop) {
+      return {
+        property: prop,
+        isShared: match.scope === 'shared',
+        matchedBy: 'page_id',
+      };
+    }
+  }
+
+  // WhatsApp: también buscar por phone_number_id si pageId no matcheó
+  if (normalizedChannel === 'whatsapp') {
+    const phoneId = process.env.WHATSAPP_PHONE_ID;
+    const waMatch = map.find(m => m.channel === 'whatsapp' && m.external_id === phoneId);
+    if (waMatch) {
+      const prop = allProperties.find(p => p.id === waMatch.property_id);
+      if (prop) {
+        return {
+          property: prop,
+          isShared: waMatch.scope === 'shared',
+          matchedBy: 'phone_number_id',
+        };
+      }
+    }
+  }
+
+  // Fallback: primera propiedad
+  return {
+    property: allProperties[0],
+    isShared: allProperties.length > 1,
+    matchedBy: 'fallback',
+  };
+}
 
 // ── GET /api/webhooks/meta — verificación ──────────────
 router.get('/meta', (req, res) => {
@@ -77,87 +156,8 @@ async function processMetaEvents(body) {
 
   for (const event of events) {
     try {
-      // Por defecto usar la primera propiedad (el agente pregunta al cliente cuál)
-      const property = properties[0];
+      // ── Ruteo automático por page_id ──
+      const { property, isShared, matchedBy } = await resolvePropertyForEvent(event, properties);
 
-      // CRM: guardar contacto
-      await saveContact(property.tenant_id, {
-        name: event.senderName,
-        phone: event.channel === 'whatsapp' ? event.senderId : null,
-        source: event.channel,
-        language: 'es',
-      });
-
-      // Inbox unificado: registrar el mensaje entrante
-      const normalizedChannel = event.channel.replace('_comment', '');
-      await insertInboxMessage({
-        property_id: property.id,
-        channel_key: normalizedChannel,
-        external_thread_id: event.messageId || event.commentId || null,
-        sender_name: event.senderName || null,
-        sender_id: event.senderId || null,
-        message_text: event.message || null,
-        direction: 'inbound',
-        status: 'unread',
-        raw_payload: event,
-      });
-
-      // Verificar tenant habilitado (pago o manual)
-      const access = await isTenantEnabled(property.tenant_id);
-      if (!access.enabled) {
-        console.log(JSON.stringify({
-          level: 'warn',
-          event: 'tenant_disabled_message_ignored',
-          tenantId: property.tenant_id,
-          reason: access.reason,
-        }));
-        continue;
-      }
-
-      // Procesar con el agente IA
-      const sessionId = event.channel + '_' + event.senderId;
-      const response = await processMessage(
-        sessionId,
-        event.message,
-        property.id,
-        {
-          channel: event.channel,
-          senderName: event.senderName,
-          tenantId: property.tenant_id,
-          isMultiProperty: properties.length > 1,
-          allProperties: properties,
-        }
-      );
-
-      if (!response?.message) continue;
-
-      // Responder por el mismo canal
-      switch (event.channel) {
-        case 'whatsapp':
-          await sendMessage('whatsapp', event.senderId, response.message);
-          break;
-        case 'instagram':
-          await sendMessage('instagram', event.senderId, response.message);
-          break;
-        case 'facebook':
-          await sendMessage('facebook', event.senderId, response.message);
-          break;
-        case 'instagram_comment':
-          await replyToInstagramComment(event.commentId, response.message);
-          break;
-        case 'facebook_comment':
-          await replyToFacebookComment(event.commentId, response.message);
-          break;
-      }
-    } catch (e) {
-      console.error(JSON.stringify({
-        level: 'error',
-        event: 'meta_event_processing_error',
-        channel: event.channel,
-        error: e.message,
-      }));
-    }
-  }
-}
-
-export default router;
+      console.log(JSON.stringify({
+        level:

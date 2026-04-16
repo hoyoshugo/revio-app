@@ -1,8 +1,14 @@
 /**
- * Meta Unified Service
+ * Meta Unified Service — v2.5
  * Maneja WhatsApp + Instagram + Facebook desde una sola cuenta Meta Business.
- * Mística tiene: WhatsApp compartido, 2 páginas FB, 2 cuentas IG.
- * El agente responde como "Mística" genérico y pregunta por la propiedad.
+ *
+ * Arquitectura multi-propiedad:
+ *   - WhatsApp: número compartido, un token/phone_id global
+ *   - Facebook: cada propiedad tiene su Page con token independiente
+ *   - Instagram: cada propiedad tiene su cuenta IG (pendiente conectar)
+ *
+ * El webhook (webhooks.js) resuelve la propiedad vía channel_property_map
+ * y pasa el token correcto en options.token.
  */
 
 const GRAPH_BASE = 'https://graph.facebook.com/v22.0';
@@ -128,6 +134,7 @@ export function parseMetaWebhook(body) {
     for (const change of (entry.changes || [])) {
       if (change.field === 'messages' && change.value?.messaging_product === 'whatsapp') {
         const msg = change.value.messages?.[0];
+        const phoneNumberId = change.value.metadata?.phone_number_id;
         if (msg && msg.type === 'text') {
           events.push({
             channel: 'whatsapp',
@@ -136,7 +143,26 @@ export function parseMetaWebhook(body) {
             message: msg.text.body,
             messageId: msg.id,
             timestamp: parseInt(msg.timestamp) * 1000,
-            pageId,
+            pageId: phoneNumberId || pageId, // Para WA, usar phone_number_id como pageId
+            phoneNumberId,
+          });
+        }
+        // También manejar mensajes interactivos (botones, listas)
+        if (msg && (msg.type === 'interactive' || msg.type === 'button')) {
+          const interactiveText =
+            msg.interactive?.button_reply?.title ||
+            msg.interactive?.list_reply?.title ||
+            msg.button?.text ||
+            '[interactivo]';
+          events.push({
+            channel: 'whatsapp',
+            senderId: msg.from,
+            senderName: change.value.contacts?.[0]?.profile?.name || msg.from,
+            message: interactiveText,
+            messageId: msg.id,
+            timestamp: parseInt(msg.timestamp) * 1000,
+            pageId: phoneNumberId || pageId,
+            phoneNumberId,
           });
         }
       }
@@ -161,41 +187,4 @@ export function parseMetaWebhook(body) {
         const c = change.value;
         events.push({
           channel: 'facebook_comment',
-          senderId: c.sender_id,
-          senderName: c.sender_name || 'usuario',
-          message: c.message,
-          commentId: c.comment_id,
-          postId: c.post_id,
-          timestamp: Date.now(),
-          pageId,
-        });
-      }
-    }
-
-    // DMs de Instagram/Facebook
-    for (const msg of (entry.messaging || [])) {
-      if (msg.message && !msg.message.is_echo) {
-        const channel = body.object === 'instagram' ? 'instagram' : 'facebook';
-        events.push({
-          channel,
-          senderId: msg.sender.id,
-          message: msg.message.text || '[media]',
-          messageId: msg.message.mid,
-          timestamp: msg.timestamp,
-          pageId,
-        });
-      }
-    }
-  }
-
-  return events;
-}
-
-// ── VERIFICAR WEBHOOK META ───────────────────────────────
-export function verifyMetaWebhook(mode, token, challenge) {
-  const verifyToken = process.env.META_VERIFY_TOKEN || process.env.META_WEBHOOK_VERIFY_TOKEN;
-  if (mode === 'subscribe' && token === verifyToken) {
-    return { valid: true, challenge };
-  }
-  return { valid: false };
-}
+          senderId

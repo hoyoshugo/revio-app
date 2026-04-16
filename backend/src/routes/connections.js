@@ -18,6 +18,8 @@ import {
   getWompiConfig,
   getWhatsAppConfig,
   getAIConfig,
+  getChannelMappings,
+  saveChannelMapping,
 } from '../services/connectionService.js';
 
 const router = Router();
@@ -247,8 +249,4 @@ router.post('/:propertyId/test', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('[Connections] Error probando:', err.message);
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-export default router;
+    res.status(500).json({ success: false, message: err.

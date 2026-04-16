@@ -191,17 +191,19 @@ export async function getAIConfig(propertyId) {
 
 /**
  * Lista todas las conexiones configuradas para una propiedad (sin exponer credenciales).
+ * Incluye scope (independent/shared) y conexiones heredadas del tenant.
  */
 export async function listConnections(propertyId) {
   const CONNECTION_KEYS = [
     'lobbypms_token', 'wompi_config', 'whatsapp_config',
     'anthropic_config', 'openai_config', 'gemini_config', 'groq_config',
     'meta_config', 'booking_config', 'airbnb_config', 'cloudbeds_config',
+    'ota_ical_urls',
   ];
 
   const { data, error } = await supabase
     .from('settings')
-    .select('key, updated_at, updated_by')
+    .select('key, updated_at, updated_by, scope')
     .eq('property_id', propertyId)
     .in('key', CONNECTION_KEYS);
 
@@ -210,17 +212,10 @@ export async function listConnections(propertyId) {
   return (data || []).map(row => ({
     key: row.key,
     status: 'connected',
+    scope: row.scope || 'independent',
     updated_at: row.updated_at,
     updated_by: row.updated_by,
   }));
 }
 
-export default {
-  getSetting,
-  saveSetting,
-  getLobbyPMSToken,
-  getWompiConfig,
-  getWhatsAppConfig,
-  getAIConfig,
-  listConnections,
-};
+/*
