@@ -110,6 +110,27 @@ curl https://revio-app-production.up.railway.app/health
 
 Si el usuario ya dio una instrucción específica al abrir la sesión, ejecuta primero esa instrucción y luego `/system-guardian` en segundo plano (o menciona que lo correrás después de completar la tarea).
 
+## Política de agentes paralelos (aplica en Cowork Y en Code)
+
+**SIEMPRE** que recibas una tarea de desarrollo, lanza agentes paralelos aislados por módulo usando la herramienta `Agent`. NO trabajes de forma secuencial si los archivos no se pisan.
+
+### Reglas del enjambre automático
+1. **Antes de codificar**: identificar qué archivos toca cada subtarea. Si no hay overlap → agentes paralelos.
+2. **Un agente = un módulo**: backend, frontend, migrations, tests, docs van en agentes separados si son independientes.
+3. **Cada agente recibe**: contexto completo del stack, convenciones ESM/.js, middleware auth, Supabase guards.
+4. **Al terminar**: el orquestador (tú) consolida resultados, resuelve conflictos, commitea y pushea.
+5. **Skills y plugins**: usar TODOS los skills disponibles (Cowork plugins + .claude/skills/ locales) de forma automática sin que el usuario lo pida. Esto incluye engineering:*, design:*, marketing:*, etc.
+6. **Sincronización Cowork ↔ Code**: el CLAUDE.md es la fuente de verdad compartida. Cualquier cambio de arquitectura, nuevo módulo, o skill actualizado se refleja aquí. Tanto sesiones de Cowork como de Claude Code leen este archivo al iniciar.
+
+### Ejemplo de despacho paralelo
+```
+Tarea: "agregar tarifas dinámicas + channel manager"
+→ Agente 1: pricingEngine.js + migration_021 + ratePlans.js enhance
+→ Agente 2: channelSync.js + migration_022 + routes + ical.js
+→ Agente 3: frontend components (si aplica)
+→ Orquestador: consolida, tests, commit, push
+```
+
 ## Enjambre de Desarrollo
 
 Siempre invocar `dev-context-loader` primero, luego el orquestador o el skill directo:
@@ -148,10 +169,10 @@ Siempre invocar `dev-context-loader` primero, luego el orquestador o el skill di
 | QA / Testing | activo | `revio-qa` |
 | Coordinacion del enjambre | activo | `swarm-coordinator` |
 
-### Roadmap real (auditado 2026-04-09)
+### Roadmap real (auditado 2026-04-16)
 ```
-Backend routes: 41 archivos (~7,500 LOC)  |  Frontend: 75 JSX (~19,400 LOC)
-API endpoints: 41 route groups  |  Migraciones: 15 SQL  |  Tests: 26/26
+Backend routes: 44 archivos (~8,700 LOC)  |  Frontend: 75 JSX (~19,400 LOC)
+API endpoints: 44 route groups  |  Migraciones: 17 SQL  |  Tests: 26/26
 
 ✅ HECHO: Inventory backend completo (9 endpoints)
 ✅ HECHO: POS Terminal standalone + seed Isla Palma
@@ -221,4 +242,50 @@ frontend/
 
 Todas ejecutadas manualmente en Supabase SQL Editor. Orden aplicado:
 1. `migration_002_ota_noshows.sql` — ota_messages, ota_reservations, ota_no_shows
+<<<<<<< HEAD
 2. `migration_003_escalations.s
+=======
+2. `migration_003_escalations.sql` — health_checks, knowledge_base, escalations
+3. `migration_005_settings.sql` — settings key-value
+4. `migration_006_saas_tables.sql` — tenants, tenant_plans, tenant_subscriptions
+5. `migration_007_health_reports.sql` — system_health_reports
+6. `migration_008_inventory.sql` — inventory_items, inventory_movements
+7. `migration_008_billing_discounts.sql` — tenant_discounts, promo_codes
+8. `migration_009_pos_tables.sql` — revenue_centers, products, pos_orders, pos_order_items
+9. `migration_010_full_pms_fixed.sql` — room_types, rooms, guests, reservations, housekeeping_tasks, events, wallets
+10. `migration_011_modules.sql` — revio_modules, tenant_modules
+11. `migration_012_analytics.sql` — analytics_events
+12. `migration_013_advanced_features_fixed.sql` — contacts, automated_messages, cancellation_cases, approval_requests, platform_audits, scheduled_reports
+13. `migration_014_channel_property_map.sql` — channel_property_map (ruteo multi-propiedad por page_id)
+
+## Comandos útiles
+
+```bash
+# Arrancar backend
+cd backend && npm run dev
+
+# Arrancar frontend
+cd frontend && npm run dev
+
+# Build frontend
+cd frontend && npm run build
+
+# Verificar backend vivo
+curl http://localhost:3001/health
+
+# Login superadmin (obtener token)
+curl -X POST http://localhost:3001/api/sa/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@misticatech.co","password":"MisticaTech2026!"}'
+```
+
+## Reglas del guardian
+
+El skill `/system-guardian` debe ejecutarse:
+- ✅ Al iniciar cada sesión de Claude Code en este proyecto
+- ✅ Después de cambios grandes en el código (nuevas rutas, nuevas integraciones)
+- ✅ Cuando el usuario pida explícitamente una revisión
+- ✅ Ante cualquier error de producción reportado
+
+No aplicar fixes automáticamente sin confirmación del usuario. Mostrar el fix, preguntar si aplicar.
+>>>>>>> 4608c40 (docs: CLAUDE.md v2.5 + parallel agent policy + deprecated skills cleanup)
