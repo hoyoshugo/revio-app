@@ -242,9 +242,6 @@ frontend/
 
 Todas ejecutadas manualmente en Supabase SQL Editor. Orden aplicado:
 1. `migration_002_ota_noshows.sql` — ota_messages, ota_reservations, ota_no_shows
-<<<<<<< HEAD
-2. `migration_003_escalations.s
-=======
 2. `migration_003_escalations.sql` — health_checks, knowledge_base, escalations
 3. `migration_005_settings.sql` — settings key-value
 4. `migration_006_saas_tables.sql` — tenants, tenant_plans, tenant_subscriptions
@@ -288,4 +285,3 @@ El skill `/system-guardian` debe ejecutarse:
 - ✅ Ante cualquier error de producción reportado
 
 No aplicar fixes automáticamente sin confirmación del usuario. Mostrar el fix, preguntar si aplicar.
->>>>>>> 4608c40 (docs: CLAUDE.md v2.5 + parallel agent policy + deprecated skills cleanup)
