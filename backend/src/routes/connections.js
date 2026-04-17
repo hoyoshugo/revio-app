@@ -45,16 +45,22 @@ router.get('/:propertyId', async (req, res) => {
       gemini_config:    { name: 'Gemini (Google)', category: 'IA', icon: '✨' },
       groq_config:      { name: 'Llama (Groq)', category: 'IA', icon: '⚡' },
       meta_config:      { name: 'Meta (Instagram/FB)', category: 'Redes Sociales', icon: '📱' },
+      meta_facebook:    { name: 'Facebook Page', category: 'Redes Sociales', icon: '📘' },
+      meta_instagram:   { name: 'Instagram Business', category: 'Redes Sociales', icon: '📸' },
       booking_config:   { name: 'Booking.com (API)', category: 'OTAs', icon: '🏩' },
       airbnb_config:    { name: 'Airbnb (API)', category: 'OTAs', icon: '🏠' },
       cloudbeds_config: { name: 'Cloudbeds', category: 'PMS', icon: '☁️' },
       ota_ical_urls:    { name: 'OTAs vía iCal', category: 'OTAs', icon: '📅' },
     };
 
-    const enriched = connections.map(c => ({
-      ...c,
-      ...(CONNECTION_META[c.key] || { name: c.key, category: 'Otro', icon: '🔌' })
-    }));
+    const enriched = connections.map(c => {
+      const meta = CONNECTION_META[c.key] || { name: c.key, category: 'Otro', icon: '🔌' };
+      // Para conexiones de canal, enriquecer el nombre con el external_name
+      if (c.external_name) {
+        meta.name = `${meta.name} — ${c.external_name}`;
+      }
+      return { ...c, ...meta };
+    });
 
     res.json({ connections: enriched });
   } catch (err) {
@@ -273,16 +279,4 @@ router.post('/:propertyId/channels', async (req, res) => {
   try {
     const { channel, external_id, external_name, scope } = req.body;
     if (!channel || !external_id) {
-      return res.status(400).json({ error: 'channel y external_id son requeridos' });
-    }
-    const data = await saveChannelMapping(
-      req.params.propertyId, channel, external_id,
-      external_name || external_id, scope || 'independent'
-    );
-    res.json({ success: true, data });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-export default router;
+      r

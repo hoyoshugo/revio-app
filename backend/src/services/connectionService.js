@@ -192,6 +192,7 @@ export async function getAIConfig(propertyId) {
 /**
  * Lista todas las conexiones configuradas para una propiedad (sin exponer credenciales).
  * Incluye scope (independent/shared) y conexiones heredadas del tenant.
+ * Fusiona settings + channel_property_map para mostrar WhatsApp/Facebook/Instagram.
  */
 export async function listConnections(propertyId) {
   const CONNECTION_KEYS = [
@@ -201,21 +202,53 @@ export async function listConnections(propertyId) {
     'ota_ical_urls',
   ];
 
-  const { data, error } = await supabase
+  // 1. Conexiones desde settings (tokens, configs JSON)
+  const { data: settingsData, error: settingsError } = await supabase
     .from('settings')
     .select('key, updated_at, updated_by, scope')
     .eq('property_id', propertyId)
     .in('key', CONNECTION_KEYS);
 
-  if (error) return [];
-
-  return (data || []).map(row => ({
+  const settingsConnections = (settingsError ? [] : (settingsData || [])).map(row => ({
     key: row.key,
     status: 'connected',
     scope: row.scope || 'independent',
     updated_at: row.updated_at,
     updated_by: row.updated_by,
   }));
+
+  // 2. Conexiones desde channel_property_map (WhatsApp, Facebook, Instagram)
+  const { data: channelData, error: channelError } = await supabase
+    .from('channel_property_map')
+    .select('channel, external_id, external_name, scope, is_active, updated_at')
+    .eq('property_id', propertyId)
+    .eq('is_active', true);
+
+  const CHANNEL_TO_KEY = {
+    whatsapp: 'whatsapp_config',
+    facebook: 'meta_facebook',
+    instagram: 'meta_instagram',
+  };
+
+  const channelConnections = (channelError ? [] : (channelData || [])).map(row => ({
+    key: CHANNEL_TO_KEY[row.channel] || `channel_${row.channel}`,
+    status: 'connected',
+    scope: row.scope || 'independent',
+    updated_at: row.updated_at,
+    updated_by: null,
+    channel: row.channel,
+    external_id: row.external_id,
+    external_name: row.external_name,
+  }));
+
+  // 3. Fusionar sin duplicados (settings tiene prioridad si existe la misma key)
+  const settingsKeys = new Set(settingsConnections.map(c => c.key));
+  const merged = [
+    ...settingsConnections,
+    ...channelConnections.filter(c => !settingsKeys.has(c.key)),
+  ];
+
+  return merged;
 }
 
 /**
