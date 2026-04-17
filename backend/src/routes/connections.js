@@ -227,6 +227,7 @@ router.post('/:propertyId/test', async (req, res) => {
         break;
       }
 
+
       case 'meta_config': {
         const { getSetting } = await import('../services/connectionService.js');
         const metaCfg = await getSetting(propertyId, 'meta_config');
@@ -254,8 +255,8 @@ router.post('/:propertyId/test', async (req, res) => {
       }
 
       case 'google_config': {
-        const { getSetting } = await import('../services/connectionService.js');
-        const googleCfg = await getSetting(propertyId, 'google_config');
+        const { getSetting: getGoogleSetting } = await import('../services/connectionService.js');
+        const googleCfg = await getGoogleSetting(propertyId, 'google_config');
         if (!googleCfg?.refresh_token || !googleCfg?.client_id || !googleCfg?.client_secret) {
           result = { success: false, message: 'Google no configurado — requiere OAuth' }; break;
         }
@@ -286,4 +287,71 @@ router.post('/:propertyId/test', async (req, res) => {
         } else {
           result = { success: false, message: `Error API Google: HTTP ${accountsRes.status}` };
         }
-        
+        break;
+      }
+
+      case 'ota_ical_urls': {
+        const { getSetting } = await import('../services/connectionService.js');
+        const { testICalUrl, syncPropertyICal } = await import('../services/icalSync.js');
+        const urls = await getSetting(propertyId, 'ota_ical_urls');
+        if (!urls || typeof urls !== 'object') {
+          result = { success: false, message: 'No hay URLs iCal configuradas' };
+          break;
+        }
+        const { data: prop } = await supabase.from('properties').select('slug').eq('id', propertyId).single();
+        const channels = ['booking_url', 'airbnb_url', 'hostelworld_url', 'vrbo_url', 'expedia_url'];
+        const tests = [];
+        for (const ch of channels) {
+          if (!urls[ch]) continue;
+          const test = await testICalUrl(urls[ch], ch.replace('_url', ''));
+          tests.push(`${ch.replace('_url', '')}: ${test.success ? `${test.count} reservas` : test.error}`);
+        }
+        // Disparar sync real (no bloqueante)
+        syncPropertyICal(prop?.slug || 'unknown', propertyId).catch(e => console.error('sync bg error:', e.message));
+        result = tests.length
+          ? { success: tests.every(t => !t.includes('error')), message: '📅 ' + tests.join(' · ') }
+          : { success: false, message: 'No hay URLs iCal configuradas' };
+        break;
+      }
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('[Connections] Error probando:', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ============================================================
+// GET /api/connections/:propertyId/channels — Mapeo de canales Meta
+// ============================================================
+router.get('/:propertyId/channels', async (req, res) => {
+  try {
+    const mappings = await getChannelMappings(req.params.propertyId);
+    res.json({ channels: mappings });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// POST /api/connections/:propertyId/channels — Guardar mapeo de canal
+// Body: { channel, external_id, external_name, scope }
+// ============================================================
+router.post('/:propertyId/channels', async (req, res) => {
+  try {
+    const { channel, external_id, external_name, scope } = req.body;
+    if (!channel || !external_id) {
+      return res.status(400).json({ error: 'channel y external_id son requeridos' });
+    }
+    const data = await saveChannelMapping(
+      req.params.propertyId, channel, external_id,
+      external_name || external_id, scope || 'independent'
+    );
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+export default router;
