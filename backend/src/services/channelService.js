@@ -110,18 +110,13 @@ async function updateChannelHealth(propertyId, channelKey, status, errorMessage 
 }
 
 // ── PING ────────────────────────────────────────────────
-async function getConnectionSetting(propertyId) {
-  const { data } = await supabase
-    .from('settings')
-    .select('value')
-    .eq('property_id', propertyId)
-    .eq('key', 'connections')
-    .maybeSingle();
-  return data?.value || {};
-}
-
 export async function pingChannel(propertyId, channelKey) {
-  const connections = await getConnectionSetting(propertyId);
+  const { getWhatsAppConfig, getSetting } = await import('./connectionService.js');
+
+  // Leer connections key del frontend como fallback
+  const { data: connSetting } = await supabase
+    .from('settings').select('value').eq('property_id', propertyId).eq('key', 'connections').maybeSingle();
+  const conn = connSetting?.value || {};
 
   // Recuperar la fila del canal para tener ical/profile si aplican
   const { data: channelRow } = await supabase
@@ -131,12 +126,12 @@ export async function pingChannel(propertyId, channelKey) {
     .eq('channel_key', channelKey)
     .maybeSingle();
 
-  const token = connections.whatsapp?.token || process.env.FACEBOOK_PAGE_TOKEN;
-
   try {
     switch (channelKey) {
       case 'whatsapp': {
-        const phoneId = connections.whatsapp?.phone_id || process.env.WHATSAPP_PHONE_ID;
+        const waCfg = await getWhatsAppConfig(propertyId);
+        const token = waCfg?.access_token;
+        const phoneId = waCfg?.phone_number_id;
         if (!token || !phoneId) {
           await updateChannelHealth(propertyId, channelKey, 'not_configured');
           return { status: 'not_configured' };
@@ -149,17 +144,20 @@ export async function pingChannel(propertyId, channelKey) {
           await updateChannelHealth(propertyId, channelKey, 'connected');
           return { status: 'connected', metadata: j };
         }
-        await updateChannelHealth(propertyId, channelKey, 'error', `HTTP ${r.status}`);
+        const body = await r.text();
+        await updateChannelHealth(propertyId, channelKey, 'error', `HTTP ${r.status}: ${body.slice(0, 100)}`);
         return { status: 'error', error: `HTTP ${r.status}` };
       }
 
-      case 'instagram':
-      case 'facebook': {
-        if (!token) {
+      case 'instagram': {
+        const metaCfg = await getSetting(propertyId, 'meta_config');
+        const token = metaCfg?.access_token || conn.facebook?.page_token || process.env.FACEBOOK_PAGE_TOKEN;
+        const igId = metaCfg?.instagram_id || conn.instagram?.business_id || channelRow?.credentials?.instagram_id;
+        if (!token || !igId) {
           await updateChannelHealth(propertyId, channelKey, 'not_configured');
           return { status: 'not_configured' };
         }
-        const r = await fetch(`${GRAPH}/me?fields=id,name`, {
+        const r = await fetch(`${GRAPH}/${igId}?fields=id,name,username`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (r.ok) {
@@ -171,67 +169,47 @@ export async function pingChannel(propertyId, channelKey) {
         return { status: 'error', error: `HTTP ${r.status}` };
       }
 
-      case 'google_business':
-        await updateChannelHealth(propertyId, channelKey, 'unchecked', 'requires_oauth');
-        return { status: 'unchecked', note: 'requires_oauth' };
-
-      case 'tripadvisor':
-        await updateChannelHealth(propertyId, channelKey, 'unchecked', 'api_readonly');
-        return { status: 'unchecked', note: 'api_readonly' };
-
-      case 'booking':
-      case 'airbnb':
-      case 'hostelworld':
-      case 'expedia':
-      case 'despegar': {
-        const icalUrl = channelRow?.ical_url || connections.ical?.[`${channelKey}_url`];
-        if (!icalUrl) {
+      case 'facebook': {
+        const metaCfg = await getSetting(propertyId, 'meta_config');
+        const token = metaCfg?.access_token || conn.facebook?.page_token || process.env.FACEBOOK_PAGE_TOKEN;
+        const pageId = metaCfg?.page_id || conn.facebook?.page_id || channelRow?.credentials?.page_id;
+        if (!token || !pageId) {
           await updateChannelHealth(propertyId, channelKey, 'not_configured');
           return { status: 'not_configured' };
         }
-        try {
-          const r = await fetch(icalUrl, { method: 'HEAD' });
-          if (r.ok || r.status === 405) {
-            // 405 = método no permitido, pero URL existe; hacer GET corto
-            await updateChannelHealth(propertyId, channelKey, 'connected');
-            return { status: 'connected' };
-          }
-          await updateChannelHealth(propertyId, channelKey, 'error', `HTTP ${r.status}`);
-          return { status: 'error', error: `HTTP ${r.status}` };
-        } catch (e) {
-          await updateChannelHealth(propertyId, channelKey, 'error', e.message);
-          return { status: 'error', error: e.message };
+        const r = await fetch(`${GRAPH}/${pageId}?fields=id,name`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (r.ok) {
+          const j = await r.json();
+          await updateChannelHealth(propertyId, channelKey, 'connected');
+          return { status: 'connected', metadata: j };
         }
+        await updateChannelHealth(propertyId, channelKey, 'error', `HTTP ${r.status}`);
+        return { status: 'error', error: `HTTP ${r.status}` };
       }
 
-      default:
-        await updateChannelHealth(propertyId, channelKey, 'unchecked', 'unknown_channel');
-        return { status: 'unchecked', error: 'unknown_channel' };
-    }
-  } catch (e) {
-    await updateChannelHealth(propertyId, channelKey, 'error', e.message);
-    return { status: 'error', error: e.message };
-  }
-}
-
-// ── INBOX ───────────────────────────────────────────────
-export async function getUnifiedInbox(propertyId, { limit = 50, channelKey = null } = {}) {
-  let query = supabase
-    .from('unified_inbox')
-    .select('*')
-    .eq('property_id', propertyId)
-    .order('received_at', { ascending: false })
-    .limit(limit);
-  if (channelKey) query = query.eq('channel_key', channelKey);
-  const { data, error } = await query;
-  if (error) return [];
-  return data || [];
-}
-
-export async function insertInboxMessage(row) {
-  try {
-    await supabase.from('unified_inbox').insert(row);
-  } catch (e) {
-    console.error('[ChannelService] insertInboxMessage error:', e.message);
-  }
-}
+      case 'google_business': {
+        const googleCfg = await getSetting(propertyId, 'google_config');
+        if (!googleCfg?.refresh_token || !googleCfg?.client_id || !googleCfg?.client_secret) {
+          await updateChannelHealth(propertyId, channelKey, 'not_configured');
+          return { status: 'not_configured' };
+        }
+        // Get fresh access token and test
+        try {
+          const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              client_id: googleCfg.client_id,
+              client_secret: googleCfg.client_secret,
+              refresh_token: googleCfg.refresh_token,
+              grant_type: 'refresh_token',
+            }),
+          });
+          if (!tokenRes.ok) {
+            await updateChannelHealth(propertyId, channelKey, 'error', 'token_refresh_failed');
+            return { status: 'error', error: 'token_refresh_failed' };
+          }
+          const { access_token } = await tokenRes.json();
+          const accountsRes = await fetch('https://mybusinessaccoun

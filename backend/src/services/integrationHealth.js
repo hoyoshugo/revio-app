@@ -123,45 +123,124 @@ export async function pingLobbyPMS(apiToken) {
   }
 }
 
+// ── INSTAGRAM / FACEBOOK PAGE ──────────────────────────
+export async function pingMetaPage(token, pageId) {
+  if (!token || !pageId) return { ok: false, error: 'missing_credentials', status: 'not_configured' };
+  const start = Date.now();
+  try {
+    const r = await fetch(`https://graph.facebook.com/v22.0/${pageId}?fields=id,name`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const ms = Date.now() - start;
+    if (r.ok) {
+      const data = await r.json();
+      return { ok: true, status: 'connected', responseTimeMs: ms, metadata: { name: data.name, id: data.id } };
+    }
+    const body = await r.text();
+    return { ok: false, error: `HTTP ${r.status}: ${body.slice(0, 100)}`, status: 'error', responseTimeMs: ms };
+  } catch (e) {
+    return { ok: false, error: e.message, status: 'error' };
+  }
+}
+
+// ── GOOGLE BUSINESS PROFILE ───────────────────────────
+export async function pingGoogleBusiness(googleConfig) {
+  if (!googleConfig?.refresh_token || !googleConfig?.client_id || !googleConfig?.client_secret) {
+    return { ok: false, error: 'not_configured', status: 'not_configured' };
+  }
+  const start = Date.now();
+  try {
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: googleConfig.client_id,
+        client_secret: googleConfig.client_secret,
+        refresh_token: googleConfig.refresh_token,
+        grant_type: 'refresh_token',
+      }),
+    });
+    if (!tokenRes.ok) {
+      return { ok: false, error: 'token_refresh_failed', status: 'error', responseTimeMs: Date.now() - start };
+    }
+    const { access_token } = await tokenRes.json();
+    const accountsRes = await fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+    const ms = Date.now() - start;
+    if (accountsRes.ok) {
+      const data = await accountsRes.json();
+      const count = Array.isArray(data.accounts) ? data.accounts.length : 0;
+      return { ok: true, status: 'connected', responseTimeMs: ms, metadata: { accounts: count, locationId: googleConfig.location_id } };
+    }
+    return { ok: false, error: `HTTP ${accountsRes.status}`, status: 'error', responseTimeMs: ms };
+  } catch (e) {
+    return { ok: false, error: e.message, status: 'error' };
+  }
+}
+
 /**
- * Pingea todas las integraciones de una propiedad basándose en
- * `settings.connections` y persiste resultados en `integration_health`.
+ * Pingea todas las integraciones de una propiedad.
+ * Lee credenciales desde settings individuales via connectionService.
  */
 export async function pingAllIntegrations(propertyId) {
-  const { data: setting } = await supabase
-    .from('settings')
-    .select('value')
-    .eq('property_id', propertyId)
-    .eq('key', 'connections')
-    .maybeSingle();
+  const { getAIConfig, getWompiConfig, getWhatsAppConfig, getLobbyPMSToken, getSetting } = await import('./connectionService.js');
 
-  const conn = setting?.value || {};
   const results = {};
 
   // Anthropic
-  const antKey = conn.anthropic?.api_key;
-  const antRes = await pingAnthropic(antKey);
+  const aiCfg = await getAIConfig(propertyId);
+  const antRes = await pingAnthropic(aiCfg?.api_key);
   await upsertHealth(propertyId, 'anthropic', antRes.status, antRes.error, antRes.metadata || {}, antRes.responseTimeMs);
   results.anthropic = antRes;
 
   // Wompi
-  const wompiKey = conn.wompi?.public_key;
-  const wompiRes = await pingWompi(wompiKey);
+  const wompiCfg = await getWompiConfig(propertyId, null);
+  const wompiRes = await pingWompi(wompiCfg?.public_key);
   await upsertHealth(propertyId, 'wompi', wompiRes.status, wompiRes.error, wompiRes.metadata || {}, wompiRes.responseTimeMs);
   results.wompi = wompiRes;
 
   // WhatsApp
-  const waToken = conn.whatsapp?.token;
-  const waPhoneId = conn.whatsapp?.phone_id;
-  const waRes = await pingWhatsApp(waToken, waPhoneId);
+  const waCfg = await getWhatsAppConfig(propertyId);
+  const waRes = await pingWhatsApp(waCfg?.access_token, waCfg?.phone_number_id);
   await upsertHealth(propertyId, 'whatsapp', waRes.status, waRes.error, waRes.metadata || {}, waRes.responseTimeMs);
   results.whatsapp = waRes;
 
   // LobbyPMS
-  const lobbyToken = conn.lobbypms?.token;
+  const lobbyToken = await getLobbyPMSToken(propertyId, null);
   const lobbyRes = await pingLobbyPMS(lobbyToken);
   await upsertHealth(propertyId, 'lobbypms', lobbyRes.status, lobbyRes.error, lobbyRes.metadata || {}, lobbyRes.responseTimeMs);
   results.lobbypms = lobbyRes;
+
+  // Meta (Facebook + Instagram) — read from meta_config, connections key, or env vars
+  const metaCfg = await getSetting(propertyId, 'meta_config');
+  const connSetting = await getSetting(propertyId, 'connections');
+  const conn = (connSetting && typeof connSetting === 'object') ? connSetting : {};
+  const metaToken = metaCfg?.access_token || conn.facebook?.page_token || process.env.FACEBOOK_PAGE_TOKEN;
+
+  // Facebook page
+  const fbPageId = metaCfg?.page_id || conn.facebook?.page_id;
+  if (fbPageId && metaToken) {
+    const fbRes = await pingMetaPage(metaToken, fbPageId);
+    await upsertHealth(propertyId, 'facebook', fbRes.status, fbRes.error, fbRes.metadata || {}, fbRes.responseTimeMs);
+    results.facebook = fbRes;
+  }
+
+  // Instagram
+  const igId = metaCfg?.instagram_id || conn.instagram?.business_id;
+  if (igId && metaToken) {
+    const igRes = await pingMetaPage(metaToken, igId);
+    await upsertHealth(propertyId, 'instagram', igRes.status, igRes.error, igRes.metadata || {}, igRes.responseTimeMs);
+    results.instagram = igRes;
+  }
+
+  // Google Business Profile
+  const googleCfg = await getSetting(propertyId, 'google_config');
+  if (googleCfg) {
+    const gRes = await pingGoogleBusiness(googleCfg);
+    await upsertHealth(propertyId, 'google_business', gRes.status, gRes.error, gRes.metadata || {}, gRes.responseTimeMs);
+    results.google_business = gRes;
+  }
 
   return results;
 }

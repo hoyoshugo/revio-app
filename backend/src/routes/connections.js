@@ -227,68 +227,63 @@ router.post('/:propertyId/test', async (req, res) => {
         break;
       }
 
-      case 'ota_ical_urls': {
+      case 'meta_config': {
         const { getSetting } = await import('../services/connectionService.js');
-        const { testICalUrl, syncPropertyICal } = await import('../services/icalSync.js');
-        const urls = await getSetting(propertyId, 'ota_ical_urls');
-        if (!urls || typeof urls !== 'object') {
-          result = { success: false, message: 'No hay URLs iCal configuradas' };
-          break;
+        const metaCfg = await getSetting(propertyId, 'meta_config');
+        if (!metaCfg?.access_token) { result = { success: false, message: 'Meta access token no configurado' }; break; }
+
+        const pageId = metaCfg.page_id;
+        if (pageId) {
+          const r = await fetch(`https://graph.facebook.com/v22.0/${pageId}?fields=id,name`, {
+            headers: { Authorization: `Bearer ${metaCfg.access_token}` }
+          });
+          if (r.ok) {
+            const d = await r.json();
+            result = { success: true, message: `Meta conectado ✅ — Página: ${d.name}` };
+          } else {
+            result = { success: false, message: `Error HTTP ${r.status}` };
+          }
+        } else {
+          // Just verify the token
+          const r = await fetch(`https://graph.facebook.com/v22.0/me?fields=id,name`, {
+            headers: { Authorization: `Bearer ${metaCfg.access_token}` }
+          });
+          result = { success: r.ok, message: r.ok ? 'Meta token válido ✅' : `Error HTTP ${r.status}` };
         }
-        const { data: prop } = await supabase.from('properties').select('slug').eq('id', propertyId).single();
-        const channels = ['booking_url', 'airbnb_url', 'hostelworld_url', 'vrbo_url', 'expedia_url'];
-        const tests = [];
-        for (const ch of channels) {
-          if (!urls[ch]) continue;
-          const test = await testICalUrl(urls[ch], ch.replace('_url', ''));
-          tests.push(`${ch.replace('_url', '')}: ${test.success ? `${test.count} reservas` : test.error}`);
-        }
-        // Disparar sync real (no bloqueante)
-        syncPropertyICal(prop?.slug || 'unknown', propertyId).catch(e => console.error('sync bg error:', e.message));
-        result = tests.length
-          ? { success: tests.every(t => !t.includes('error')), message: '📅 ' + tests.join(' · ') }
-          : { success: false, message: 'No hay URLs iCal configuradas' };
         break;
       }
-    }
 
-    res.json(result);
-  } catch (err) {
-    console.error('[Connections] Error probando:', err.message);
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+      case 'google_config': {
+        const { getSetting } = await import('../services/connectionService.js');
+        const googleCfg = await getSetting(propertyId, 'google_config');
+        if (!googleCfg?.refresh_token || !googleCfg?.client_id || !googleCfg?.client_secret) {
+          result = { success: false, message: 'Google no configurado — requiere OAuth' }; break;
+        }
 
-// ============================================================
-// GET /api/connections/:propertyId/channels — Mapeo de canales Meta
-// ============================================================
-router.get('/:propertyId/channels', async (req, res) => {
-  try {
-    const mappings = await getChannelMappings(req.params.propertyId);
-    res.json({ channels: mappings });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+        // Get fresh access token
+        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_id: googleCfg.client_id,
+            client_secret: googleCfg.client_secret,
+            refresh_token: googleCfg.refresh_token,
+            grant_type: 'refresh_token',
+          }),
+        });
+        if (!tokenRes.ok) {
+          result = { success: false, message: 'Error al refrescar token de Google' }; break;
+        }
+        const { access_token } = await tokenRes.json();
 
-// ============================================================
-// POST /api/connections/:propertyId/channels — Guardar mapeo de canal
-// Body: { channel, external_id, external_name, scope }
-// ============================================================
-router.post('/:propertyId/channels', async (req, res) => {
-  try {
-    const { channel, external_id, external_name, scope } = req.body;
-    if (!channel || !external_id) {
-      return res.status(400).json({ error: 'channel y external_id son requeridos' });
-    }
-    const data = await saveChannelMapping(
-      req.params.propertyId, channel, external_id,
-      external_name || external_id, scope || 'independent'
-    );
-    res.json({ success: true, data });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-export default router;
+        const accountsRes = await fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', {
+          headers: { Authorization: `Bearer ${access_token}` },
+        });
+        if (accountsRes.ok) {
+          const data = await accountsRes.json();
+          const count = Array.isArray(data.accounts) ? data.accounts.length : 0;
+          result = { success: true, message: `Google Business ✅ — ${count} cuenta(s) encontrada(s)` };
+        } else {
+          result = { success: false, message: `Error API Google: HTTP ${accountsRes.status}` };
+        }
+        
