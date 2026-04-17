@@ -279,4 +279,16 @@ router.post('/:propertyId/channels', async (req, res) => {
   try {
     const { channel, external_id, external_name, scope } = req.body;
     if (!channel || !external_id) {
-      r
+      return res.status(400).json({ error: 'channel y external_id son requeridos' });
+    }
+    const data = await saveChannelMapping(
+      req.params.propertyId, channel, external_id,
+      external_name || external_id, scope || 'independent'
+    );
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+export default router;
