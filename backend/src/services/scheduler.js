@@ -9,9 +9,6 @@ import { db } from '../models/supabase.js';
 export function startScheduler() {
   console.log('[Scheduler] Iniciando tareas programadas...');
 
-  // ============================================================
-  // Procesar comunicaciones pendientes — cada 5 minutos
-  // ============================================================
   cron.schedule('*/5 * * * *', async () => {
     try {
       const result = await processPendingCommunications();
@@ -23,22 +20,15 @@ export function startScheduler() {
     }
   });
 
-  // ============================================================
-  // Actualizar caché de ocupación — cada hora
-  // ============================================================
   cron.schedule('0 * * * *', async () => {
     try {
-      console.log('[Scheduler] Actualizando caché de ocupación...');
+      console.log('[Scheduler] Actualizando cache de ocupacion...');
       await updateOccupancyCache();
     } catch (err) {
-      console.error('[Scheduler] Error actualizando ocupación:', err.message);
+      console.error('[Scheduler] Error actualizando ocupacion:', err.message);
     }
   });
 
-  // ============================================================
-  // Detectar y procesar no-shows — cada 15 minutos
-  // Solo activo entre 13:00 y 22:00 (lógica interna en detectNoShows)
-  // ============================================================
   cron.schedule('*/15 * * * *', async () => {
     try {
       const result = await detectNoShows();
@@ -50,10 +40,6 @@ export function startScheduler() {
     }
   });
 
-  // ============================================================
-  // Poll mensajes OTA — cada 10 minutos
-  // Consulta Booking.com, Airbnb, Hostelworld por nuevos mensajes
-  // ============================================================
   cron.schedule('*/10 * * * *', async () => {
     try {
       const properties = await db.getAllProperties();
@@ -66,9 +52,6 @@ export function startScheduler() {
     }
   });
 
-  // ============================================================
-  // Health Monitor — cada 5 minutos
-  // ============================================================
   cron.schedule('*/5 * * * *', async () => {
     try {
       await runHealthChecks();
@@ -77,10 +60,6 @@ export function startScheduler() {
     }
   });
 
-  // ============================================================
-  // Poll mensajes sociales (Google, TripAdvisor no tienen webhook)
-  // — cada 30 minutos
-  // ============================================================
   cron.schedule('*/30 * * * *', async () => {
     try {
       const properties = await db.getAllProperties();
@@ -90,15 +69,13 @@ export function startScheduler() {
       const { supabase } = await import('../models/supabase.js');
 
       for (const prop of properties) {
-        // Google reviews + Q&A
-        if (googleBusiness.CONFIGURED(prop.slug)) {
-          const msgs = await googleBusiness.getUnreadMessages(prop.slug);
+        if (await googleBusiness.CONFIGURED(prop.id)) {
+          const msgs = await googleBusiness.getUnreadMessages(prop.id);
           for (const msg of msgs) {
             const { data: ex } = await supabase.from('ota_messages').select('id').eq('platform_message_id', msg.platform_message_id).single();
             if (!ex) await processIncomingOtaMessage('google', msg, prop.slug, prop.id);
           }
         }
-        // TripAdvisor reviews
         if (tripadvisor.CONFIGURED(prop.slug)) {
           const msgs = await tripadvisor.getUnreadMessages(prop.slug);
           for (const msg of msgs) {
@@ -112,10 +89,6 @@ export function startScheduler() {
     }
   });
 
-  // ============================================================
-  // Access Control — cada 6 horas
-  // Verifica pagos vencidos, suspende y reactiva tenants
-  // ============================================================
   cron.schedule('0 */6 * * *', async () => {
     try {
       const result = await runAccessControlCheck();
@@ -128,11 +101,11 @@ export function startScheduler() {
   });
 
   console.log('[Scheduler] Tareas activas:');
-  console.log('  · Comunicaciones: cada 5 min');
-  console.log('  · Health Monitor: cada 5 min');
-  console.log('  · Ocupación: cada hora');
-  console.log('  · No-shows: cada 15 min (13:00-22:00)');
-  console.log('  · OTA Poll: cada 10 min');
-  console.log('  · Social Poll (Google/TripAdvisor): cada 30 min');
-  console.log('  · Access Control (pagos): cada 6 horas');
+  console.log('  - Comunicaciones: cada 5 min');
+  console.log('  - Health Monitor: cada 5 min');
+  console.log('  - Ocupacion: cada hora');
+  console.log('  - No-shows: cada 15 min (13:00-22:00)');
+  console.log('  - OTA Poll: cada 10 min');
+  console.log('  - Social Poll (Google/TripAdvisor): cada 30 min');
+  console.log('  - Access Control (pagos): cada 6 horas');
 }

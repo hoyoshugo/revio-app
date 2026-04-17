@@ -37,8 +37,6 @@ function cacheInvalidate(propertyId, key) {
 
 /**
  * Lee un valor de settings por propertyId y key.
- * Maneja automáticamente el fallback a ENV vars para compatibilidad
- * mientras se completa la migración de clientes legacy.
  */
 export async function getSetting(propertyId, key) {
   if (!propertyId) return null;
@@ -58,7 +56,6 @@ export async function getSetting(propertyId, key) {
     return null;
   }
 
-  // Si es string encriptado, desencriptar
   let value = data.value;
   if (typeof value === 'string' && value.includes(':')) {
     value = decrypt(value);
@@ -74,14 +71,12 @@ export async function getSetting(propertyId, key) {
 export async function saveSetting(propertyId, key, value, updatedBy = null) {
   if (!propertyId || !key) throw new Error('propertyId y key son requeridos');
 
-  // Encriptar credenciales sensibles
   const sensitiveKeys = ['token', 'key', 'secret', 'password', 'api_key'];
   let storedValue = value;
 
   if (typeof value === 'string' && sensitiveKeys.some(k => key.toLowerCase().includes(k))) {
     storedValue = encrypt(value);
   } else if (typeof value === 'object' && value !== null) {
-    // Encriptar campos sensibles dentro de objetos JSON
     const encrypted = { ...value };
     for (const [field, fieldVal] of Object.entries(encrypted)) {
       if (typeof fieldVal === 'string' && sensitiveKeys.some(k => field.toLowerCase().includes(k))) {
@@ -107,29 +102,16 @@ export async function saveSetting(propertyId, key, value, updatedBy = null) {
   return true;
 }
 
-/**
- * Lee el token de LobbyPMS para una propiedad.
- * Fallback a ENV var si no está en BD (compatibilidad durante migración).
- */
 export async function getLobbyPMSToken(propertyId, propertySlug) {
-  // 1. Intentar desde BD
   const setting = await getSetting(propertyId, 'lobbypms_token');
   if (setting && typeof setting === 'string') return setting;
-
-  // 2. Fallback a ENV (solo mientras se completa migración de clientes)
   const envKey = `LOBBY_TOKEN_${propertySlug?.toUpperCase().replace(/-/g, '_')}`;
   return process.env[envKey] || null;
 }
 
-/**
- * Lee la configuración de Wompi para una propiedad.
- * Fallback a ENV vars si no está en BD.
- */
 export async function getWompiConfig(propertyId, propertySlug) {
-  // 1. Intentar desde BD
   const setting = await getSetting(propertyId, 'wompi_config');
   if (setting && typeof setting === 'object') {
-    // Desencriptar campos si están encriptados
     return {
       public_key: typeof setting.public_key === 'string' && setting.public_key.includes(':')
         ? decrypt(setting.public_key) : setting.public_key,
@@ -137,8 +119,6 @@ export async function getWompiConfig(propertyId, propertySlug) {
         ? decrypt(setting.private_key) : setting.private_key,
     };
   }
-
-  // 2. Fallback a ENV
   const slugKey = propertySlug?.toUpperCase().replace(/-/g, '_');
   return {
     public_key: process.env[`WOMPI_PUBLIC_KEY_${slugKey}`] || null,
@@ -146,9 +126,6 @@ export async function getWompiConfig(propertyId, propertySlug) {
   };
 }
 
-/**
- * Lee la configuración de WhatsApp/Meta para una propiedad.
- */
 export async function getWhatsAppConfig(propertyId) {
   const setting = await getSetting(propertyId, 'whatsapp_config');
   if (setting && typeof setting === 'object') {
@@ -159,7 +136,6 @@ export async function getWhatsAppConfig(propertyId) {
       waba_id: setting.waba_id,
     };
   }
-  // Fallback a ENV global (configuración de plataforma)
   return {
     access_token: process.env.WHATSAPP_TOKEN || null,
     phone_number_id: process.env.WHATSAPP_PHONE_ID || null,
@@ -167,10 +143,6 @@ export async function getWhatsAppConfig(propertyId) {
   };
 }
 
-/**
- * Lee la configuración del proveedor de IA para una propiedad.
- * Por defecto usa Claude (Anthropic) desde la configuración de plataforma.
- */
 export async function getAIConfig(propertyId) {
   const setting = await getSetting(propertyId, 'anthropic_config');
   if (setting && typeof setting === 'object') {
@@ -181,7 +153,6 @@ export async function getAIConfig(propertyId) {
       model: setting.model || 'claude-sonnet-4-6',
     };
   }
-  // Default: clave de plataforma (compartida entre todos los tenants que no tienen su propia)
   return {
     provider: 'anthropic',
     api_key: process.env.ANTHROPIC_API_KEY || null,
@@ -189,20 +160,14 @@ export async function getAIConfig(propertyId) {
   };
 }
 
-/**
- * Lista todas las conexiones configuradas para una propiedad (sin exponer credenciales).
- * Incluye scope (independent/shared) y conexiones heredadas del tenant.
- * Fusiona settings + channel_property_map para mostrar WhatsApp/Facebook/Instagram.
- */
 export async function listConnections(propertyId) {
   const CONNECTION_KEYS = [
     'lobbypms_token', 'wompi_config', 'whatsapp_config',
     'anthropic_config', 'openai_config', 'gemini_config', 'groq_config',
     'meta_config', 'booking_config', 'airbnb_config', 'cloudbeds_config',
-    'ota_ical_urls',
+    'ota_ical_urls', 'google_config',
   ];
 
-  // 1. Conexiones desde settings (tokens, configs JSON)
   const { data: settingsData, error: settingsError } = await supabase
     .from('settings')
     .select('key, updated_at, updated_by, scope')
@@ -217,7 +182,6 @@ export async function listConnections(propertyId) {
     updated_by: row.updated_by,
   }));
 
-  // 2. Conexiones desde channel_property_map (WhatsApp, Facebook, Instagram)
   const { data: ownChannels, error: ownErr } = await supabase
     .from('channel_property_map')
     .select('channel, external_id, external_name, scope, is_active, updated_at')
@@ -256,7 +220,6 @@ export async function listConnections(propertyId) {
     external_name: row.external_name,
   }));
 
-  // 3. Fusionar sin duplicados (settings tiene prioridad si existe la misma key)
   const settingsKeys = new Set(settingsConnections.map(c => c.key));
   const merged = [
     ...settingsConnections,
@@ -266,17 +229,12 @@ export async function listConnections(propertyId) {
   return merged;
 }
 
-/**
- * Obtiene el mapeo de canales para una propiedad (channel_property_map).
- */
 export async function getChannelMappings(propertyId) {
-  // Own channels (independent + shared owned by this property)
   const { data: own, error: ownErr } = await supabase
     .from('channel_property_map')
     .select('channel, external_id, external_name, scope, is_active')
     .eq('property_id', propertyId);
 
-  // Shared channels from other properties
   const { data: shared, error: sharedErr } = await supabase
     .from('channel_property_map')
     .select('channel, external_id, external_name, scope, is_active')
@@ -293,9 +251,6 @@ export async function getChannelMappings(propertyId) {
   ];
 }
 
-/**
- * Guarda o actualiza un mapeo de canal para una propiedad.
- */
 export async function saveChannelMapping(propertyId, channel, externalId, externalName, scope = 'independent') {
   const { data, error } = await supabase
     .from('channel_property_map')

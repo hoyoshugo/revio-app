@@ -68,6 +68,7 @@ import { generalLimiter } from './middleware/rateLimiter.js';
 import { startScheduler } from './services/scheduler.js';
 import { runPendingMigrations } from './services/dbMigrations.js';
 import { detectAndStoreIp } from './utils/ipMonitor.js';
+import googleAuthRoutes from './routes/googleAuth.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -171,6 +172,7 @@ app.use('/api/approval-requests', approvalRequestsRoutes);
 app.use('/api/platform-audits', platformAuditsRoutes);
 app.use('/api/scheduled-reports', scheduledReportsRoutes);
 app.use('/api', channelSyncRoutes);
+app.use('/api/google', googleAuthRoutes);
 
 // Cron OTA iCal sync — cada 15 minutos
 cron.schedule('*/15 * * * *', async () => {
