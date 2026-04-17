@@ -218,11 +218,29 @@ export async function listConnections(propertyId) {
   }));
 
   // 2. Conexiones desde channel_property_map (WhatsApp, Facebook, Instagram)
-  const { data: channelData, error: channelError } = await supabase
+  //    - independent: solo registros de esta propiedad
+  //    - shared: aparece para TODAS las propiedades (ej: WhatsApp número compartido)
+  const { data: ownChannels, error: ownErr } = await supabase
     .from('channel_property_map')
     .select('channel, external_id, external_name, scope, is_active, updated_at')
     .eq('property_id', propertyId)
     .eq('is_active', true);
+
+  const { data: sharedChannels, error: sharedErr } = await supabase
+    .from('channel_property_map')
+    .select('channel, external_id, external_name, scope, is_active, updated_at')
+    .eq('scope', 'shared')
+    .eq('is_active', true)
+    .neq('property_id', propertyId);
+
+  // Merge own + shared (deduplicate by channel)
+  const ownList = ownErr ? [] : (ownChannels || []);
+  const sharedList = sharedErr ? [] : (sharedChannels || []);
+  const seenChannels = new Set(ownList.map(r => r.channel));
+  const channelData = [
+    ...ownList,
+    ...sharedList.filter(r => !seenChannels.has(r.channel)),
+  ];
 
   const CHANNEL_TO_KEY = {
     whatsapp: 'whatsapp_config',
@@ -255,44 +273,10 @@ export async function listConnections(propertyId) {
  * Obtiene el mapeo de canales para una propiedad (channel_property_map).
  */
 export async function getChannelMappings(propertyId) {
-  const { data, error } = await supabase
+  // Own channels (independent + shared owned by this property)
+  const { data: own, error: ownErr } = await supabase
     .from('channel_property_map')
     .select('channel, external_id, external_name, scope, is_active')
     .eq('property_id', propertyId);
-  if (error) return [];
-  return data || [];
-}
 
-/**
- * Guarda o actualiza un mapeo de canal para una propiedad.
- */
-export async function saveChannelMapping(propertyId, channel, externalId, externalName, scope = 'independent') {
-  const { data, error } = await supabase
-    .from('channel_property_map')
-    .upsert({
-      property_id: propertyId,
-      channel,
-      external_id: externalId,
-      external_name: externalName,
-      scope,
-      is_active: true,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'channel,external_id' })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export default {
-  getSetting,
-  saveSetting,
-  getLobbyPMSToken,
-  getWompiConfig,
-  getWhatsAppConfig,
-  getAIConfig,
-  listConnections,
-  getChannelMappings,
-  saveChannelMapping,
-};
+  // Shared
