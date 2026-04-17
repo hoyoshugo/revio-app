@@ -285,3 +285,5 @@ El skill `/system-guardian` debe ejecutarse:
 - ✅ Ante cualquier error de producción reportado
 
 No aplicar fixes automáticamente sin confirmación del usuario. Mostrar el fix, preguntar si aplicar.
+
+<!-- deploy-trigger: 2026-04-17T12:55:54.746888 -->
