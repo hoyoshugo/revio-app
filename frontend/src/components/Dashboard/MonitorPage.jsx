@@ -139,6 +139,7 @@ export default function MonitorPage() {
   const [auditLog, setAuditLog] = useState([]);
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [usage, setUsage] = useState(null);
 
   const loadAll = useCallback(async () => {
     if (!propertyId) return;
@@ -160,6 +161,14 @@ export default function MonitorPage() {
       if (cRes.ok) setChannels((await cRes.json()).channels || []);
       if (sRes.ok) setSystem(await sRes.json());
       if (aRes.ok) setAuditLog((await aRes.json()).events || []);
+
+      // Uso del agente del mes (no bloqueante si falla)
+      try {
+        const uRes = await fetch(`${API}/api/usage/current-month`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (uRes.ok) setUsage(await uRes.json());
+      } catch { /* silencioso */ }
     } catch (e) {
       console.error(e);
     }
@@ -378,6 +387,72 @@ export default function MonitorPage() {
             middle={system?.crons?.audit?.schedule || 'domingos 08:00'}
             right={<StatusDot status={system?.crons?.audit?.status || 'scheduled'} />}
           />
+        </Section>
+      )}
+
+      {/* Sección Uso del agente IA — solo si /api/usage devolvió datos */}
+      {usage && (
+        <Section title="Uso del agente IA — mes actual" icon={Zap}>
+          <div className="px-4 py-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <div className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-3)' }}>
+                Mensajes
+              </div>
+              <div className="text-xl font-bold" style={{ color: 'var(--text-1)' }}>
+                {usage.totals?.messages || 0}
+              </div>
+              {usage.limit?.max_conversations_month > 0 && (
+                <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-2)' }}>
+                  de {usage.limit.max_conversations_month} ({usage.limit.used_pct}%)
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-3)' }}>
+                Tokens entrada
+              </div>
+              <div className="text-xl font-bold" style={{ color: 'var(--text-1)' }}>
+                {(usage.totals?.input_tokens || 0).toLocaleString()}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-3)' }}>
+                Tokens salida
+              </div>
+              <div className="text-xl font-bold" style={{ color: 'var(--text-1)' }}>
+                {(usage.totals?.output_tokens || 0).toLocaleString()}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-3)' }}>
+                Costo estimado
+              </div>
+              <div className="text-xl font-bold" style={{ color: 'var(--accent)' }}>
+                ${(usage.totals?.cost_usd || 0).toFixed(4)} USD
+              </div>
+              <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-3)' }}>
+                {usage.billing_mode === 'byok' ? 'BYOK · pagas a Anthropic' : 'Plataforma Alzio'}
+              </div>
+            </div>
+          </div>
+          {usage.limit?.max_conversations_month > 0 && (
+            <div className="px-4 pb-4">
+              <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full"
+                  style={{
+                    width: `${usage.limit.used_pct}%`,
+                    background:
+                      usage.limit.used_pct >= 90
+                        ? '#ef4444'
+                        : usage.limit.used_pct >= 70
+                        ? '#f59e0b'
+                        : 'var(--accent)',
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </Section>
       )}
 

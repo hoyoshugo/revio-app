@@ -8,6 +8,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { supabase } from '../models/supabase.js';
 import { sendWhatsAppMessage } from './agentUtils.js';
+import { trackAnthropicUsage } from './aiUsageTracker.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const TA_API = 'https://api.content.tripadvisor.com/api/v1';
@@ -120,12 +121,34 @@ ${review.title ? `Título: ${review.title}\n\n` : ''}${review.review_text || '(s
 Genera la respuesta sugerida.`;
 
   try {
+    const model = 'claude-haiku-4-5-20251001';
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model,
       max_tokens: 500,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
     });
+
+    // Trackear costo (no bloqueante). Reviews AI los paga Alzio platform.
+    if (response?.usage) {
+      try {
+        const { data: prop } = await supabase
+          .from('properties')
+          .select('tenant_id')
+          .eq('id', review.property_id)
+          .maybeSingle();
+        if (prop?.tenant_id) {
+          trackAnthropicUsage({
+            tenantId: prop.tenant_id,
+            propertyId: review.property_id,
+            source: 'reviews',
+            usage: response.usage,
+            model,
+            platformPaid: true,
+          }).catch(() => {});
+        }
+      } catch { /* tracking opcional */ }
+    }
 
     const aiText = response.content?.[0]?.text || '';
 
@@ -153,8 +176,8 @@ Genera la respuesta sugerida.`;
         `📝 *Nueva reseña en TripAdvisor* (${review.rating || '?'}⭐)\n` +
         `De: ${review.reviewer_name || 'Huésped'}\n` +
         `_"${preview}"_\n\n` +
-        `Ver respuesta sugerida por IA en Revio:\n` +
-        `https://revio-app-production.up.railway.app/reviews`;
+        `Ver respuesta sugerida por IA en Alzio:\n` +
+        `https://app.alzio.co/reviews`;
 
       for (const phone of phones) {
         if (phone) await sendWhatsAppMessage(phone, message);

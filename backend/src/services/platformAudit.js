@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { supabase } from '../models/supabase.js';
 import { getGoogleReviews } from './socialChannels.js';
+import { trackAnthropicUsage } from './aiUsageTracker.js';
 
 /**
  * Auditoría automática de plataformas (Google, TripAdvisor, etc.)
@@ -28,7 +29,7 @@ export async function runPlatformAudit(tenantId, propertyId) {
   if (googlePlaceId && process.env.GOOGLE_API_KEY) {
     const reviews = await getGoogleReviews(googlePlaceId, process.env.GOOGLE_API_KEY);
     if (reviews.length > 0) {
-      const audit = await analyzeReviews('google', reviews);
+      const audit = await analyzeReviews('google', reviews, tenantId);
       const avgRating = reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length;
 
       await supabase.from('platform_audits').insert({
@@ -51,7 +52,7 @@ export async function runPlatformAudit(tenantId, propertyId) {
   return results;
 }
 
-async function analyzeReviews(platform, reviews) {
+async function analyzeReviews(platform, reviews, tenantId = null) {
   if (!reviews.length || !process.env.ANTHROPIC_API_KEY) {
     return { positive: 0, negative: 0, neutral: 0, issues: [], recommendations: [] };
   }
@@ -62,9 +63,10 @@ async function analyzeReviews(platform, reviews) {
     .join('\n---\n');
 
   try {
+    const model = 'claude-haiku-4-5-20251001';
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model,
       max_tokens: 600,
       messages: [{
         role: 'user',
@@ -75,6 +77,17 @@ Reseñas:
 ${reviewTexts}`
       }]
     });
+
+    // Trackear costo (no bloqueante). Audits los paga Alzio platform.
+    if (tenantId && response?.usage) {
+      trackAnthropicUsage({
+        tenantId,
+        source: 'audit',
+        usage: response.usage,
+        model,
+        platformPaid: true,
+      }).catch(() => {});
+    }
 
     const text = response.content[0].text.replace(/```json|```/g, '').trim();
     return JSON.parse(text);

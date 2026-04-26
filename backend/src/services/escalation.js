@@ -14,6 +14,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { supabase } from '../models/supabase.js';
 import { sendWhatsAppMessage } from '../integrations/whatsapp.js';
+import { trackAnthropicUsage } from './aiUsageTracker.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const TEAM_NUMBERS = [
@@ -72,8 +73,19 @@ export async function createEscalation(conversationId, propertyId, reason, conve
 
   if (existing) return existing; // ya escalada
 
+  // Resolver tenant_id del propertyId para trackear costo
+  let tenantId = null;
+  try {
+    const { data: prop } = await supabase
+      .from('properties')
+      .select('tenant_id')
+      .eq('id', propertyId)
+      .maybeSingle();
+    tenantId = prop?.tenant_id || null;
+  } catch { /* sin tenant => tracking se salta */ }
+
   // Generar resumen del contexto
-  const summary = await generateConversationSummary(conversationHistory);
+  const summary = await generateConversationSummary(conversationHistory, tenantId);
 
   // Guardar escalación en BD
   const { data: escalation, error } = await supabase
@@ -106,8 +118,10 @@ export async function createEscalation(conversationId, propertyId, reason, conve
 
 // ============================================================
 // Generar resumen de la conversación para el equipo
+// Costo se trackea via aiUsageTracker — uso plataforma (escalation
+// summaries no se cobran al tenant, los paga Alzio internamente).
 // ============================================================
-async function generateConversationSummary(conversationHistory) {
+async function generateConversationSummary(conversationHistory, tenantId = null) {
   if (!conversationHistory?.length) return 'Sin historial disponible.';
 
   try {
@@ -116,8 +130,9 @@ async function generateConversationSummary(conversationHistory) {
       .map(m => `${m.role === 'user' ? 'Huésped' : 'IA'}: ${m.content}`)
       .join('\n');
 
+    const model = 'claude-sonnet-4-6';
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model,
       max_tokens: 300,
       messages: [{
         role: 'user',
@@ -125,9 +140,19 @@ async function generateConversationSummary(conversationHistory) {
       }]
     });
 
+    // Trackear uso (no bloqueante)
+    if (tenantId && response?.usage) {
+      trackAnthropicUsage({
+        tenantId,
+        source: 'escalation',
+        usage: response.usage,
+        model,
+        platformPaid: true,
+      }).catch(() => {});
+    }
+
     return response.content.find(b => b.type === 'text')?.text || 'Resumen no disponible.';
   } catch {
-    // Resumen básico sin IA
     const last = conversationHistory[conversationHistory.length - 1];
     return `Último mensaje del huésped: "${last?.content?.substring(0, 200) || 'N/A'}"`;
   }
