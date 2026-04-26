@@ -108,16 +108,27 @@ const MESSAGING_CHANNELS = [
     ] },
 ];
 
+// `enabled` controls whether the card is shown. Each OTA/review platform must
+// have a working API path that supports Alzio's purpose (respond inquiries,
+// respond reviews, close sales). When the partner application is approved and
+// the API integration ships, flip `enabled` to true.
+//   - tripadvisor: Content API is read-only; no public Reply API for individual
+//     hotels. Owners reply only via Owner Tools UI. Partner application required.
+//   - booking:     Connectivity Partner application required for Messaging API.
+//   - airbnb:      Software Partner application required for Messaging API.
+//   - expedia:     EPS / Conversations API requires enterprise integration.
+//   - hostelworld: Partner API access requires application.
+//   - despegar:    LATAM partner program application required.
 const OTA_CHANNELS = [
-  { key: 'booking',     name: 'Booking.com',  icon: '🏩', guide: 'booking_ical' },
-  { key: 'airbnb',      name: 'Airbnb',       icon: '🏠', guide: 'airbnb_ical' },
-  { key: 'expedia',     name: 'Expedia',      icon: '🗺️', guide: 'expedia_ical' },
-  { key: 'hostelworld', name: 'Hostelworld',  icon: '🌍', guide: 'hostelworld_ical' },
-  { key: 'despegar',    name: 'Despegar',     icon: '🛫', guide: 'despegar_ical' },
+  { key: 'booking',     name: 'Booking.com',  icon: '🏩', guide: 'booking_ical',     enabled: false },
+  { key: 'airbnb',      name: 'Airbnb',       icon: '🏠', guide: 'airbnb_ical',      enabled: false },
+  { key: 'expedia',     name: 'Expedia',      icon: '🗺️', guide: 'expedia_ical',     enabled: false },
+  { key: 'hostelworld', name: 'Hostelworld',  icon: '🌍', guide: 'hostelworld_ical', enabled: false },
+  { key: 'despegar',    name: 'Despegar',     icon: '🛫', guide: 'despegar_ical',    enabled: false },
 ];
 
 const REVIEW_CHANNELS = [
-  { key: 'tripadvisor', name: 'TripAdvisor', icon: '🦉', guide: 'tripadvisor' },
+  { key: 'tripadvisor', name: 'TripAdvisor', icon: '🦉', guide: 'tripadvisor', enabled: false },
 ];
 
 // ────────────────────────────────────────────────────────
@@ -511,7 +522,8 @@ export default function IntegrationsPanel({ properties = [], token }) {
   function renderOtasTab() {
     return (
       <div className="space-y-6">
-        {/* ── SUB-SECCIÓN 1: Reseñas IA ──────────────────── */}
+        {/* ── SUB-SECCIÓN 1: Reseñas IA — solo si al menos 1 canal habilitado ──── */}
+        {REVIEW_CHANNELS.some(c => c.enabled) && (
         <div>
           <div className="mb-3">
             <h3 className="text-sm font-bold" style={{ color: 'var(--text-1)' }}>
@@ -523,7 +535,7 @@ export default function IntegrationsPanel({ properties = [], token }) {
             </p>
           </div>
           <div className="space-y-2">
-            {REVIEW_CHANNELS.map(ch => {
+            {REVIEW_CHANNELS.filter(ch => ch.enabled).map(ch => {
               const row = channelOf(ch.key);
               return (
                 <div
@@ -583,8 +595,10 @@ export default function IntegrationsPanel({ properties = [], token }) {
             </div>
           </div>
         </div>
+        )}
 
-        {/* ── SUB-SECCIÓN 2: OTAs ───────────────────────── */}
+        {/* ── SUB-SECCIÓN 2: OTAs — solo si al menos 1 canal habilitado ──────── */}
+        {OTA_CHANNELS.some(c => c.enabled) && (
         <div>
           <div className="mb-3">
             <h3 className="text-sm font-bold" style={{ color: 'var(--text-1)' }}>
@@ -596,7 +610,7 @@ export default function IntegrationsPanel({ properties = [], token }) {
             </p>
           </div>
           <div className="space-y-2">
-            {OTA_CHANNELS.map(ch => {
+            {OTA_CHANNELS.filter(ch => ch.enabled).map(ch => {
               const row = channelOf(ch.key);
               const configured = !!row.profile_url;
               return (
@@ -655,6 +669,7 @@ export default function IntegrationsPanel({ properties = [], token }) {
             })}
           </div>
         </div>
+        )}
 
         {/* ── SUB-SECCIÓN 3: Roadmap ────────────────────── */}
         <div
