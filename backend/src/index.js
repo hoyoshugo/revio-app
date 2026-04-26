@@ -254,18 +254,87 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     version: '1.0.0',
-    service: 'Revio Agent',
+    service: 'Alzio Hoteles API',
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime())
   });
 });
 
-// Servir el script del widget embebible
-app.get('/embed.js', (req, res) => {
-  const apiUrl = process.env.FRONTEND_URL || `http://localhost:${PORT}`;
+// ============================================================
+// Widget embebible per-tenant
+//
+// GET /embed.js[?tenant=<slug>]
+//   - sin tenant: widget neutro Alzio
+//   - con tenant: lookup branding (logo, color, agent_name, greeting)
+//
+// CORS: el script se carga desde el sitio del cliente. La API debe
+// permitir cross-origin para los endpoints del chat. Ya configurado vía
+// middleware CORS en este server.
+// ============================================================
+app.get('/embed.js', async (req, res) => {
+  const apiUrl = process.env.WIDGET_API_URL || process.env.FRONTEND_URL || `http://localhost:${PORT}`;
+  const tenantSlug = (req.query.tenant || '').toString().trim().toLowerCase();
+  let branding = {
+    business_name: 'Alzio',
+    agent_name: 'Asistente',
+    greeting: '',
+    primary_color: '#6366F1',
+    accent_color: '#4F46E5',
+    logo_url: '',
+    avatar_emoji: '💬',
+    property_slug: '',
+  };
+  if (tenantSlug) {
+    try {
+      const { supabase } = await import('./models/supabase.js');
+      const { data: tenant } = await supabase
+        .from('tenants')
+        .select('id, slug, business_name, agent_name, greeting_custom, primary_color, accent_color, logo_url, avatar_emoji')
+        .eq('slug', tenantSlug)
+        .maybeSingle();
+      if (tenant) {
+        branding = {
+          business_name: tenant.business_name || branding.business_name,
+          agent_name: tenant.agent_name || `Asistente de ${tenant.business_name || branding.business_name}`,
+          greeting: tenant.greeting_custom || '',
+          primary_color: tenant.primary_color || branding.primary_color,
+          accent_color: tenant.accent_color || tenant.primary_color || branding.accent_color,
+          logo_url: tenant.logo_url || '',
+          avatar_emoji: tenant.avatar_emoji || branding.avatar_emoji,
+          property_slug: '', // las propiedades se resuelven al runtime via /api/chat/init
+        };
+        // Cargar primer property_slug del tenant para que el widget tenga
+        // un default si el host no lo provee via window.AlzioConfig.
+        const { data: firstProp } = await supabase
+          .from('properties')
+          .select('slug')
+          .eq('tenant_id', tenant.id)
+          .eq('is_active', true)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        branding.property_slug = firstProp?.slug || '';
+      }
+    } catch (err) {
+      console.error('[/embed.js] tenant lookup error:', err.message);
+    }
+  }
   res.setHeader('Content-Type', 'application/javascript');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.send(generateEmbedScript(apiUrl));
+  res.setHeader('Cache-Control', 'public, max-age=300'); // 5 min cache (rebrand fluido)
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.send(generateEmbedScript(apiUrl, branding));
+});
+
+// ============================================================
+// Página de documentación del embed widget
+// GET /docs/embed
+// Muestra el snippet listo para copiar + opciones de configuración.
+// ============================================================
+app.get('/docs/embed', (req, res) => {
+  const apiUrl = process.env.WIDGET_API_URL || process.env.FRONTEND_URL || `http://localhost:${PORT}`;
+  const tenantParam = req.query.tenant ? `?tenant=${encodeURIComponent(req.query.tenant)}` : '';
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(generateEmbedDocs(apiUrl, tenantParam));
 });
 
 // ── Servir frontend compilado (producción Railway) ───────────
@@ -296,7 +365,7 @@ app.use((err, req, res, next) => {
 // INICIO
 // ============================================================
 app.listen(PORT, () => {
-  console.log(`🌊 Revio Agent corriendo en puerto ${PORT}`);
+  console.log(`🌊 Alzio Hoteles API corriendo en puerto ${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/health`);
   console.log(`   Widget: http://localhost:${PORT}/embed.js`);
   console.log(`   Env: ${process.env.NODE_ENV || 'development'}`);
@@ -312,73 +381,98 @@ app.listen(PORT, () => {
 });
 
 // ============================================================
-// Script del chat widget embebible (generado dinámicamente)
+// Script del chat widget embebible — generado dinámicamente con branding
+// del tenant. CSS IDs `alzio-widget-*` para evitar colisión con widgets
+// legacy de Mística/Revio que el cliente pudiera tener.
 // ============================================================
-function generateEmbedScript(apiUrl) {
+function generateEmbedScript(apiUrl, branding) {
+  const b = branding || {};
+  // Escape único para inyección segura en JS string literal
+  const safe = (s) => String(s || '').replace(/[\\'"`]/g, (m) => '\\' + m).replace(/<\/script/gi, '<\\/script');
+  const primary = safe(b.primary_color || '#6366F1');
+  const accent = safe(b.accent_color || '#4F46E5');
+  const businessName = safe(b.business_name || 'Alzio');
+  const agentName = safe(b.agent_name || 'Asistente');
+  const greeting = safe(b.greeting || '');
+  const logoUrl = safe(b.logo_url || '');
+  const avatar = safe(b.avatar_emoji || '💬');
+  const defaultPropertySlug = safe(b.property_slug || '');
+
   return `
 (function() {
   'use strict';
 
-  var REVIO_API = '${apiUrl}';
-  // Acepta window.RevioConfig (nuevo) o window.MysticaConfig (legacy)
-  var config = window.RevioConfig || window.MysticaConfig || {};
-  var propertySlug = config.property || 'isla-palma';
+  var ALZIO_API = '${apiUrl}';
+  var config = window.AlzioConfig || window.RevioConfig || window.MysticaConfig || {};
+  var propertySlug = config.property || '${defaultPropertySlug}';
   var lang = config.language || (navigator.language || 'es').substring(0, 2);
 
-  // Estilos del widget
+  // Branding inyectado server-side desde tenants table
+  var BRAND = {
+    primary: '${primary}',
+    accent: '${accent}',
+    business: '${businessName}',
+    agent: '${agentName}',
+    greeting: '${greeting}',
+    logo: '${logoUrl}',
+    avatar: '${avatar}',
+  };
+
   var style = document.createElement('style');
-  style.textContent = \`
-    #mystica-widget { position: fixed; bottom: 24px; right: 24px; z-index: 99999; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-    #mystica-btn { width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #1a1a2e 0%, #00b4d8 100%); border: none; cursor: pointer; box-shadow: 0 4px 20px rgba(0,180,216,0.4); display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
-    #mystica-btn:hover { transform: scale(1.1); }
-    #mystica-btn svg { width: 28px; height: 28px; fill: white; }
-    #mystica-chat { position: absolute; bottom: 72px; right: 0; width: 360px; height: 520px; background: white; border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,0.15); display: none; flex-direction: column; overflow: hidden; }
-    #mystica-chat.open { display: flex; animation: slideUp 0.3s ease; }
-    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-    #mystica-header { background: linear-gradient(135deg, #1a1a2e 0%, #00b4d8 100%); color: white; padding: 16px; display: flex; align-items: center; gap: 12px; }
-    #mystica-header img { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.2); }
-    #mystica-header-info h3 { margin: 0; font-size: 15px; font-weight: 600; }
-    #mystica-header-info p { margin: 2px 0 0; font-size: 11px; opacity: 0.8; }
-    #mystica-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: #f8f9fa; }
-    .mystica-msg { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; line-height: 1.5; word-wrap: break-word; }
-    .mystica-msg.bot { background: white; border-radius: 12px 12px 12px 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); color: #1a1a2e; align-self: flex-start; }
-    .mystica-msg.user { background: linear-gradient(135deg, #1a1a2e, #00b4d8); color: white; border-radius: 12px 12px 2px 12px; align-self: flex-end; }
-    #mystica-input-area { padding: 12px; border-top: 1px solid #eee; display: flex; gap: 8px; background: white; }
-    #mystica-input { flex: 1; border: 1px solid #ddd; border-radius: 20px; padding: 8px 16px; font-size: 13.5px; outline: none; resize: none; }
-    #mystica-input:focus { border-color: #00b4d8; }
-    #mystica-send { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #1a1a2e, #00b4d8); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    #mystica-send svg { width: 16px; height: 16px; fill: white; }
-    #mystica-typing { display: none; align-self: flex-start; background: white; padding: 10px 14px; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-    #mystica-typing span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #00b4d8; animation: bounce 1.2s infinite; margin: 0 2px; }
-    #mystica-typing span:nth-child(2) { animation-delay: 0.2s; }
-    #mystica-typing span:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-8px); } }
-    @media (max-width: 480px) { #mystica-chat { width: calc(100vw - 32px); right: -16px; bottom: 68px; height: 70vh; } }
-  \`;
+  style.textContent =
+    '#alzio-widget { position: fixed; bottom: 24px; right: 24px; z-index: 99999; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }' +
+    '#alzio-widget-btn { width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, ' + BRAND.primary + ' 0%, ' + BRAND.accent + ' 100%); border: none; cursor: pointer; box-shadow: 0 4px 20px rgba(99,102,241,0.4); display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }' +
+    '#alzio-widget-btn:hover { transform: scale(1.1); }' +
+    '#alzio-widget-btn svg { width: 28px; height: 28px; fill: white; }' +
+    '#alzio-widget-chat { position: absolute; bottom: 72px; right: 0; width: 360px; height: 520px; background: white; border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,0.15); display: none; flex-direction: column; overflow: hidden; }' +
+    '#alzio-widget-chat.open { display: flex; animation: alzioSlideUp 0.3s ease; }' +
+    '@keyframes alzioSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }' +
+    '#alzio-widget-header { background: linear-gradient(135deg, ' + BRAND.primary + ' 0%, ' + BRAND.accent + ' 100%); color: white; padding: 16px; display: flex; align-items: center; gap: 12px; }' +
+    '#alzio-widget-header img { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.2); object-fit: cover; }' +
+    '#alzio-widget-header-info h3 { margin: 0; font-size: 15px; font-weight: 600; }' +
+    '#alzio-widget-header-info p { margin: 2px 0 0; font-size: 11px; opacity: 0.8; }' +
+    '#alzio-widget-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: #f8f9fa; }' +
+    '.alzio-widget-msg { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; line-height: 1.5; word-wrap: break-word; }' +
+    '.alzio-widget-msg.bot { background: white; border-radius: 12px 12px 12px 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); color: #1a1a2e; align-self: flex-start; }' +
+    '.alzio-widget-msg.user { background: linear-gradient(135deg, ' + BRAND.primary + ', ' + BRAND.accent + '); color: white; border-radius: 12px 12px 2px 12px; align-self: flex-end; }' +
+    '#alzio-widget-input-area { padding: 12px; border-top: 1px solid #eee; display: flex; gap: 8px; background: white; }' +
+    '#alzio-widget-input { flex: 1; border: 1px solid #ddd; border-radius: 20px; padding: 8px 16px; font-size: 13.5px; outline: none; resize: none; }' +
+    '#alzio-widget-input:focus { border-color: ' + BRAND.primary + '; }' +
+    '#alzio-widget-send { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, ' + BRAND.primary + ', ' + BRAND.accent + '); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }' +
+    '#alzio-widget-send svg { width: 16px; height: 16px; fill: white; }' +
+    '#alzio-widget-typing { display: none; align-self: flex-start; background: white; padding: 10px 14px; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }' +
+    '#alzio-widget-typing span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ' + BRAND.primary + '; animation: alzioBounce 1.2s infinite; margin: 0 2px; }' +
+    '#alzio-widget-typing span:nth-child(2) { animation-delay: 0.2s; }' +
+    '#alzio-widget-typing span:nth-child(3) { animation-delay: 0.4s; }' +
+    '@keyframes alzioBounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-8px); } }' +
+    '@media (max-width: 480px) { #alzio-widget-chat { width: calc(100vw - 32px); right: -16px; bottom: 68px; height: 70vh; } }';
   document.head.appendChild(style);
 
-  // Crear HTML del widget
+  // HTML del widget — usa logo si existe, sino emoji
+  var avatarHtml = BRAND.logo
+    ? '<img src="' + BRAND.logo + '" alt="' + BRAND.business + '">'
+    : '<div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;">' + BRAND.avatar + '</div>';
+
   var widget = document.createElement('div');
-  widget.id = 'mystica-widget';
-  widget.innerHTML = \`
-    <div id="mystica-chat">
-      <div id="mystica-header">
-        <div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;">🌊</div>
-        <div id="mystica-header-info">
-          <h3>Revio Agent</h3>
-          <p>Asistente virtual · En línea</p>
-        </div>
-      </div>
-      <div id="mystica-messages"></div>
-      <div id="mystica-input-area">
-        <textarea id="mystica-input" rows="1" placeholder="Escribe tu mensaje..."></textarea>
-        <button id="mystica-send"><svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>
-      </div>
-    </div>
-    <button id="mystica-btn">
-      <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
-    </button>
-  \`;
+  widget.id = 'alzio-widget';
+  widget.innerHTML =
+    '<div id="alzio-widget-chat">' +
+      '<div id="alzio-widget-header">' +
+        avatarHtml +
+        '<div id="alzio-widget-header-info">' +
+          '<h3>' + BRAND.business + '</h3>' +
+          '<p>' + BRAND.agent + '</p>' +
+        '</div>' +
+      '</div>' +
+      '<div id="alzio-widget-messages"></div>' +
+      '<div id="alzio-widget-input-area">' +
+        '<textarea id="alzio-widget-input" rows="1" placeholder="Escribe tu mensaje..."></textarea>' +
+        '<button id="alzio-widget-send" aria-label="Enviar"><svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>' +
+      '</div>' +
+    '</div>' +
+    '<button id="alzio-widget-btn" aria-label="Abrir chat">' +
+      '<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>' +
+    '</button>';
   document.body.appendChild(widget);
 
   var sessionId = null;
@@ -386,15 +480,15 @@ function generateEmbedScript(apiUrl) {
   var isLoading = false;
   var initialized = false;
 
-  var btn = document.getElementById('mystica-btn');
-  var chat = document.getElementById('mystica-chat');
-  var messages = document.getElementById('mystica-messages');
-  var input = document.getElementById('mystica-input');
-  var sendBtn = document.getElementById('mystica-send');
+  var btn = document.getElementById('alzio-widget-btn');
+  var chat = document.getElementById('alzio-widget-chat');
+  var messages = document.getElementById('alzio-widget-messages');
+  var input = document.getElementById('alzio-widget-input');
+  var sendBtn = document.getElementById('alzio-widget-send');
 
   function addMessage(text, isUser) {
     var msg = document.createElement('div');
-    msg.className = 'mystica-msg ' + (isUser ? 'user' : 'bot');
+    msg.className = 'alzio-widget-msg ' + (isUser ? 'user' : 'bot');
     msg.innerHTML = text.replace(/\\n/g, '<br>').replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>');
     messages.appendChild(msg);
     messages.scrollTop = messages.scrollHeight;
@@ -403,8 +497,8 @@ function generateEmbedScript(apiUrl) {
 
   function showTyping() {
     var t = document.createElement('div');
-    t.id = 'mystica-typing';
-    t.className = 'mystica-msg bot';
+    t.id = 'alzio-widget-typing';
+    t.className = 'alzio-widget-msg bot';
     t.innerHTML = '<span></span><span></span><span></span>';
     messages.appendChild(t);
     messages.scrollTop = messages.scrollHeight;
@@ -416,16 +510,18 @@ function generateEmbedScript(apiUrl) {
     if (initialized) return;
     initialized = true;
     try {
-      var res = await fetch(REVIO_API + '/api/chat/init', {
+      var res = await fetch(ALZIO_API + '/api/chat/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ property_slug: propertySlug, language: lang })
       });
       var data = await res.json();
       sessionId = data.session_id;
-      addMessage(data.greeting, false);
+      // Greeting custom del tenant si está configurado, sino el del init
+      var greeting = BRAND.greeting || data.greeting || '¡Hola! ¿En qué puedo ayudarte?';
+      addMessage(greeting, false);
     } catch(e) {
-      addMessage('¡Hola! ¿En qué puedo ayudarte? 🌊', false);
+      addMessage(BRAND.greeting || '¡Hola! ¿En qué puedo ayudarte?', false);
     }
   }
 
@@ -438,20 +534,20 @@ function generateEmbedScript(apiUrl) {
     isLoading = true;
     var typing = showTyping();
     try {
-      var res = await fetch(REVIO_API + '/api/chat', {
+      var res = await fetch(ALZIO_API + '/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text, session_id: sessionId, property_slug: propertySlug })
       });
       var data = await res.json();
       typing.remove();
-      addMessage(data.reply || 'Lo siento, hubo un problema. Intenta de nuevo.', false);
-      if (data.booking?.payment_link_url) {
-        addMessage('💳 <a href="' + data.booking.payment_link_url + '" target="_blank" style="color:#00b4d8;font-weight:bold;">Completar pago aquí →</a>', false);
+      addMessage(data.reply || data.message || 'Lo siento, hubo un problema. Intenta de nuevo.', false);
+      if (data.booking && data.booking.payment_link_url) {
+        addMessage('💳 <a href="' + data.booking.payment_link_url + '" target="_blank" style="color:' + BRAND.primary + ';font-weight:bold;">Completar pago aquí →</a>', false);
       }
     } catch(e) {
       typing.remove();
-      addMessage('Hubo un problema de conexión. Por favor intenta de nuevo. 🙏', false);
+      addMessage('Hubo un problema de conexión. Por favor intenta de nuevo.', false);
     }
     isLoading = false;
   }
@@ -472,10 +568,77 @@ function generateEmbedScript(apiUrl) {
     this.style.height = Math.min(this.scrollHeight, 80) + 'px';
   });
 
-  // Auto-abrir después de 8 segundos si está configurado
   if (config.autoOpen) setTimeout(function() { if (!isOpen) btn.click(); }, 8000);
 })();
 `;
+}
+
+// ============================================================
+// Página de docs HTML para el embed widget
+// ============================================================
+function generateEmbedDocs(apiUrl, tenantParam) {
+  const exampleSlug = 'mi-hotel';
+  const scriptSrc = apiUrl + '/embed.js' + (tenantParam || '');
+  return `<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8"><title>Alzio Embed Widget — Documentación</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#0f172a;line-height:1.6}
+  h1{font-size:28px;margin:0 0 8px}h2{font-size:18px;margin:32px 0 8px;border-bottom:1px solid #e5e7eb;padding-bottom:6px}
+  pre{background:#0f172a;color:#e2e8f0;padding:14px 16px;border-radius:8px;overflow:auto;font-size:13px}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+  .badge{display:inline-block;background:#6366F1;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-right:6px}
+  table{width:100%;border-collapse:collapse;margin:8px 0}
+  td,th{padding:8px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:top}
+  th{background:#f8fafc;font-size:13px}
+  .muted{color:#64748b;font-size:13px}
+</style></head>
+<body>
+<h1>Alzio Embed Widget</h1>
+<p class="muted">Agente IA de ventas para tu sitio web. Una sola línea de código.</p>
+
+<h2><span class="badge">1</span>Instalación</h2>
+<p>Pegá este script antes del cierre de <code>&lt;/body&gt;</code> en tu sitio web:</p>
+<pre>&lt;script src="${scriptSrc}" async&gt;&lt;/script&gt;</pre>
+<p class="muted">Reemplazá <code>tenant=${exampleSlug}</code> con tu slug real.</p>
+
+<h2><span class="badge">2</span>Configuración (opcional)</h2>
+<p>Para personalizar al runtime declará <code>window.AlzioConfig</code> ANTES del script:</p>
+<pre>&lt;script&gt;
+  window.AlzioConfig = {
+    property: 'isla-palma',     // slug propiedad por defecto (override del backend)
+    language: 'es',              // es | en | pt | fr | de
+    autoOpen: false              // abrir automáticamente al pasar 8s
+  };
+&lt;/script&gt;
+&lt;script src="${scriptSrc}" async&gt;&lt;/script&gt;</pre>
+
+<h2><span class="badge">3</span>Branding</h2>
+<p>El branding (logo, paleta, nombre del agente, mensaje de bienvenida) se
+configura desde el panel de Alzio en la tabla <code>tenants</code>:</p>
+<table>
+  <tr><th>Campo</th><th>Tipo</th><th>Ejemplo</th></tr>
+  <tr><td>business_name</td><td>texto</td><td>Hotel del Mar</td></tr>
+  <tr><td>agent_name</td><td>texto</td><td>Asistente · En línea</td></tr>
+  <tr><td>greeting_custom</td><td>texto</td><td>¡Hola! Soy Sara, asistente del Hotel del Mar 👋</td></tr>
+  <tr><td>primary_color</td><td>hex</td><td>#0EA5E9</td></tr>
+  <tr><td>accent_color</td><td>hex</td><td>#0284C7</td></tr>
+  <tr><td>logo_url</td><td>URL</td><td>https://misitio.com/logo.png</td></tr>
+  <tr><td>avatar_emoji</td><td>texto</td><td>🏨 (fallback si no hay logo)</td></tr>
+</table>
+<p class="muted">El widget cachea por 5 minutos. Cambios en branding se ven reflejados ese tiempo después.</p>
+
+<h2><span class="badge">4</span>Probar el widget</h2>
+<p>Probalo ahora con un tenant existente (cambiá el slug):</p>
+<pre>${scriptSrc}</pre>
+<p>Una burbuja debe aparecer en la esquina inferior derecha. Click para abrir el chat.</p>
+
+<h2><span class="badge">5</span>Soporte</h2>
+<p>Reportá issues a <a href="mailto:soporte@alzio.co">soporte@alzio.co</a>.</p>
+
+<script src="${scriptSrc}"></script>
+</body></html>`;
 }
 
 export default app;
