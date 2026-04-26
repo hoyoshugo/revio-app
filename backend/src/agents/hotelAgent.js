@@ -621,19 +621,32 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
     } catch (err) {
       console.error('[Agent] Error creando escalación:', err.message);
     }
+    // Cargar contacto WhatsApp dinámico del tenant (sin hardcode)
+    let urgentContact = '';
+    try {
+      const { data: prop } = await supabase
+        .from('properties')
+        .select('whatsapp_number')
+        .eq('id', propertyId)
+        .maybeSingle();
+      if (prop?.whatsapp_number) {
+        urgentContact = ` ${prop.whatsapp_number}`;
+      }
+    } catch { /* sin contacto extra */ }
+
     const escalationMsg = {
-      es: '⏸️ Entiendo tu frustración. He conectado a un miembro de nuestro equipo que te atenderá personalmente en breve. Para urgencias: WhatsApp +573234392420 🌊',
-      en: '⏸️ I understand your frustration. I\'ve connected a team member who will assist you personally shortly. For urgencies: WhatsApp +573234392420 🌊',
-      fr: '⏸️ Je comprends votre frustration. J\'ai connecté un membre de notre équipe qui vous aidera personnellement. Urgences: WhatsApp +573234392420 🌊',
-      de: '⏸️ Ich verstehe Ihre Frustration. Ein Teammitglied wird sich persönlich um Sie kümmern. Dringend: WhatsApp +573234392420 🌊',
-      pt: '⏸️ Entendo sua frustração. Conectei um membro da nossa equipe que vai atendê-lo pessoalmente em breve. Urgências: WhatsApp +573234392420 🌊'
+      es: `⏸️ Entiendo tu frustración. He conectado a un miembro de nuestro equipo que te atenderá personalmente en breve.${urgentContact ? ' Para urgencias: WhatsApp' + urgentContact : ''}`,
+      en: `⏸️ I understand your frustration. I've connected a team member who will assist you personally shortly.${urgentContact ? ' For urgencies: WhatsApp' + urgentContact : ''}`,
+      fr: `⏸️ Je comprends votre frustration. J'ai connecté un membre de notre équipe qui vous aidera personnellement.${urgentContact ? ' Urgences: WhatsApp' + urgentContact : ''}`,
+      de: `⏸️ Ich verstehe Ihre Frustration. Ein Teammitglied wird sich persönlich um Sie kümmern.${urgentContact ? ' Dringend: WhatsApp' + urgentContact : ''}`,
+      pt: `⏸️ Entendo sua frustração. Conectei um membro da nossa equipe que vai atendê-lo pessoalmente em breve.${urgentContact ? ' Urgências: WhatsApp' + urgentContact : ''}`,
     };
-    const lang = detectLanguage(userMessage);
+    const lang = detectLanguage(userMessage) || 'es';
     return {
       message: escalationMsg[lang] || escalationMsg.es,
       session_id: sessionId,
       conversation_id: conversation.id,
-      escalated: true
+      escalated: true,
     };
   }
 
@@ -796,8 +809,14 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
     tools_called: toolsUsed
   });
 
-  // Actualizar estado de la conversación si hay datos nuevos
-  await updateConversationFromContext(conversation.id, userMessage, finalResponse);
+  // Actualizar estado de la conversación si hay datos nuevos.
+  // Pasamos tenantId para que el matching de propiedad sea dinámico.
+  await updateConversationFromContext(
+    conversation.id,
+    userMessage,
+    finalResponse,
+    property?.tenant_id || null
+  );
 
   return {
     message: finalResponse,
@@ -831,27 +850,72 @@ function buildClaudeMessages(dbMessages, latestUserMessage) {
 }
 
 // ============================================================
-// Detección simple de idioma
+// Detección simple de idioma — heurística de patrones de palabra.
+// PT-BR incluye coloquialismos comunes (vc, valeu, tá, blz) además de
+// formas formales para mejorar el match contra mensajes de WhatsApp.
+// Si ningún patrón matchea, retorna null (Claude responde en el idioma
+// del huésped basándose en el mensaje completo).
 // ============================================================
 function detectLanguage(text) {
+  if (!text || typeof text !== 'string') return null;
   const lower = text.toLowerCase();
-  const patterns = {
-    en: /\b(hello|hi|hey|good|morning|evening|night|the|is|are|have|want|looking|book|room|available|please|thank|what|how|when|where)\b/,
-    fr: /\b(bonjour|bonsoir|salut|je|vous|nous|est|sont|avez|voulez|cherche|réserver|chambre|disponible|merci|quoi|comment|quand|où)\b/,
-    de: /\b(hallo|guten|ich|sie|wir|ist|sind|haben|möchte|suche|buchen|zimmer|verfügbar|danke|was|wie|wann|wo)\b/,
-    pt: /\b(olá|oi|bom dia|boa tarde|boa noite|eu|você|nós|quero|procuro|reservar|quarto|disponível|obrigad[oa]|como|quando|onde|preciso)\b/
-  };
 
-  for (const [lang, pattern] of Object.entries(patterns)) {
-    if (pattern.test(lower)) return lang;
+  // PT-BR primero (es más específico y evita confusiones con ES)
+  if (/\b(olá|oi|bom dia|boa tarde|boa noite|você|vocês|vc|valeu|obrigad[oa]|estou|reservar|quarto|disponível|preciso|gostaria|tudo bem|blz|tá|td|brigad[oa]|abraços?|saudações|por favor|com certeza|ônibus|hospedagem)\b/i.test(lower)) {
+    return 'pt';
   }
-  return 'es'; // default
+
+  // FR (acentos diagnósticos)
+  if (/\b(bonjour|bonsoir|salut|merci|s'il vous plaît|je voudrais|réserver|chambre|disponible|combien|où|quand|comment|j'aimerais|est-ce que)\b/i.test(lower)) {
+    return 'fr';
+  }
+
+  // DE (umlauts y palabras frecuentes)
+  if (/\b(hallo|guten\s+(tag|morgen|abend)|möchte|möchten|ich|sie|haben|buchen|zimmer|verfügbar|danke|bitte|wie\s+viel|wann|wo)\b/i.test(lower)) {
+    return 'de';
+  }
+
+  // EN (genérico, después de PT/FR/DE para evitar falsos positivos)
+  if (/\b(hello|hi|hey|good\s+(morning|evening|afternoon|night)|please|thank|booking|room|available|how\s+(much|many)|when|where|i\s+(want|would|need|am))\b/i.test(lower)) {
+    return 'en';
+  }
+
+  // ES (default tras agotar los demás)
+  if (/\b(hola|buenos\s+(días|tardes|noches)|gracias|por favor|quisiera|reservar|habitación|disponib|cuánto|cuándo|dónde|cómo|necesito|quiero|me gustaría)\b/i.test(lower)) {
+    return 'es';
+  }
+
+  return null;
+}
+
+// Cache simple de propiedades por tenant para evitar lookups por mensaje
+const _propertyCache = new Map();
+const _PROPERTY_CACHE_TTL_MS = 5 * 60_000;
+
+async function getTenantProperties(tenantId) {
+  if (!tenantId) return [];
+  const cached = _propertyCache.get(tenantId);
+  if (cached && Date.now() - cached.ts < _PROPERTY_CACHE_TTL_MS) return cached.data;
+  try {
+    const { data } = await supabase
+      .from('properties')
+      .select('slug, name, brand_name')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true);
+    const list = data || [];
+    _propertyCache.set(tenantId, { data: list, ts: Date.now() });
+    return list;
+  } catch {
+    return [];
+  }
 }
 
 // ============================================================
-// Actualizar contexto de la conversación con datos extraídos
+// Actualizar contexto de la conversación con datos extraídos.
+// Property detection es dinámico: lee properties del tenant y matchea
+// nombre/brand_name/slug contra el mensaje. Sin hardcode al cliente piloto.
 // ============================================================
-async function updateConversationFromContext(conversationId, userMessage, agentResponse) {
+async function updateConversationFromContext(conversationId, userMessage, agentResponse, tenantId) {
   const combined = userMessage + ' ' + agentResponse;
   const updates = {};
 
@@ -861,9 +925,20 @@ async function updateConversationFromContext(conversationId, userMessage, agentR
     /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/g
   ];
 
-  // Detectar propiedad de interés
-  if (/isla palma|island/i.test(combined)) updates.property_interest = 'isla-palma';
-  else if (/tayrona/i.test(combined)) updates.property_interest = 'tayrona';
+  // Detectar propiedad de interés mediante lookup dinámico
+  if (tenantId) {
+    const props = await getTenantProperties(tenantId);
+    for (const p of props) {
+      const candidates = [p.name, p.brand_name, p.slug.replace(/-/g, ' ')]
+        .filter(Boolean)
+        .map((s) => s.toLowerCase());
+      const text = combined.toLowerCase();
+      if (candidates.some((c) => c && text.includes(c))) {
+        updates.property_interest = p.slug;
+        break;
+      }
+    }
+  }
 
   // Detectar idioma del mensaje del usuario
   const lang = detectLanguage(userMessage);
