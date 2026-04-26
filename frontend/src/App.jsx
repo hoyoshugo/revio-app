@@ -4,25 +4,31 @@ import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { SuperAdminProvider, useSuperAdmin } from './context/SuperAdminContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { ModulesProvider } from './hooks/useModules.jsx';
+import ToastContainer from './components/Toast.jsx';
 
 // Lazy imports for code splitting
-const LoginPage          = React.lazy(() => import('./components/Admin/LoginPage.jsx'));
-const Dashboard          = React.lazy(() => import('./components/Dashboard/Dashboard.jsx'));
-const SuperAdminLogin    = React.lazy(() => import('./components/SuperAdmin/SuperAdminLogin.jsx'));
-const SuperAdminLayout   = React.lazy(() => import('./components/SuperAdmin/SuperAdminLayout.jsx'));
-const LandingPage        = React.lazy(() => import('./pages/Landing/LandingPage.jsx'));
-const RegisterPage       = React.lazy(() => import('./pages/Register/RegisterPage.jsx'));
-const OnboardingWizard   = React.lazy(() => import('./pages/Onboarding/OnboardingWizard.jsx'));
-const LegalPage          = React.lazy(() => import('./pages/Legal/LegalPage.jsx'));
-const BookingPage        = React.lazy(() => import('./pages/BookingEngine/BookingPage.jsx'));
+const LoginPage = React.lazy(() => import('./components/Admin/LoginPage.jsx'));
+const Dashboard = React.lazy(() => import('./components/Dashboard/Dashboard.jsx'));
+const SuperAdminLogin = React.lazy(() => import('./components/SuperAdmin/SuperAdminLogin.jsx'));
+const SuperAdminLayout = React.lazy(() => import('./components/SuperAdmin/SuperAdminLayout.jsx'));
+const LandingPage = React.lazy(() => import('./pages/Landing/LandingPage.jsx'));
+const RegisterPage = React.lazy(() => import('./pages/Register/RegisterPage.jsx'));
+const OnboardingWizard = React.lazy(() => import('./pages/Onboarding/OnboardingWizard.jsx'));
+const LegalPage = React.lazy(() => import('./pages/Legal/LegalPage.jsx'));
+const BookingPage = React.lazy(() => import('./pages/BookingEngine/BookingPage.jsx'));
 const EcosystemVisualizer = React.lazy(() => import('./pages/Ecosystem/EcosystemVisualizer.jsx'));
-const POSTerminalPage    = React.lazy(() => import('./pages/POS/POSTerminalPage.jsx'));
+const POSTerminalPage = React.lazy(() => import('./pages/POS/POSTerminalPage.jsx'));
 
 function PageLoader() {
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
-      <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-        style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
+    <div
+      className="min-h-screen flex items-center justify-center"
+      style={{ background: 'var(--bg)' }}
+    >
+      <div
+        className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+        style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }}
+      />
     </div>
   );
 }
@@ -46,12 +52,16 @@ function PublicOnlyRoute({ children }) {
 export default function App() {
   return (
     <ThemeProvider>
+      <ToastContainer />
       <BrowserRouter>
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            {/* ── Public landing ── */}
+            {/* ── Root: redirect to /login (marketing vive en alzio.co, no aqui) ── */}
+            <Route path="/" element={<Navigate to="/login" replace />} />
+
+            {/* ── Landing interna SPA (reservada — alzio.co es el marketing canonico) ── */}
             <Route
-              path="/"
+              path="/landing"
               element={
                 <AuthProvider>
                   <PublicOnlyRoute>
@@ -62,19 +72,25 @@ export default function App() {
             />
 
             {/* ── Register & Onboarding (public) ── */}
-            <Route path="/register" element={
-              <AuthProvider>
-                <PublicOnlyRoute>
-                  <RegisterPage />
-                </PublicOnlyRoute>
-              </AuthProvider>
-            } />
+            <Route
+              path="/register"
+              element={
+                <AuthProvider>
+                  <PublicOnlyRoute>
+                    <RegisterPage />
+                  </PublicOnlyRoute>
+                </AuthProvider>
+              }
+            />
 
-            <Route path="/onboarding" element={
-              <AuthProvider>
-                <OnboardingWizard />
-              </AuthProvider>
-            } />
+            <Route
+              path="/onboarding"
+              element={
+                <AuthProvider>
+                  <OnboardingWizard />
+                </AuthProvider>
+              }
+            />
 
             {/* ── Legal docs (public) ── */}
             <Route path="/legal/:slug" element={<LegalPage />} />
@@ -87,13 +103,16 @@ export default function App() {
             <Route path="/ecosystem" element={<EcosystemVisualizer />} />
 
             {/* ── POS Terminal standalone (tablet mode) ── */}
-            <Route path="/pos" element={
-              <AuthProvider>
-                <ProtectedRoute>
-                  <POSTerminalPage />
-                </ProtectedRoute>
-              </AuthProvider>
-            } />
+            <Route
+              path="/pos"
+              element={
+                <AuthProvider>
+                  <ProtectedRoute>
+                    <POSTerminalPage />
+                  </ProtectedRoute>
+                </AuthProvider>
+              }
+            />
 
             {/* ── Superadmin (auth separada) ── */}
             <Route
@@ -122,7 +141,14 @@ export default function App() {
                 <AuthProvider>
                   <ModulesProvider>
                     <Routes>
-                      <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
+                      <Route
+                        path="/login"
+                        element={
+                          <PublicOnlyRoute>
+                            <LoginPage />
+                          </PublicOnlyRoute>
+                        }
+                      />
                       <Route
                         path="/*"
                         element={
