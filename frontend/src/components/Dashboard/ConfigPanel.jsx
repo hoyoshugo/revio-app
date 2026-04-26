@@ -166,7 +166,13 @@ function SectionCard({ title, children }) {
 }
 
 function toast(msg, ok = true) {
-  // Simple inline toast — no library needed
+  // Usa el sistema global window.alzioToast (montado en App.jsx).
+  // Fallback a inline DOM toast si el ToastContainer no está disponible.
+  if (typeof window !== 'undefined' && typeof window.alzioToast === 'function') {
+    window.alzioToast(msg, ok ? 'success' : 'error');
+    return;
+  }
+  // Fallback legacy
   const el = document.createElement('div');
   el.className = `fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium shadow-xl transition-all ${ok ? 'bg-green-800 text-green-100' : 'bg-red-800 text-red-100'}`;
   el.innerHTML = `${ok ? '✅' : '❌'} ${msg}`;

@@ -219,6 +219,32 @@ router.put('/tenants/:id', requireSuperadminAuth, async (req, res) => {
   }
 });
 
+// E-AGENT-7.2: PATCH billing-config — editar byok_required, platform_billing_enabled,
+// max_conversations_month sin tocar otros campos del tenant.
+router.patch('/tenants/:id/billing-config', requireSuperadminAuth, async (req, res) => {
+  try {
+    const allowed = ['byok_required', 'platform_billing_enabled', 'max_conversations_month'];
+    const updates = {};
+    for (const k of allowed) {
+      if (req.body[k] !== undefined) updates[k] = req.body[k];
+    }
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'Ningún campo válido para actualizar' });
+    }
+    updates.updated_at = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('tenants')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select('id, byok_required, platform_billing_enabled, max_conversations_month')
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/tenants/:id/toggle', requireSuperadminAuth, async (req, res) => {
   try {
     const { data: tenant } = await supabase.from('tenants').select('status, business_name, contact_phone').eq('id', req.params.id).single();

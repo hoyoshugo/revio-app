@@ -14,8 +14,19 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Brain, CreditCard, Building2, MessageCircle, Globe,
-  Eye, EyeOff, RefreshCw, HelpCircle, Save, CheckCircle2, AlertCircle, Circle,
+  Brain,
+  CreditCard,
+  Building2,
+  MessageCircle,
+  Globe,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  HelpCircle,
+  Save,
+  CheckCircle2,
+  AlertCircle,
+  Circle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useIntegrationGuide } from './IntegrationGuide.jsx';
@@ -26,105 +37,207 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 // CATÁLOGOS
 // ────────────────────────────────────────────────────────
 const AI_PROVIDERS = [
-  { key: 'anthropic', name: 'Claude', brand: 'Anthropic', icon: '🤖', guide: 'claude',
-    fields: [{ k: 'api_key', label: 'Anthropic API Key', placeholder: 'sk-ant-api03-...', secret: true }] },
-  { key: 'openai',    name: 'GPT-4',  brand: 'OpenAI',    icon: '🧠', guide: 'openai',
-    fields: [{ k: 'api_key', label: 'OpenAI API Key', placeholder: 'sk-...', secret: true }] },
-  { key: 'gemini',    name: 'Gemini', brand: 'Google',    icon: '✨', guide: 'gemini',
-    fields: [{ k: 'api_key', label: 'Google AI API Key', placeholder: 'AIza...', secret: true }] },
+  {
+    key: 'anthropic',
+    name: 'Claude',
+    brand: 'Anthropic',
+    icon: '🤖',
+    guide: 'claude',
+    fields: [
+      { k: 'api_key', label: 'Anthropic API Key', placeholder: 'sk-ant-api03-...', secret: true },
+    ],
+  },
+  {
+    key: 'openai',
+    name: 'GPT-4',
+    brand: 'OpenAI',
+    icon: '🧠',
+    guide: 'openai',
+    fields: [{ k: 'api_key', label: 'OpenAI API Key', placeholder: 'sk-...', secret: true }],
+  },
+  {
+    key: 'gemini',
+    name: 'Gemini',
+    brand: 'Google',
+    icon: '✨',
+    guide: 'gemini',
+    fields: [{ k: 'api_key', label: 'Google AI API Key', placeholder: 'AIza...', secret: true }],
+  },
 ];
 
 const PAYMENT_PROVIDERS = [
-  { key: 'wompi',       name: 'Wompi',         brand: 'Colombia',  icon: '💳', guide: 'wompi',
+  {
+    key: 'wompi',
+    name: 'Wompi',
+    brand: 'Colombia',
+    icon: '💳',
+    guide: 'wompi',
     fields: [
-      { k: 'public_key',  label: 'Llave pública',  placeholder: 'pub_prod_...', secret: false },
-      { k: 'private_key', label: 'Llave privada',  placeholder: 'prv_prod_...', secret: true  },
-    ] },
-  { key: 'mercadopago', name: 'Mercado Pago',  brand: 'LATAM',     icon: '🛒', guide: 'mercado_pago',
+      { k: 'public_key', label: 'Llave pública', placeholder: 'pub_prod_...', secret: false },
+      { k: 'private_key', label: 'Llave privada', placeholder: 'prv_prod_...', secret: true },
+    ],
+  },
+  {
+    key: 'mercadopago',
+    name: 'Mercado Pago',
+    brand: 'LATAM',
+    icon: '🛒',
+    guide: 'mercado_pago',
     fields: [
-      { k: 'access_token', label: 'Access Token',  placeholder: 'APP_USR-...', secret: true  },
-      { k: 'public_key',   label: 'Public Key',    placeholder: 'APP_USR-...', secret: false },
-    ] },
-  { key: 'stripe',      name: 'Stripe',        brand: 'Global',    icon: '💰', guide: 'stripe',
+      { k: 'access_token', label: 'Access Token', placeholder: 'APP_USR-...', secret: true },
+      { k: 'public_key', label: 'Public Key', placeholder: 'APP_USR-...', secret: false },
+    ],
+  },
+  {
+    key: 'stripe',
+    name: 'Stripe',
+    brand: 'Global',
+    icon: '💰',
+    guide: 'stripe',
     fields: [
-      { k: 'public_key',  label: 'Publishable Key', placeholder: 'pk_live_...', secret: false },
-      { k: 'secret_key',  label: 'Secret Key',      placeholder: 'sk_live_...', secret: true  },
-    ] },
-  { key: 'wise',        name: 'Wise',          brand: 'Global',    icon: '💸', guide: 'wise',
+      { k: 'public_key', label: 'Publishable Key', placeholder: 'pk_live_...', secret: false },
+      { k: 'secret_key', label: 'Secret Key', placeholder: 'sk_live_...', secret: true },
+    ],
+  },
+  {
+    key: 'wise',
+    name: 'Wise',
+    brand: 'Global',
+    icon: '💸',
+    guide: 'wise',
     fields: [
-      { k: 'api_token',  label: 'API Token',  placeholder: 'wise_token_...', secret: true  },
-      { k: 'profile_id', label: 'Profile ID', placeholder: '12345678',        secret: false },
-    ] },
-  { key: 'paypal',      name: 'PayPal',        brand: 'Internacional', icon: '🅿️', guide: 'paypal',
+      { k: 'api_token', label: 'API Token', placeholder: 'wise_token_...', secret: true },
+      { k: 'profile_id', label: 'Profile ID', placeholder: '12345678', secret: false },
+    ],
+  },
+  {
+    key: 'paypal',
+    name: 'PayPal',
+    brand: 'Internacional',
+    icon: '🅿️',
+    guide: 'paypal',
     fields: [
-      { k: 'client_id',     label: 'Client ID',     placeholder: 'A21AA...', secret: false },
-      { k: 'client_secret', label: 'Client Secret', placeholder: 'EL...',    secret: true  },
-    ] },
-  { key: 'payu',        name: 'PayU',          brand: 'LATAM',      icon: '🏦', guide: 'payu',
+      { k: 'client_id', label: 'Client ID', placeholder: 'A21AA...', secret: false },
+      { k: 'client_secret', label: 'Client Secret', placeholder: 'EL...', secret: true },
+    ],
+  },
+  {
+    key: 'payu',
+    name: 'PayU',
+    brand: 'LATAM',
+    icon: '🏦',
+    guide: 'payu',
     fields: [
-      { k: 'api_key',     label: 'API Key',     placeholder: '...', secret: true  },
-      { k: 'api_login',   label: 'API Login',   placeholder: '...', secret: false },
+      { k: 'api_key', label: 'API Key', placeholder: '...', secret: true },
+      { k: 'api_login', label: 'API Login', placeholder: '...', secret: false },
       { k: 'merchant_id', label: 'Merchant ID', placeholder: '...', secret: false },
-    ] },
+    ],
+  },
 ];
 
 const PMS_PROVIDERS = [
-  { key: 'lobbypms',  name: 'LobbyPMS',  brand: 'LATAM',     icon: '🏨', guide: 'lobbypms',
-    fields: [{ k: 'token', label: 'API Key', placeholder: 'lp_...', secret: true }] },
-  { key: 'cloudbeds', name: 'Cloudbeds', brand: 'Global',    icon: '☁️', guide: 'cloudbeds',
+  {
+    key: 'lobbypms',
+    name: 'LobbyPMS',
+    brand: 'LATAM',
+    icon: '🏨',
+    guide: 'lobbypms',
+    fields: [{ k: 'token', label: 'API Key', placeholder: 'lp_...', secret: true }],
+  },
+  {
+    key: 'cloudbeds',
+    name: 'Cloudbeds',
+    brand: 'Global',
+    icon: '☁️',
+    guide: 'cloudbeds',
     fields: [
-      { k: 'client_id',     label: 'Client ID',     placeholder: 'cb_client_...', secret: false },
-      { k: 'client_secret', label: 'Client Secret', placeholder: '...',           secret: true },
-      { k: 'property_id',   label: 'Hotel ID',      placeholder: '12345',         secret: false },
-    ] },
-  { key: 'mews',      name: 'Mews',      brand: 'Global',    icon: '🔷', guide: 'mews',
+      { k: 'client_id', label: 'Client ID', placeholder: 'cb_client_...', secret: false },
+      { k: 'client_secret', label: 'Client Secret', placeholder: '...', secret: true },
+      { k: 'property_id', label: 'Hotel ID', placeholder: '12345', secret: false },
+    ],
+  },
+  {
+    key: 'mews',
+    name: 'Mews',
+    brand: 'Global',
+    icon: '🔷',
+    guide: 'mews',
     fields: [
-      { k: 'access_token',  label: 'Access Token',   placeholder: 'mews_...', secret: true },
-      { k: 'enterprise_id', label: 'Enterprise ID',  placeholder: 'uuid',     secret: false },
-    ] },
-  { key: 'none',      name: 'Ninguno',   brand: 'Manual',    icon: '🚫', guide: null, fields: [] },
+      { k: 'access_token', label: 'Access Token', placeholder: 'mews_...', secret: true },
+      { k: 'enterprise_id', label: 'Enterprise ID', placeholder: 'uuid', secret: false },
+    ],
+  },
+  { key: 'none', name: 'Ninguno', brand: 'Manual', icon: '🚫', guide: null, fields: [] },
 ];
 
 const MESSAGING_CHANNELS = [
-  { key: 'whatsapp', name: 'WhatsApp Business', icon: '💬', guide: 'whatsapp',
+  {
+    key: 'whatsapp',
+    name: 'WhatsApp Business',
+    icon: '💬',
+    guide: 'whatsapp',
     fields: [
-      { k: 'token',    label: 'WhatsApp Access Token', placeholder: 'EAAJ...',           secret: true  },
-      { k: 'phone_id', label: 'Phone Number ID',       placeholder: '101206379439613',    secret: false },
-    ] },
-  { key: 'instagram', name: 'Instagram', icon: '📸', guide: 'instagram',
+      { k: 'token', label: 'WhatsApp Access Token', placeholder: 'EAAJ...', secret: true },
+      { k: 'phone_id', label: 'Phone Number ID', placeholder: '101206379439613', secret: false },
+    ],
+  },
+  {
+    key: 'instagram',
+    name: 'Instagram',
+    icon: '📸',
+    guide: 'instagram',
     note: 'Usa el mismo token de Facebook. Tu cuenta de Instagram debe estar vinculada a una Página de Facebook Business.',
     fields: [
       { k: 'business_id', label: 'Instagram Business ID', placeholder: '17841...', secret: false },
-    ] },
-  { key: 'facebook', name: 'Facebook Messenger', icon: '📘', guide: 'facebook',
+    ],
+  },
+  {
+    key: 'facebook',
+    name: 'Facebook Messenger',
+    icon: '📘',
+    guide: 'facebook',
     fields: [
-      { k: 'page_token', label: 'Page Access Token', placeholder: 'EAAJ...', secret: true  },
-      { k: 'page_id',    label: 'Page ID',           placeholder: '123...',  secret: false },
-    ] },
-  { key: 'google_business', name: 'Google Business Profile', icon: '🔍', guide: 'google_business',
-    note: 'La verificación OAuth se completa en un paso adicional por el equipo de Revio.',
+      { k: 'page_token', label: 'Page Access Token', placeholder: 'EAAJ...', secret: true },
+      { k: 'page_id', label: 'Page ID', placeholder: '123...', secret: false },
+    ],
+  },
+  {
+    key: 'google_business',
+    name: 'Google Business Profile',
+    icon: '🔍',
+    guide: 'google_business',
+    note: 'La verificación OAuth se completa en un paso adicional por el equipo de Alzio.',
     fields: [
-      { k: 'location_id', label: 'Business Profile ID', placeholder: 'accounts/.../locations/...', secret: false },
-    ] },
+      {
+        k: 'location_id',
+        label: 'Business Profile ID',
+        placeholder: 'accounts/.../locations/...',
+        secret: false,
+      },
+    ],
+  },
 ];
 
-// `enabled` controls whether the card is shown. Each OTA/review platform must
-// have a working API path that supports Alzio's purpose (respond inquiries,
-// respond reviews, close sales). When the partner application is approved and
-// the API integration ships, flip `enabled` to true.
-//   - tripadvisor: Content API is read-only; no public Reply API for individual
-//     hotels. Owners reply only via Owner Tools UI. Partner application required.
-//   - booking:     Connectivity Partner application required for Messaging API.
-//   - airbnb:      Software Partner application required for Messaging API.
-//   - expedia:     EPS / Conversations API requires enterprise integration.
-//   - hostelworld: Partner API access requires application.
-//   - despegar:    LATAM partner program application required.
+// `enabled` controls whether the card is rendered. Each OTA/review platform
+// must have a working API path that supports Alzio's purpose (respond
+// inquiries, respond reviews, close sales). Flip `enabled: true` for a key
+// once that partner program approves Alzio and the API integration ships.
+//   - tripadvisor: Content API is read-only; no public Reply API for
+//                  individual hotels. Owners reply only via Owner Tools UI.
+//                  Premium Partner application path documented but not viable
+//                  until Alzio reaches 100+ properties.
+//   - booking:     Connectivity Partner application sent (email partner_apply@).
+//   - airbnb:      Software Partner program closed to new applicants;
+//                  inquiry routed via host support channel.
+//   - expedia:     Rapid API web form submitted ("Thank you" confirmation).
+//   - hostelworld: Channel Manager API request sent (partner.support@).
+//   - despegar:    Email sent to rcalderon@hoteldo.com (regional rep, Colombia).
 const OTA_CHANNELS = [
-  { key: 'booking',     name: 'Booking.com',  icon: '🏩', guide: 'booking_ical',     enabled: false },
-  { key: 'airbnb',      name: 'Airbnb',       icon: '🏠', guide: 'airbnb_ical',      enabled: false },
-  { key: 'expedia',     name: 'Expedia',      icon: '🗺️', guide: 'expedia_ical',     enabled: false },
-  { key: 'hostelworld', name: 'Hostelworld',  icon: '🌍', guide: 'hostelworld_ical', enabled: false },
-  { key: 'despegar',    name: 'Despegar',     icon: '🛫', guide: 'despegar_ical',    enabled: false },
+  { key: 'booking', name: 'Booking.com', icon: '🏩', guide: 'booking_ical', enabled: false },
+  { key: 'airbnb', name: 'Airbnb', icon: '🏠', guide: 'airbnb_ical', enabled: false },
+  { key: 'expedia', name: 'Expedia', icon: '🗺️', guide: 'expedia_ical', enabled: false },
+  { key: 'hostelworld', name: 'Hostelworld', icon: '🌍', guide: 'hostelworld_ical', enabled: false },
+  { key: 'despegar', name: 'Despegar', icon: '🛫', guide: 'despegar_ical', enabled: false },
 ];
 
 const REVIEW_CHANNELS = [
@@ -136,10 +249,10 @@ const REVIEW_CHANNELS = [
 // ────────────────────────────────────────────────────────
 function HealthBadge({ status }) {
   const map = {
-    connected:      { emoji: '🟢', label: 'Conectado',      color: '#22c55e' },
-    unchecked:      { emoji: '🟡', label: 'Sin verificar',   color: '#f59e0b' },
-    error:          { emoji: '🔴', label: 'Error',           color: '#ef4444' },
-    not_configured: { emoji: '⚫', label: 'No configurado',  color: '#6b7280' },
+    connected: { emoji: '🟢', label: 'Conectado', color: '#22c55e' },
+    unchecked: { emoji: '🟡', label: 'Sin verificar', color: '#f59e0b' },
+    error: { emoji: '🔴', label: 'Error', color: '#ef4444' },
+    not_configured: { emoji: '⚫', label: 'No configurado', color: '#6b7280' },
   };
   const s = map[status] || map.not_configured;
   return (
@@ -156,20 +269,26 @@ function SecretField({ label, value, onChange, placeholder, secret = true }) {
   const [visible, setVisible] = useState(false);
   return (
     <div className="space-y-1">
-      <label className="text-xs" style={{ color: 'var(--text-2)' }}>{label}</label>
+      <label className="text-xs" style={{ color: 'var(--text-2)' }}>
+        {label}
+      </label>
       <div className="relative">
         <input
           type={secret && !visible ? 'password' : 'text'}
           value={value || ''}
-          onChange={e => onChange(e.target.value)}
+          onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           className="w-full rounded-lg px-3 py-2 text-sm pr-10 focus:outline-none"
-          style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+          style={{
+            background: 'var(--bg)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-1)',
+          }}
         />
         {secret && (
           <button
             type="button"
-            onClick={() => setVisible(v => !v)}
+            onClick={() => setVisible((v) => !v)}
             className="absolute top-1/2 right-2 -translate-y-1/2 p-1 rounded hover:bg-white/5"
             style={{ color: 'var(--text-2)' }}
           >
@@ -197,11 +316,17 @@ function ProviderCard({ provider, active, onSelect }) {
         {active && <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--accent)' }} />}
       </div>
       <div>
-        <div className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>{provider.name}</div>
-        <div className="text-xs" style={{ color: 'var(--text-2)' }}>{provider.brand}</div>
+        <div className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>
+          {provider.name}
+        </div>
+        <div className="text-xs" style={{ color: 'var(--text-2)' }}>
+          {provider.brand}
+        </div>
       </div>
-      <div className="mt-1 text-[10px] font-medium uppercase tracking-wider"
-        style={{ color: active ? 'var(--accent)' : 'var(--text-3)' }}>
+      <div
+        className="mt-1 text-[10px] font-medium uppercase tracking-wider"
+        style={{ color: active ? 'var(--accent)' : 'var(--text-3)' }}
+      >
         {active ? 'Activo ✓' : 'Seleccionar'}
       </div>
     </button>
@@ -227,11 +352,11 @@ function GuideButton({ guideId, onGuide }) {
 // PANEL PRINCIPAL
 // ────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'ai',         label: 'IA',                icon: Brain },
-  { id: 'payments',   label: 'Pagos',             icon: CreditCard },
-  { id: 'pms',        label: 'PMS',               icon: Building2 },
-  { id: 'messaging',  label: 'Canales Directos',  icon: MessageCircle },
-  { id: 'otas',       label: 'OTAs y Reseñas',    icon: Globe },
+  { id: 'ai', label: 'IA', icon: Brain },
+  { id: 'payments', label: 'Pagos', icon: CreditCard },
+  { id: 'pms', label: 'PMS', icon: Building2 },
+  { id: 'messaging', label: 'Canales Directos', icon: MessageCircle },
+  { id: 'otas', label: 'OTAs y Reseñas', icon: Globe },
 ];
 
 export default function IntegrationsPanel({ properties = [], token }) {
@@ -258,24 +383,39 @@ export default function IntegrationsPanel({ properties = [], token }) {
     setLoading(true);
     try {
       const [selRes, settRes, chanRes, healthRes] = await Promise.all([
-        fetch(`${API}/api/channels/${propertyId}/providers`, { headers: { Authorization: `Bearer ${tk}` } }),
-        fetch(`${API}/api/settings?property_id=${propertyId}`, { headers: { Authorization: `Bearer ${tk}` } }),
-        fetch(`${API}/api/channels/${propertyId}`,             { headers: { Authorization: `Bearer ${tk}` } }),
-        fetch(`${API}/api/integration-health?property_id=${propertyId}`, { headers: { Authorization: `Bearer ${tk}` } }),
+        fetch(`${API}/api/channels/${propertyId}/providers`, {
+          headers: { Authorization: `Bearer ${tk}` },
+        }),
+        fetch(`${API}/api/settings?property_id=${propertyId}`, {
+          headers: { Authorization: `Bearer ${tk}` },
+        }),
+        fetch(`${API}/api/channels/${propertyId}`, { headers: { Authorization: `Bearer ${tk}` } }),
+        fetch(`${API}/api/integration-health?property_id=${propertyId}`, {
+          headers: { Authorization: `Bearer ${tk}` },
+        }),
       ]);
-      if (selRes.ok)    setSelections((await selRes.json()).selections || {});
-      if (settRes.ok)   setConnections((await settRes.json()).settings?.connections || {});
-      if (chanRes.ok)   setChannels((await chanRes.json()).channels || []);
+      if (selRes.ok) setSelections((await selRes.json()).selections || {});
+      if (settRes.ok) setConnections((await settRes.json()).settings?.connections || {});
+      if (chanRes.ok) setChannels((await chanRes.json()).channels || []);
       if (healthRes.ok) setHealth((await healthRes.json()).health || {});
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+    }
     setLoading(false);
   }, [propertyId, tk]);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   function toast(msg, ok = true) {
-    // Simple toast via console + alert fallback. Se puede integrar con el sistema existente del proyecto.
-    console.log(ok ? '✅' : '❌', msg);
+    // Usa el sistema global window.alzioToast (montado en App.jsx).
+    // Fallback a console si el ToastContainer no está disponible.
+    if (typeof window !== 'undefined' && typeof window.alzioToast === 'function') {
+      window.alzioToast(msg, ok ? 'success' : 'error');
+    } else {
+      console.log(ok ? '✅' : '❌', msg);
+    }
   }
 
   async function saveProviderSelection(category, providerKey) {
@@ -285,24 +425,26 @@ export default function IntegrationsPanel({ properties = [], token }) {
         headers: { Authorization: `Bearer ${tk}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ category, providerKey }),
       });
-      setSelections(prev => ({ ...prev, [category]: providerKey }));
-    } catch (e) { toast('Error al cambiar proveedor: ' + e.message, false); }
+      setSelections((prev) => ({ ...prev, [category]: providerKey }));
+    } catch (e) {
+      toast('Error al cambiar proveedor: ' + e.message, false);
+    }
   }
 
   function updateConnection(section, key, value) {
-    setConnections(prev => ({
+    setConnections((prev) => ({
       ...prev,
       [section]: { ...(prev[section] || {}), [key]: value },
     }));
   }
 
   function channelOf(channelKey) {
-    return channels.find(c => c.channel_key === channelKey) || { channel_key: channelKey };
+    return channels.find((c) => c.channel_key === channelKey) || { channel_key: channelKey };
   }
 
   function updateChannel(channelKey, patch) {
-    setChannels(prev => {
-      const idx = prev.findIndex(c => c.channel_key === channelKey);
+    setChannels((prev) => {
+      const idx = prev.findIndex((c) => c.channel_key === channelKey);
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = { ...next[idx], ...patch };
@@ -337,11 +479,11 @@ export default function IntegrationsPanel({ properties = [], token }) {
 
       // 3. Sincronizar iCal urls al key dedicado para el cron OTA sync
       const icalSummary = {
-        booking_url:     channelOf('booking').ical_url     || '',
-        airbnb_url:      channelOf('airbnb').ical_url      || '',
+        booking_url: channelOf('booking').ical_url || '',
+        airbnb_url: channelOf('airbnb').ical_url || '',
         hostelworld_url: channelOf('hostelworld').ical_url || '',
-        expedia_url:     channelOf('expedia').ical_url     || '',
-        vrbo_url:        '',
+        expedia_url: channelOf('expedia').ical_url || '',
+        vrbo_url: '',
       };
       await fetch(`${API}/api/settings`, {
         method: 'PUT',
@@ -351,7 +493,9 @@ export default function IntegrationsPanel({ properties = [], token }) {
 
       toast('Credenciales guardadas');
       await verifyAll();
-    } catch (e) { toast('Error al guardar: ' + e.message, false); }
+    } catch (e) {
+      toast('Error al guardar: ' + e.message, false);
+    }
     setSaving(false);
   }
 
@@ -367,7 +511,9 @@ export default function IntegrationsPanel({ properties = [], token }) {
         headers: { Authorization: `Bearer ${tk}` },
       });
       if (h.ok) setHealth((await h.json()).health || {});
-    } catch (e) { toast('Error al verificar: ' + e.message, false); }
+    } catch (e) {
+      toast('Error al verificar: ' + e.message, false);
+    }
     setVerifying(false);
   }
 
@@ -381,7 +527,9 @@ export default function IntegrationsPanel({ properties = [], token }) {
         headers: { Authorization: `Bearer ${tk}` },
       });
       if (ch.ok) setChannels((await ch.json()).channels || []);
-    } catch (e) { toast('Error: ' + e.message, false); }
+    } catch (e) {
+      toast('Error: ' + e.message, false);
+    }
   }
 
   const healthOf = (key) => health[key]?.status || 'unchecked';
@@ -389,11 +537,11 @@ export default function IntegrationsPanel({ properties = [], token }) {
   // ── Render helpers por tab ────────────────────────────
   function renderProviderTab(category, providers) {
     const active = selections[category];
-    const provider = providers.find(p => p.key === active) || providers[0];
+    const provider = providers.find((p) => p.key === active) || providers[0];
     return (
       <div className="space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {providers.map(p => (
+          {providers.map((p) => (
             <ProviderCard
               key={p.key}
               provider={p}
@@ -412,15 +560,19 @@ export default function IntegrationsPanel({ properties = [], token }) {
               <div className="flex items-center gap-2">
                 <span className="text-xl">{provider.icon}</span>
                 <div>
-                  <div className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>{provider.name}</div>
-                  <div className="text-[11px]" style={{ color: 'var(--text-2)' }}>{provider.brand}</div>
+                  <div className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>
+                    {provider.name}
+                  </div>
+                  <div className="text-[11px]" style={{ color: 'var(--text-2)' }}>
+                    {provider.brand}
+                  </div>
                 </div>
               </div>
               <HealthBadge status={healthOf(provider.key)} />
             </div>
 
             <div className="space-y-2">
-              {provider.fields.map(field => (
+              {provider.fields.map((field) => (
                 <SecretField
                   key={field.k}
                   label={field.label}
@@ -439,7 +591,11 @@ export default function IntegrationsPanel({ properties = [], token }) {
                 onClick={verifyAll}
                 disabled={verifying}
                 className="text-[11px] px-3 py-1.5 rounded-lg font-medium disabled:opacity-50"
-                style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+                style={{
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-1)',
+                }}
               >
                 {verifying ? 'Verificando...' : 'Verificar conexión'}
               </button>
@@ -466,7 +622,7 @@ export default function IntegrationsPanel({ properties = [], token }) {
   function renderMessagingTab() {
     return (
       <div className="space-y-3">
-        {MESSAGING_CHANNELS.map(ch => (
+        {MESSAGING_CHANNELS.map((ch) => (
           <div
             key={ch.key}
             className="rounded-xl p-4 space-y-3"
@@ -475,7 +631,9 @@ export default function IntegrationsPanel({ properties = [], token }) {
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
                 <span className="text-xl">{ch.icon}</span>
-                <div className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>{ch.name}</div>
+                <div className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>
+                  {ch.name}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <HealthBadge status={healthOf(ch.key)} />
@@ -484,14 +642,16 @@ export default function IntegrationsPanel({ properties = [], token }) {
             </div>
 
             {ch.note && (
-              <div className="text-[11px] px-3 py-2 rounded-lg"
-                style={{ background: 'var(--bg)', color: 'var(--text-2)' }}>
+              <div
+                className="text-[11px] px-3 py-2 rounded-lg"
+                style={{ background: 'var(--bg)', color: 'var(--text-2)' }}
+              >
                 ℹ️ {ch.note}
               </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {ch.fields.map(field => (
+              {ch.fields.map((field) => (
                 <SecretField
                   key={field.k}
                   label={field.label}
@@ -508,7 +668,11 @@ export default function IntegrationsPanel({ properties = [], token }) {
                 type="button"
                 onClick={() => verifyChannel(ch.key)}
                 className="text-[11px] px-3 py-1.5 rounded-lg font-medium"
-                style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+                style={{
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-1)',
+                }}
               >
                 Verificar
               </button>
@@ -523,19 +687,19 @@ export default function IntegrationsPanel({ properties = [], token }) {
     return (
       <div className="space-y-6">
         {/* ── SUB-SECCIÓN 1: Reseñas IA — solo si al menos 1 canal habilitado ──── */}
-        {REVIEW_CHANNELS.some(c => c.enabled) && (
+        {REVIEW_CHANNELS.some((c) => c.enabled) && (
         <div>
           <div className="mb-3">
             <h3 className="text-sm font-bold" style={{ color: 'var(--text-1)' }}>
               📝 Reseñas — IA redacta, tú publicas
             </h3>
             <p className="text-xs mt-1" style={{ color: 'var(--text-2)' }}>
-              El agente lee las reseñas nuevas, genera la respuesta perfecta y te notifica
-              para que la publiques con un clic.
+              El agente lee las reseñas nuevas, genera la respuesta perfecta y te notifica para que
+              la publiques con un clic.
             </p>
           </div>
           <div className="space-y-2">
-            {REVIEW_CHANNELS.filter(ch => ch.enabled).map(ch => {
+            {REVIEW_CHANNELS.filter((ch) => ch.enabled).map((ch) => {
               const row = channelOf(ch.key);
               return (
                 <div
@@ -546,37 +710,61 @@ export default function IntegrationsPanel({ properties = [], token }) {
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2">
                       <span className="text-xl">{ch.icon}</span>
-                      <div className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>{ch.name}</div>
+                      <div className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>
+                        {ch.name}
+                      </div>
                     </div>
                     <GuideButton guideId={ch.guide} onGuide={openGuide} />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs" style={{ color: 'var(--text-2)' }}>URL de tu propiedad en {ch.name}</label>
+                    <label className="text-xs" style={{ color: 'var(--text-2)' }}>
+                      URL de tu propiedad en {ch.name}
+                    </label>
                     <input
                       type="text"
                       value={row.profile_url || ''}
-                      onChange={e => updateChannel(ch.key, { profile_url: e.target.value, channel_type: 'review' })}
+                      onChange={(e) =>
+                        updateChannel(ch.key, {
+                          profile_url: e.target.value,
+                          channel_type: 'review',
+                        })
+                      }
                       placeholder="https://..."
                       className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none"
-                      style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+                      style={{
+                        background: 'var(--bg)',
+                        border: '1px solid var(--border)',
+                        color: 'var(--text-1)',
+                      }}
                     />
                   </div>
                   {ch.key === 'tripadvisor' && (
                     <div className="space-y-1">
-                      <label className="text-xs" style={{ color: 'var(--text-2)' }}>TripAdvisor API Key (opcional)</label>
+                      <label className="text-xs" style={{ color: 'var(--text-2)' }}>
+                        TripAdvisor API Key (opcional)
+                      </label>
                       <input
                         type="password"
                         value={connections[ch.key]?.api_key || ''}
-                        onChange={e => updateConnection(ch.key, 'api_key', e.target.value)}
+                        onChange={(e) => updateConnection(ch.key, 'api_key', e.target.value)}
                         placeholder="Para Content API..."
                         className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none"
-                        style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+                        style={{
+                          background: 'var(--bg)',
+                          border: '1px solid var(--border)',
+                          color: 'var(--text-1)',
+                        }}
                       />
                     </div>
                   )}
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[9px] px-2 py-0.5 rounded-full font-medium"
-                      style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}>
+                    <span
+                      className="text-[9px] px-2 py-0.5 rounded-full font-medium"
+                      style={{
+                        background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+                        color: 'var(--accent)',
+                      }}
+                    >
                       🤖 IA redacta · 👤 Tú publicas
                     </span>
                   </div>
@@ -585,11 +773,21 @@ export default function IntegrationsPanel({ properties = [], token }) {
             })}
             <div
               className="rounded-xl p-3 text-xs"
-              style={{ background: 'var(--bg)', border: '1px dashed var(--border)', color: 'var(--text-2)' }}
+              style={{
+                background: 'var(--bg)',
+                border: '1px dashed var(--border)',
+                color: 'var(--text-2)',
+              }}
             >
-              ℹ️ <strong>Google Reviews</strong> se configura junto con <strong>Google Business Profile</strong> en el tab Canales Directos.
-              <span className="ml-2 inline-block px-2 py-0.5 rounded-full"
-                style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}>
+              ℹ️ <strong>Google Reviews</strong> se configura junto con{' '}
+              <strong>Google Business Profile</strong> en el tab Canales Directos.
+              <span
+                className="ml-2 inline-block px-2 py-0.5 rounded-full"
+                style={{
+                  background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+                  color: 'var(--accent)',
+                }}
+              >
                 🤖 IA redacta · 👤 Tú publicas
               </span>
             </div>
@@ -598,19 +796,19 @@ export default function IntegrationsPanel({ properties = [], token }) {
         )}
 
         {/* ── SUB-SECCIÓN 2: OTAs — solo si al menos 1 canal habilitado ──────── */}
-        {OTA_CHANNELS.some(c => c.enabled) && (
+        {OTA_CHANNELS.some((c) => c.enabled) && (
         <div>
           <div className="mb-3">
             <h3 className="text-sm font-bold" style={{ color: 'var(--text-1)' }}>
               🏨 OTAs — Optimización y visibilidad
             </h3>
             <p className="text-xs mt-1" style={{ color: 'var(--text-2)' }}>
-              Mantén tus perfiles actualizados. La mensajería directa en OTAs estará
-              disponible cuando Revio complete la certificación como Connectivity Partner.
+              Mantén tus perfiles actualizados. La mensajería directa en OTAs estará disponible
+              cuando Alzio complete la certificación como Connectivity Partner.
             </p>
           </div>
           <div className="space-y-2">
-            {OTA_CHANNELS.filter(ch => ch.enabled).map(ch => {
+            {OTA_CHANNELS.filter((ch) => ch.enabled).map((ch) => {
               const row = channelOf(ch.key);
               const configured = !!row.profile_url;
               return (
@@ -622,11 +820,19 @@ export default function IntegrationsPanel({ properties = [], token }) {
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2">
                       <span className="text-xl">{ch.icon}</span>
-                      <div className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>{ch.name}</div>
+                      <div className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>
+                        {ch.name}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium"
-                        style={{ color: configured ? '#22c55e' : '#6b7280', borderColor: configured ? '#22c55e' : '#6b7280', background: (configured ? '#22c55e' : '#6b7280') + '15' }}>
+                      <span
+                        className="text-[10px] px-2 py-0.5 rounded-full border font-medium"
+                        style={{
+                          color: configured ? '#22c55e' : '#6b7280',
+                          borderColor: configured ? '#22c55e' : '#6b7280',
+                          background: (configured ? '#22c55e' : '#6b7280') + '15',
+                        }}
+                      >
                         {configured ? '✅ Configurado' : '⚫ Sin configurar'}
                       </span>
                       <GuideButton guideId={ch.guide} onGuide={openGuide} />
@@ -634,14 +840,25 @@ export default function IntegrationsPanel({ properties = [], token }) {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div className="space-y-1">
-                      <label className="text-xs" style={{ color: 'var(--text-2)' }}>URL de tu perfil público</label>
+                      <label className="text-xs" style={{ color: 'var(--text-2)' }}>
+                        URL de tu perfil público
+                      </label>
                       <input
                         type="text"
                         value={row.profile_url || ''}
-                        onChange={e => updateChannel(ch.key, { profile_url: e.target.value, channel_type: 'ota' })}
+                        onChange={(e) =>
+                          updateChannel(ch.key, {
+                            profile_url: e.target.value,
+                            channel_type: 'ota',
+                          })
+                        }
                         placeholder="https://..."
                         className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none"
-                        style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+                        style={{
+                          background: 'var(--bg)',
+                          border: '1px solid var(--border)',
+                          color: 'var(--text-1)',
+                        }}
                       />
                     </div>
                     <div className="flex items-end">
@@ -651,7 +868,11 @@ export default function IntegrationsPanel({ properties = [], token }) {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-[11px] px-3 py-2 rounded-lg flex items-center gap-1"
-                          style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+                          style={{
+                            background: 'var(--bg)',
+                            border: '1px solid var(--border)',
+                            color: 'var(--text-1)',
+                          }}
                         >
                           🔗 Ver perfil
                         </a>
@@ -659,8 +880,13 @@ export default function IntegrationsPanel({ properties = [], token }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[9px] px-2 py-0.5 rounded-full font-medium"
-                      style={{ background: 'color-mix(in srgb, #f59e0b 15%, transparent)', color: '#f59e0b' }}>
+                    <span
+                      className="text-[9px] px-2 py-0.5 rounded-full font-medium"
+                      style={{
+                        background: 'color-mix(in srgb, #f59e0b 15%, transparent)',
+                        color: '#f59e0b',
+                      }}
+                    >
                       💬 Mensajería directa: En certificación
                     </span>
                   </div>
@@ -689,17 +915,40 @@ export default function IntegrationsPanel({ properties = [], token }) {
           </div>
           <div className="space-y-2">
             {[
-              { icon: '✅', title: 'FASE 1 (Actual)', desc: 'Canales directos: WhatsApp, Instagram, Facebook' },
-              { icon: '🔄', title: 'FASE 2 (Q3 2025)', desc: 'Aplicación Connectivity Partner Booking.com + Airbnb' },
-              { icon: '📋', title: 'FASE 3 (Q4 2025)', desc: 'Mensajería Booking.com vía API certificada' },
-              { icon: '🚀', title: 'FASE 4 (2026)', desc: 'Channel Manager propio + todas las OTAs' },
+              {
+                icon: '✅',
+                title: 'FASE 1 (Actual)',
+                desc: 'Canales directos: WhatsApp, Instagram, Facebook',
+              },
+              {
+                icon: '🔄',
+                title: 'FASE 2 (Q3 2025)',
+                desc: 'Aplicación Connectivity Partner Booking.com + Airbnb',
+              },
+              {
+                icon: '📋',
+                title: 'FASE 3 (Q4 2025)',
+                desc: 'Mensajería Booking.com vía API certificada',
+              },
+              {
+                icon: '🚀',
+                title: 'FASE 4 (2026)',
+                desc: 'Channel Manager propio + todas las OTAs',
+              },
             ].map((p, i) => (
-              <div key={i} className="flex items-start gap-2 px-3 py-2 rounded-lg"
-                style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+              <div
+                key={i}
+                className="flex items-start gap-2 px-3 py-2 rounded-lg"
+                style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+              >
                 <span className="text-lg">{p.icon}</span>
                 <div>
-                  <div className="text-xs font-bold" style={{ color: 'var(--text-1)' }}>{p.title}</div>
-                  <div className="text-[11px]" style={{ color: 'var(--text-2)' }}>{p.desc}</div>
+                  <div className="text-xs font-bold" style={{ color: 'var(--text-1)' }}>
+                    {p.title}
+                  </div>
+                  <div className="text-[11px]" style={{ color: 'var(--text-2)' }}>
+                    {p.desc}
+                  </div>
                 </div>
               </div>
             ))}
@@ -712,10 +961,14 @@ export default function IntegrationsPanel({ properties = [], token }) {
               <input
                 type="email"
                 value={draftWaitlistEmail}
-                onChange={e => setDraftWaitlistEmail(e.target.value)}
+                onChange={(e) => setDraftWaitlistEmail(e.target.value)}
                 placeholder="tu@email.com"
                 className="flex-1 rounded-lg px-3 py-2 text-sm"
-                style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+                style={{
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-1)',
+                }}
               />
               <button
                 onClick={async () => {
@@ -732,7 +985,9 @@ export default function IntegrationsPanel({ properties = [], token }) {
                     });
                     setDraftWaitlistEmail('');
                     toast('Te avisaremos cuando esté disponible');
-                  } catch (e) { toast('Error: ' + e.message, false); }
+                  } catch (e) {
+                    toast('Error: ' + e.message, false);
+                  }
                 }}
                 className="text-xs px-3 py-2 rounded-lg font-medium"
                 style={{ background: 'var(--accent)', color: '#fff' }}
@@ -753,21 +1008,33 @@ export default function IntegrationsPanel({ properties = [], token }) {
       {/* Selector de propiedad */}
       {props.length > 1 && (
         <div className="flex items-center gap-2">
-          <label className="text-xs" style={{ color: 'var(--text-2)' }}>Propiedad:</label>
+          <label className="text-xs" style={{ color: 'var(--text-2)' }}>
+            Propiedad:
+          </label>
           <select
             value={propertyId}
-            onChange={e => setPropertyId(e.target.value)}
+            onChange={(e) => setPropertyId(e.target.value)}
             className="rounded-lg px-3 py-1.5 text-sm"
-            style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+            style={{
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-1)',
+            }}
           >
-            {props.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {props.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
           </select>
         </div>
       )}
 
       {/* Tabs */}
-      <div className="flex flex-wrap gap-1 p-1 rounded-xl"
-        style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+      <div
+        className="flex flex-wrap gap-1 p-1 rounded-xl"
+        style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+      >
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -775,7 +1042,10 @@ export default function IntegrationsPanel({ properties = [], token }) {
             onClick={() => setActiveTab(id)}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
             style={{
-              background: activeTab === id ? 'color-mix(in srgb, var(--accent) 20%, transparent)' : 'transparent',
+              background:
+                activeTab === id
+                  ? 'color-mix(in srgb, var(--accent) 20%, transparent)'
+                  : 'transparent',
               color: activeTab === id ? 'var(--accent)' : 'var(--text-2)',
               fontWeight: activeTab === id ? 600 : 400,
             }}
@@ -794,11 +1064,11 @@ export default function IntegrationsPanel({ properties = [], token }) {
 
       {!loading && (
         <div className="pb-24">
-          {activeTab === 'ai'        && renderProviderTab('ai',       AI_PROVIDERS)}
-          {activeTab === 'payments'  && renderProviderTab('payments', PAYMENT_PROVIDERS)}
-          {activeTab === 'pms'       && renderProviderTab('pms',      PMS_PROVIDERS)}
+          {activeTab === 'ai' && renderProviderTab('ai', AI_PROVIDERS)}
+          {activeTab === 'payments' && renderProviderTab('payments', PAYMENT_PROVIDERS)}
+          {activeTab === 'pms' && renderProviderTab('pms', PMS_PROVIDERS)}
           {activeTab === 'messaging' && renderMessagingTab()}
-          {activeTab === 'otas'      && renderOtasTab()}
+          {activeTab === 'otas' && renderOtasTab()}
         </div>
       )}
 
@@ -816,7 +1086,11 @@ export default function IntegrationsPanel({ properties = [], token }) {
           onClick={verifyAll}
           disabled={verifying}
           className="text-xs px-3 py-2 rounded-xl font-medium disabled:opacity-50 inline-flex items-center gap-1.5"
-          style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+          style={{
+            background: 'var(--bg)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-1)',
+          }}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${verifying ? 'animate-spin' : ''}`} />
           {verifying ? 'Verificando...' : 'Verificar ahora'}
