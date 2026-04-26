@@ -265,13 +265,13 @@ async function notifyGuestCancellation(booking, { policy, penaltyAmount, refundA
   const messages = {
     es: {
       subject: `Tu reserva en ${property?.name} ha sido cancelada`,
-      message: `Hola ${booking.guest_name},\n\nTu reserva en ${property?.name} ha sido cancelada.\n\n📅 Check-in: ${booking.checkin_date}\n\n${policyText}\n${refundEligible ? `💳 Reembolso: $${(refundAmount/1000000).toFixed(1)}M COP (procesando en 5-10 días hábiles).` : ''}\n\nEsperamos verte en una próxima visita 🌊\n\nEquipo Mística`,
-      html: `<h2>Cancelación confirmada</h2><p>Hola <strong>${booking.guest_name}</strong>,</p><p>Tu reserva en <strong>${property?.name}</strong> ha sido cancelada.</p><p>${policyText}</p>${refundEligible ? `<p><strong>Reembolso:</strong> $${(refundAmount/1000000).toFixed(1)}M COP (5-10 días hábiles)</p>` : ''}<p>Equipo Mística 🌊</p>`
+      message: `Hola ${booking.guest_name},\n\nTu reserva en ${property?.name} ha sido cancelada.\n\n📅 Check-in: ${booking.checkin_date}\n\n${policyText}\n${refundEligible ? `💳 Reembolso: $${(refundAmount/1000000).toFixed(1)}M COP (procesando en 5-10 días hábiles).` : ''}\n\nEsperamos verte en una próxima visita 🌊\n\nEquipo ${property?.name || 'del hotel'}`,
+      html: `<h2>Cancelación confirmada</h2><p>Hola <strong>${booking.guest_name}</strong>,</p><p>Tu reserva en <strong>${property?.name}</strong> ha sido cancelada.</p><p>${policyText}</p>${refundEligible ? `<p><strong>Reembolso:</strong> $${(refundAmount/1000000).toFixed(1)}M COP (5-10 días hábiles)</p>` : ''}<p>Equipo ${property?.name || 'del hotel'} 🌊</p>`
     },
     en: {
       subject: `Your booking at ${property?.name} has been cancelled`,
-      message: `Hi ${booking.guest_name},\n\nYour booking at ${property?.name} has been cancelled.\n\n📅 Check-in: ${booking.checkin_date}\n\n${policyText}\n${refundEligible ? `💳 Refund: $${(refundAmount/1000000).toFixed(1)}M COP (processing in 5-10 business days).` : ''}\n\nHope to see you on a future visit 🌊\n\nMística Team`,
-      html: `<h2>Cancellation confirmed</h2><p>Hi <strong>${booking.guest_name}</strong>,</p><p>Your booking at <strong>${property?.name}</strong> has been cancelled.</p><p>${policyText}</p>${refundEligible ? `<p><strong>Refund:</strong> $${(refundAmount/1000000).toFixed(1)}M COP (5-10 business days)</p>` : ''}<p>Mística Team 🌊</p>`
+      message: `Hi ${booking.guest_name},\n\nYour booking at ${property?.name} has been cancelled.\n\n📅 Check-in: ${booking.checkin_date}\n\n${policyText}\n${refundEligible ? `💳 Refund: $${(refundAmount/1000000).toFixed(1)}M COP (processing in 5-10 business days).` : ''}\n\nHope to see you on a future visit 🌊\n\n${property?.name || 'The hotel'} Team`,
+      html: `<h2>Cancellation confirmed</h2><p>Hi <strong>${booking.guest_name}</strong>,</p><p>Your booking at <strong>${property?.name}</strong> has been cancelled.</p><p>${policyText}</p>${refundEligible ? `<p><strong>Refund:</strong> $${(refundAmount/1000000).toFixed(1)}M COP (5-10 business days)</p>` : ''}<p>${property?.name || 'The hotel'} Team 🌊</p>`
     }
   };
 

@@ -15,12 +15,29 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
+import bcrypt from 'bcryptjs';
 import { supabase } from '../models/supabase.js';
-import { requireAuth, requireSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, requireSuperAdmin, requireRole } from '../middleware/auth.js';
 import { encryptAiConfig, decryptAiConfig } from '../services/encryption.js';
 import { getLobbyPMSToken, getWompiConfig, getWhatsAppConfig } from '../services/connectionService.js';
 
 const router = Router();
+const BCRYPT_ROUNDS = 10;
+
+async function logRbacAction(req, action, targetUserId, before, after) {
+  try {
+    await supabase.from('rbac_audit_log').insert({
+      tenant_id: req.user?.tenant_id || null,
+      actor_user_id: req.user?.id || null,
+      target_user_id: targetUserId,
+      action,
+      before_state: before || null,
+      after_state: after || null,
+      ip_address: req.ip || null,
+      user_agent: req.headers['user-agent'] || null,
+    });
+  } catch { /* audit table puede no existir aun */ }
+}
 
 // ============================================================
 // HELPERS
@@ -194,46 +211,257 @@ router.get('/users', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/users', requireAuth, async (req, res) => {
+router.post('/users', requireRole('admin', 'manager'), async (req, res) => {
   const { email, name, role, property_id, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'email y password son requeridos' });
+  if (password.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
   try {
-    const { data: existing } = await supabase.from('users').select('id').eq('email', email.toLowerCase()).single();
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .maybeSingle();
     if (existing) return res.status(409).json({ error: 'El email ya está registrado' });
 
-    const { data, error } = await supabase.from('users').insert({
-      email: email.toLowerCase().trim(),
-      name,
-      role: role || 'staff',
-      property_id: property_id || null,
-      password_hash: password, // plaintext como el resto del sistema
-      is_active: true
-    }).select('id, email, name, role, property_id, is_active, created_at').single();
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+
+    const { data, error } = await supabase
+      .from('users')
+      .insert({
+        email: email.toLowerCase().trim(),
+        name,
+        role: role || 'staff',
+        property_id: property_id || null,
+        password_hash: passwordHash,
+        password_hash_version: 1,
+        password_changed_at: new Date().toISOString(),
+        is_active: true,
+      })
+      .select('id, email, name, role, property_id, is_active, created_at')
+      .single();
 
     if (error) throw error;
+
+    // Asociar al tenant via tenant_members si el caller tiene tenant_id
+    if (req.user?.tenant_id) {
+      try {
+        const tenantRoleMap = {
+          super_admin: 'admin',
+          admin: 'admin',
+          manager: 'manager',
+          owner: 'owner',
+          staff: 'operator',
+          receptionist: 'operator',
+          marketing: 'operator',
+          readonly: 'viewer',
+        };
+        await supabase.from('tenant_members').insert({
+          tenant_id: req.user.tenant_id,
+          user_id: data.id,
+          role: tenantRoleMap[role || 'staff'] || 'viewer',
+          invited_by: req.user.id,
+          is_active: true,
+        });
+      } catch { /* tabla puede no existir aun */ }
+    }
+
+    await logRbacAction(req, 'create_user', data.id, null, { email: data.email, role: data.role });
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-router.put('/users/:id', requireAuth, async (req, res) => {
+router.put('/users/:id', requireRole('admin', 'manager'), async (req, res) => {
   const { name, role, property_id, is_active, password } = req.body;
   try {
+    // Self-protection: un manager no puede degradar a un admin/owner
+    const { data: target } = await supabase
+      .from('users')
+      .select('id, email, role, property_id, is_active')
+      .eq('id', req.params.id)
+      .single();
+    if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
+
     const updates = {};
-    if (name !== undefined)        updates.name        = name;
-    if (role !== undefined)        updates.role        = role;
+    if (name !== undefined) updates.name = name;
+    if (role !== undefined) updates.role = role;
     if (property_id !== undefined) updates.property_id = property_id;
-    if (is_active !== undefined)   updates.is_active   = is_active;
-    if (password)                  updates.password_hash = password;
+    if (is_active !== undefined) updates.is_active = is_active;
+    if (password) {
+      if (password.length < 8) {
+        return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+      }
+      updates.password_hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+      updates.password_hash_version = 1;
+      updates.password_changed_at = new Date().toISOString();
+    }
 
     const { data, error } = await supabase
       .from('users')
       .update(updates)
       .eq('id', req.params.id)
-      .select('id, email, name, role, property_id, is_active').single();
+      .select('id, email, name, role, property_id, is_active')
+      .single();
     if (error) throw error;
+
+    const action = password ? 'reset_password' : 'update_user';
+    await logRbacAction(req, action, data.id, target, { ...target, ...updates });
     res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ────────────────────────────────────────────────────────────
+// DELETE /api/settings/users/:id — desactivar (soft delete)
+// Solo owner/admin pueden borrar. No se borra fila para preservar audit log.
+// ────────────────────────────────────────────────────────────
+router.delete('/users/:id', requireRole('admin'), async (req, res) => {
+  try {
+    if (req.user.id === req.params.id) {
+      return res.status(400).json({ error: 'No puedes eliminarte a ti mismo' });
+    }
+    const { data: target } = await supabase
+      .from('users')
+      .select('id, email, role, is_active')
+      .eq('id', req.params.id)
+      .single();
+    if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    // No permitir borrar al ultimo owner del tenant
+    if (req.user.tenant_id) {
+      try {
+        const { data: tm } = await supabase
+          .from('tenant_members')
+          .select('id, user_id, role, is_active')
+          .eq('tenant_id', req.user.tenant_id)
+          .eq('role', 'owner')
+          .eq('is_active', true);
+        const isLastOwner = tm?.length === 1 && tm[0].user_id === req.params.id;
+        if (isLastOwner) {
+          return res.status(400).json({ error: 'No puedes eliminar al último owner del tenant' });
+        }
+      } catch { /* tabla puede no existir */ }
+    }
+
+    await supabase
+      .from('users')
+      .update({ is_active: false })
+      .eq('id', req.params.id);
+
+    if (req.user.tenant_id) {
+      try {
+        await supabase
+          .from('tenant_members')
+          .update({ is_active: false })
+          .eq('tenant_id', req.user.tenant_id)
+          .eq('user_id', req.params.id);
+      } catch { /* */ }
+    }
+
+    await logRbacAction(req, 'delete', req.params.id, target, { is_active: false });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ────────────────────────────────────────────────────────────
+// POST /api/settings/users/:id/reset-password
+// Solo owner/admin pueden resetear. Genera password temporal random
+// (12 chars), retorna en response. El usuario debe cambiarla al login.
+// ────────────────────────────────────────────────────────────
+router.post('/users/:id/reset-password', requireRole('admin'), async (req, res) => {
+  try {
+    const { data: target } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('id', req.params.id)
+      .single();
+    if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    // Random password 12 chars sin chars confusos (sin O 0 l 1 I)
+    const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    let temp = '';
+    for (let i = 0; i < 12; i++) {
+      temp += charset[Math.floor(Math.random() * charset.length)];
+    }
+
+    const passwordHash = await bcrypt.hash(temp, BCRYPT_ROUNDS);
+    await supabase
+      .from('users')
+      .update({
+        password_hash: passwordHash,
+        password_hash_version: 1,
+        password_changed_at: new Date().toISOString(),
+      })
+      .eq('id', req.params.id);
+
+    await logRbacAction(req, 'reset_password', target.id, null, { email: target.email });
+    res.json({ success: true, email: target.email, temporary_password: temp });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ────────────────────────────────────────────────────────────
+// POST /api/settings/users/invite — invitar por email (sin password)
+// Crea row en tenant_members con invite_token y user inactivo. El usuario
+// completa el signup desde el email recibido.
+// ────────────────────────────────────────────────────────────
+router.post('/users/invite', requireRole('admin', 'manager'), async (req, res) => {
+  const { email, role, property_id } = req.body;
+  if (!email) return res.status(400).json({ error: 'email es requerido' });
+  if (!req.user?.tenant_id) {
+    return res.status(400).json({ error: 'No se pudo determinar tu tenant_id' });
+  }
+  try {
+    const cleanEmail = email.toLowerCase().trim();
+
+    // Si ya existe el user, agregarlo como tenant_member directo
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('email', cleanEmail)
+      .maybeSingle();
+
+    const tenantRoleMap = {
+      admin: 'admin',
+      manager: 'manager',
+      operator: 'operator',
+      viewer: 'viewer',
+    };
+    const tenantRole = tenantRoleMap[role || 'operator'] || 'operator';
+
+    const inviteToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    if (existing) {
+      // Add a tenant_members row (or upsert)
+      const { error } = await supabase
+        .from('tenant_members')
+        .upsert({
+          tenant_id: req.user.tenant_id,
+          user_id: existing.id,
+          role: tenantRole,
+          invited_by: req.user.id,
+          invited_email: cleanEmail,
+          is_active: true,
+        }, { onConflict: 'tenant_id,user_id' });
+      if (error) throw error;
+      await logRbacAction(req, 'invite_existing', existing.id, null, { email: cleanEmail, role: tenantRole });
+      return res.json({ success: true, status: 'added_existing_user', email: cleanEmail });
+    }
+
+    // Crear placeholder row en tenant_members con invite_token (sin user_id aún)
+    // Esquema actual requiere user_id NOT NULL; fallback: documentar que el flujo
+    // de invite-by-email completo requiere endpoint /accept-invite que crea el user.
+    // Por ahora, error claro para que admin sepa que necesita crear el user manualmente.
+    return res.status(501).json({
+      error: 'Invitación por email a usuarios nuevos no implementada todavía. Crea el usuario directamente con email + password temporal.',
+      hint: 'POST /api/settings/users con password temporal y compártelo manualmente',
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

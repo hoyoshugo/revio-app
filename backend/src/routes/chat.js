@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { processMessage } from '../agents/hotelAgent.js';
-import { db } from '../models/supabase.js';
+import { db, supabase } from '../models/supabase.js';
 import lobby from '../integrations/lobbyPMS.js';
 import wompi from '../integrations/wompi.js';
 import whatsapp from '../integrations/whatsapp.js';
@@ -17,7 +17,7 @@ router.post('/', chatLimiter, async (req, res) => {
   const {
     message,
     session_id,
-    property_slug = 'isla-palma', // propiedad por defecto
+    property_slug, // sin default; el widget debe enviarlo via window.AlzioConfig
     utm_source,
     utm_medium,
     utm_campaign
@@ -255,22 +255,51 @@ router.get('/history/:sessionId', requireAuth, async (req, res) => {
 
 // ============================================================
 // POST /api/chat/init — Inicializar sesión del widget
+// E-AGENT-1: greeting tenant-aware. Carga business_name desde la propiedad
+// (vía slug) o cae a un saludo genérico si no resuelve. Cero hardcode al
+// nombre del piloto.
 // ============================================================
 router.post('/init', async (req, res) => {
-  const { property_slug = 'isla-palma', language = 'es' } = req.body;
+  const { property_slug, language = 'es' } = req.body;
   const sessionId = uuidv4();
 
+  // Resolver nombre del negocio (si tenemos el slug)
+  let businessName = null;
+  let agentName = 'Asistente';
+  if (property_slug) {
+    try {
+      const { data: prop } = await supabase
+        .from('properties')
+        .select('name, brand_name, tenants(business_name)')
+        .eq('slug', property_slug)
+        .maybeSingle();
+      businessName = prop?.tenants?.business_name || prop?.brand_name || prop?.name || null;
+      agentName = businessName ? `el asistente de ${businessName}` : 'tu asistente';
+    } catch { /* fallback a genéricos */ }
+  }
+
   const greetings = {
-    es: '¡Hola! 🌊 Soy Mística AI, tu asistente para descubrir el paraíso en Colombia. ¿Estás pensando en una escapada a la isla o al Tayrona?',
-    en: 'Hi there! 🌊 I\'m Mística AI, your guide to paradise in Colombia. Are you thinking of a getaway to the island or to Tayrona?',
-    fr: 'Bonjour! 🌊 Je suis Mística AI, votre guide pour le paradis en Colombie. Vous pensez à une escapade sur l\'île ou au Tayrona?',
-    de: 'Hallo! 🌊 Ich bin Mística AI, Ihr Guide für das Paradies in Kolumbien. Denken Sie an einen Ausflug zur Insel oder zum Tayrona?'
+    es: businessName
+      ? `¡Hola! Soy ${agentName}. ¿En qué te puedo ayudar hoy?`
+      : '¡Hola! Soy tu asistente virtual. ¿En qué te puedo ayudar?',
+    en: businessName
+      ? `Hi there! I'm ${agentName}. How can I help you today?`
+      : "Hi there! I'm your virtual assistant. How can I help?",
+    pt: businessName
+      ? `Olá! Eu sou ${agentName}. Como posso ajudar?`
+      : 'Olá! Sou seu assistente virtual. Como posso ajudar?',
+    fr: businessName
+      ? `Bonjour! Je suis ${agentName}. Comment puis-je vous aider?`
+      : 'Bonjour! Je suis votre assistant virtuel. Comment puis-je vous aider?',
+    de: businessName
+      ? `Hallo! Ich bin ${agentName}. Wie kann ich helfen?`
+      : 'Hallo! Ich bin Ihr virtueller Assistent. Wie kann ich helfen?',
   };
 
   res.json({
     session_id: sessionId,
     greeting: greetings[language] || greetings.es,
-    property_slug
+    property_slug,
   });
 });
 

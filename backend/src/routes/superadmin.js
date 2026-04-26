@@ -227,9 +227,10 @@ router.post('/tenants/:id/toggle', requireSuperadminAuth, async (req, res) => {
     await supabase.from('tenants').update({ status: newStatus }).eq('id', req.params.id);
 
     if (tenant.contact_phone) {
+      const supportEmail = process.env.SUPPORT_EMAIL || 'soporte@alzio.co';
       const msg = newStatus === 'active'
-        ? `✅ *Mística AI reactivado* — Tu acceso ha sido reactivado. ¡Bienvenido de vuelta! 🌊`
-        : `⚠️ *Mística AI suspendido* — Tu acceso ha sido suspendido. Contacta soporte: soporte@misticatech.co`;
+        ? `✅ *Alzio reactivado* — Tu acceso ha sido reactivado. ¡Bienvenido de vuelta!`
+        : `⚠️ *Alzio suspendido* — Tu acceso ha sido suspendido. Contacta soporte: ${supportEmail}`;
       sendWhatsAppMessage(tenant.contact_phone, msg).catch(() => {});
     }
 
@@ -482,15 +483,16 @@ router.post('/onboarding', requireSuperadminAuth, async (req, res) => {
 
     // 4. Notificación de bienvenida
     if (send_welcome) {
-      const welcomeMsg = `🌊 *¡Bienvenido a Mística AI!*\n\n` +
+      const panelUrl = process.env.PANEL_URL || 'https://app.alzio.co';
+      const welcomeMsg = `*¡Bienvenido a Alzio!*\n\n` +
         `Hola ${contact_name || business_name},\n\n` +
         `Tu cuenta está lista. Accede a tu panel en:\n` +
-        `🔗 https://app.misticatech.co\n\n` +
+        `🔗 ${panelUrl}\n\n` +
         `📧 Usuario: ${dashboard_email || contact_email}\n` +
         `🔑 Contraseña: ${dashboard_password || 'Cambiar2026!'}\n\n` +
         `Tienes *${trial_days} días de prueba gratuita*.\n\n` +
         `Si necesitas ayuda, escríbenos aquí mismo.\n` +
-        `Equipo Mística Tech 🌊`;
+        `Equipo Alzio`;
 
       if (contact_phone) {
         sendWhatsAppMessage(contact_phone, welcomeMsg).catch(() => {});

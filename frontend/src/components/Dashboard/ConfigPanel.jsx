@@ -551,18 +551,30 @@ function TabProperties({ properties, token, onRefresh }) {
 const ROLES = [
   { value: 'super_admin', label: 'Super Admin' },
   { value: 'admin', label: 'Admin' },
-  { value: 'staff', label: 'Recepción' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'staff', label: 'Recepción / Operador' },
   { value: 'marketing', label: 'Marketing' },
   { value: 'readonly', label: 'Solo lectura' },
 ];
 
+// Roles que pueden gestionar usuarios. Si el user actual no es uno de estos,
+// la UI deshabilita acciones de creación/borrado/reset.
+const ADMIN_ROLES = ['super_admin', 'owner', 'admin', 'manager'];
+const DELETE_ROLES = ['super_admin', 'owner', 'admin'];
+
 function TabUsers({ properties, token }) {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [resetResult, setResetResult] = useState(null);
+
+  const canManage = ADMIN_ROLES.includes(currentUser?.role);
+  const canDelete = DELETE_ROLES.includes(currentUser?.role);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -612,6 +624,36 @@ function TabUsers({ properties, token }) {
       body: JSON.stringify({ is_active: !user.is_active }),
     });
     fetchUsers();
+  }
+
+  async function deleteUser(user) {
+    try {
+      const res = await fetch(`${API}/api/settings/users/${user.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Error eliminando usuario');
+      toast(`Usuario ${user.email} eliminado`);
+      setConfirmDelete(null);
+      fetchUsers();
+    } catch (err) {
+      toast(err.message, false);
+      setConfirmDelete(null);
+    }
+  }
+
+  async function resetPassword(user) {
+    try {
+      const res = await fetch(`${API}/api/settings/users/${user.id}/reset-password`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Error reseteando contraseña');
+      const data = await res.json();
+      setResetResult({ email: data.email, password: data.temporary_password });
+    } catch (err) {
+      toast(err.message, false);
+    }
   }
 
   const UserForm = () => (
@@ -674,6 +716,11 @@ function TabUsers({ properties, token }) {
 
   return (
     <div className="space-y-4">
+      {!canManage && (
+        <div className="bg-yellow-900/20 border border-yellow-800 text-yellow-300 text-xs rounded-lg px-3 py-2">
+          Tu rol actual ({currentUser?.role || 'sin rol'}) no permite gestionar usuarios. Solo lectura.
+        </div>
+      )}
       <div className="flex justify-between items-center">
         <p className="text-sm text-gray-500">{users.length} usuario(s)</p>
         <button
@@ -682,11 +729,73 @@ function TabUsers({ properties, token }) {
             setEditing(null);
             setForm({ role: 'staff' });
           }}
-          className="flex items-center gap-2 px-3 py-1.5 bg-mystica-blue hover:bg-mystica-blue/80 text-white rounded-lg text-sm"
+          disabled={!canManage}
+          className="flex items-center gap-2 px-3 py-1.5 bg-mystica-blue hover:bg-mystica-blue/80 text-white rounded-lg text-sm disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Plus className="w-4 h-4" /> Nuevo usuario
         </button>
       </div>
+
+      {/* Modal: confirmación de delete */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-red-800 rounded-2xl p-6 max-w-md w-full">
+            <h3 className="text-lg font-bold text-white mb-2">¿Eliminar usuario?</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              Vas a desactivar a <strong className="text-white">{confirmDelete.email}</strong>. La cuenta queda en archivado (no se borra DB) y pierde acceso inmediato. Esta acción se registra en el audit log.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => deleteUser(confirmDelete)}
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: resultado de reset password */}
+      {resetResult && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-yellow-800 rounded-2xl p-6 max-w-md w-full">
+            <h3 className="text-lg font-bold text-white mb-2">Contraseña temporal generada</h3>
+            <p className="text-sm text-gray-400 mb-3">
+              Compártesela al usuario por canal seguro. Debe cambiarla en el primer login.
+            </p>
+            <div className="bg-gray-800 rounded-lg p-3 mb-3">
+              <div className="text-xs text-gray-500 mb-1">Email</div>
+              <div className="text-sm text-white font-mono mb-2">{resetResult.email}</div>
+              <div className="text-xs text-gray-500 mb-1">Contraseña temporal</div>
+              <div className="text-sm text-yellow-300 font-mono select-all">{resetResult.password}</div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`Email: ${resetResult.email}\nContraseña: ${resetResult.password}`);
+                  toast('Credenciales copiadas');
+                }}
+                className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm"
+              >
+                Copiar
+              </button>
+              <button
+                onClick={() => setResetResult(null)}
+                className="px-3 py-1.5 bg-mystica-blue hover:bg-mystica-blue/80 text-white rounded-lg text-sm"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {adding && <UserForm />}
 
@@ -734,16 +843,38 @@ function TabUsers({ properties, token }) {
                         </button>
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => {
-                            setEditing(u);
-                            setAdding(false);
-                            setForm({ ...u, password: '' });
-                          }}
-                          className="p-1.5 text-gray-500 hover:text-blue-400 rounded hover:bg-gray-800"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              setEditing(u);
+                              setAdding(false);
+                              setForm({ ...u, password: '' });
+                            }}
+                            disabled={!canManage}
+                            title="Editar"
+                            className="p-1.5 text-gray-500 hover:text-blue-400 rounded hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => resetPassword(u)}
+                            disabled={!canDelete}
+                            title="Reset password"
+                            className="p-1.5 text-gray-500 hover:text-yellow-400 rounded hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          </button>
+                          {u.id !== currentUser?.id && (
+                            <button
+                              onClick={() => setConfirmDelete(u)}
+                              disabled={!canDelete}
+                              title="Eliminar"
+                              className="p-1.5 text-gray-500 hover:text-red-400 rounded hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </>
                   )}

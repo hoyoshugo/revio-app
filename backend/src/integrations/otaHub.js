@@ -136,24 +136,34 @@ async function generateOtaReply(message, platform, propertySlug, language = 'es'
     tiktok: 'TikTok'
   };
 
-  const systemPrompt = `Eres el agente de atención al cliente de Mística Hostels respondiendo a mensajes de ${platformNames[platform] || platform}.
+  // Cargar branding del tenant. Las URLs y firma se resuelven dinámicamente
+  // desde properties.tenants. Sin hardcode al cliente piloto.
+  let businessName = 'el hotel';
+  let bookingUrl = null;
+  let howToGetUrl = null;
+  let whatsappContact = null;
+  try {
+    const { data: prop } = await supabase
+      .from('properties')
+      .select('name, brand_name, whatsapp_number, booking_url, how_to_get_url, tenants(business_name)')
+      .eq('slug', propertySlug)
+      .maybeSingle();
+    businessName = prop?.tenants?.business_name || prop?.brand_name || prop?.name || businessName;
+    bookingUrl = prop?.booking_url || null;
+    howToGetUrl = prop?.how_to_get_url || null;
+    whatsappContact = prop?.whatsapp_number || null;
+  } catch { /* fallback */ }
+
+  const systemPrompt = `Eres el agente de atención al cliente de ${businessName} respondiendo a mensajes de ${platformNames[platform] || platform}.
 
 REGLAS:
 - Responde en el mismo idioma que el mensaje del huésped
 - Sé cálido, profesional y conciso (los mensajes OTA deben ser cortos)
-- Si el huésped pregunta sobre disponibilidad o precios, dirígelo a reservar directamente: ${
-    propertySlug === 'isla-palma'
-      ? 'https://booking.misticaisland.com'
-      : 'https://booking.misticatayrona.com'
-  }
-- Si pregunta cómo llegar: ${
-    propertySlug === 'isla-palma'
-      ? 'https://www.misticaisland.com/how-to-get'
-      : 'https://www.mhostels.co/how-to-get'
-  }
-- Para urgencias o cambios en la reserva: WhatsApp +573234392420
+${bookingUrl ? `- Si pregunta sobre disponibilidad o precios, dirígelo a reservar directamente: ${bookingUrl}` : '- Si pregunta sobre disponibilidad o precios, dirígelo al canal de reservas oficial del hotel'}
+${howToGetUrl ? `- Si pregunta cómo llegar: ${howToGetUrl}` : ''}
+${whatsappContact ? `- Para urgencias o cambios en la reserva: WhatsApp ${whatsappContact}` : ''}
 - NO inventes políticas ni precios específicos
-- Firma siempre con: "Equipo Mística 🌊"
+- Firma siempre con: "Equipo ${businessName}"
 - Máximo 150 palabras por respuesta`;
 
   try {

@@ -1,10 +1,52 @@
-// /api/auth — Authentication endpoints for Revio
+// /api/auth — Authentication endpoints for Alzio
+// E-AGENT-1 (2026-04-26): bcrypt hashing + auto-rehash de legacy plaintext.
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import { supabase } from '../models/supabase.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
+const BCRYPT_ROUNDS = 10;
+
+// Verifica password contra hash. Soporta:
+//   - password_hash_version = 0 -> plaintext legacy (compare ===)
+//   - password_hash_version = 1 -> bcrypt
+// Retorna { ok, needsRehash }
+async function verifyPassword(plain, hash, version) {
+  if (version === 1 || (typeof hash === 'string' && hash.startsWith('$2'))) {
+    const ok = await bcrypt.compare(plain, hash);
+    return { ok, needsRehash: false };
+  }
+  // legacy plaintext
+  return { ok: plain === hash, needsRehash: true };
+}
+
+async function hashPassword(plain) {
+  return bcrypt.hash(plain, BCRYPT_ROUNDS);
+}
+
+// Resolver tenant_id principal de un user (vía tenant_members; fallback a property)
+async function resolveTenantId(userId, propertyId) {
+  try {
+    const { data: member } = await supabase
+      .from('tenant_members')
+      .select('tenant_id')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (member?.tenant_id) return member.tenant_id;
+  } catch { /* tabla puede no existir aún (pre-migration) */ }
+
+  if (propertyId) {
+    const { data: prop } = await supabase
+      .from('properties').select('tenant_id').eq('id', propertyId).maybeSingle();
+    return prop?.tenant_id || null;
+  }
+  return null;
+}
 
 // ── POST /api/auth/login ──────────────────────────────────────
 router.post('/login', async (req, res) => {
@@ -20,12 +62,46 @@ router.post('/login', async (req, res) => {
       .single();
 
     if (error || !user) return res.status(401).json({ error: 'Credenciales inválidas' });
-    if (password !== user.password_hash) return res.status(401).json({ error: 'Credenciales inválidas' });
+
+    const { ok, needsRehash } = await verifyPassword(
+      password,
+      user.password_hash,
+      user.password_hash_version
+    );
+    if (!ok) return res.status(401).json({ error: 'Credenciales inválidas' });
+
+    // Auto-rehash legacy plaintext en background (no bloquea login)
+    if (needsRehash) {
+      (async () => {
+        try {
+          const newHash = await hashPassword(password);
+          await supabase
+            .from('users')
+            .update({
+              password_hash: newHash,
+              password_hash_version: 1,
+              password_changed_at: new Date().toISOString(),
+            })
+            .eq('id', user.id);
+          console.log(`[auth] Rehashed legacy password for user ${user.id}`);
+        } catch (err) {
+          console.error('[auth] Rehash failed:', err.message);
+        }
+      })();
+    }
 
     await supabase.from('users').update({ last_login: new Date().toISOString() }).eq('id', user.id);
 
+    const tenantId = await resolveTenantId(user.id, user.property_id);
+
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, property_id: user.property_id },
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        property_id: user.property_id,
+        tenant_id: tenantId,
+      },
       process.env.JWT_SECRET || 'revio_dev_secret_2026',
       { expiresIn: '7d' }
     );
@@ -37,18 +113,18 @@ router.post('/login', async (req, res) => {
       .eq('is_active', true)
       .order('name');
 
-    const flatProperties = (properties || []).map(p => ({
+    const flatProperties = (properties || []).map((p) => ({
       ...p,
       group_name: p.tenants?.group_name || null,
       group_description: p.tenants?.group_description || null,
     }));
 
-    const { password_hash, ...safeUser } = user;
+    const { password_hash, password_hash_version, ...safeUser } = user;
     res.json({
       token,
       user: safeUser,
       properties: flatProperties,
-      current_property: user.properties || null
+      current_property: user.properties || null,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -61,52 +137,135 @@ router.post('/register', async (req, res) => {
   if (!name || !email || !password || !property_name) {
     return res.status(400).json({ error: 'name, email, password y property_name son requeridos' });
   }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+  }
 
   try {
-    // Check for existing email
-    const { data: existing } = await supabase.from('users').select('id').eq('email', email.toLowerCase()).maybeSingle();
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .maybeSingle();
     if (existing) return res.status(409).json({ error: 'Este email ya está registrado' });
 
-    // Create property slug
     const baseSlug = property_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const suffix   = Math.random().toString(36).slice(2, 6);
-    const slug     = `${baseSlug}-${suffix}`;
+    const suffix = Math.random().toString(36).slice(2, 6);
+    const slug = `${baseSlug}-${suffix}`;
 
-    // Create property
     const { data: property, error: propErr } = await supabase
       .from('properties')
       .insert({
-        slug, name: property_name, brand_name: property_name,
-        location: city || 'Colombia', plan,
-        is_active: true
+        slug,
+        name: property_name,
+        brand_name: property_name,
+        location: city || 'Colombia',
+        plan,
+        is_active: true,
       })
-      .select().single();
+      .select()
+      .single();
     if (propErr) throw propErr;
 
-    // Create admin user
+    const passwordHash = await hashPassword(password);
+
     const { data: user, error: userErr } = await supabase
       .from('users')
       .insert({
-        property_id: property.id, email: email.toLowerCase(), password_hash: password,
-        name, role: 'admin', is_active: true
+        property_id: property.id,
+        email: email.toLowerCase(),
+        password_hash: passwordHash,
+        password_hash_version: 1,
+        password_changed_at: new Date().toISOString(),
+        name,
+        role: 'admin',
+        is_active: true,
       })
-      .select().single();
+      .select()
+      .single();
     if (userErr) throw userErr;
 
+    // Crear tenant_members owner si la tabla existe
+    try {
+      if (property.tenant_id) {
+        await supabase.from('tenant_members').insert({
+          tenant_id: property.tenant_id,
+          user_id: user.id,
+          role: 'owner',
+          is_active: true,
+        });
+      }
+    } catch { /* tabla puede no existir aún */ }
+
+    const tenantId = property.tenant_id || (await resolveTenantId(user.id, property.id));
+
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, property_id: property.id },
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        property_id: property.id,
+        tenant_id: tenantId,
+      },
       process.env.JWT_SECRET || 'revio_dev_secret_2026',
       { expiresIn: '7d' }
     );
 
-    const { password_hash, ...safeUser } = user;
+    const { password_hash, password_hash_version, ...safeUser } = user;
     res.status(201).json({
       token,
       user: safeUser,
       properties: [property],
       current_property: property,
-      message: `¡Bienvenido a Revio, ${name}! Tu propiedad "${property_name}" está lista.`
+      message: `¡Bienvenido a Alzio, ${name}! Tu propiedad "${property_name}" está lista.`,
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/auth/change-password ────────────────────────────
+router.post('/change-password', requireAuth, async (req, res) => {
+  const { current_password, new_password } = req.body;
+  if (!current_password || !new_password) {
+    return res.status(400).json({ error: 'current_password y new_password requeridos' });
+  }
+  if (new_password.length < 8) {
+    return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
+  }
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, password_hash, password_hash_version')
+      .eq('id', req.user.id)
+      .single();
+    if (error || !user) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    const { ok } = await verifyPassword(current_password, user.password_hash, user.password_hash_version);
+    if (!ok) return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+
+    const newHash = await hashPassword(new_password);
+    await supabase
+      .from('users')
+      .update({
+        password_hash: newHash,
+        password_hash_version: 1,
+        password_changed_at: new Date().toISOString(),
+      })
+      .eq('id', user.id);
+
+    // Audit log
+    try {
+      await supabase.from('rbac_audit_log').insert({
+        actor_user_id: req.user.id,
+        target_user_id: req.user.id,
+        action: 'change_password',
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'] || null,
+      });
+    } catch { /* audit table puede no existir aún */ }
+
+    res.json({ success: true, message: 'Contraseña actualizada' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -118,7 +277,8 @@ router.get('/me', requireAuth, async (req, res) => {
     const { data: user, error } = await supabase
       .from('users')
       .select('id,email,name,role,property_id,last_login,created_at')
-      .eq('id', req.user.id).single();
+      .eq('id', req.user.id)
+      .single();
     if (error) return res.status(404).json({ error: 'Usuario no encontrado' });
 
     const { data: properties } = await supabase
@@ -126,8 +286,7 @@ router.get('/me', requireAuth, async (req, res) => {
       .select('id,name,slug,brand_name,brand_logo_url,location,plan,is_active,tenant_id,tenants(group_name,group_description)')
       .eq('is_active', true);
 
-    // Aplanar group_name al nivel de propiedad
-    const flatProperties = (properties || []).map(p => ({
+    const flatProperties = (properties || []).map((p) => ({
       ...p,
       group_name: p.tenants?.group_name || null,
       group_description: p.tenants?.group_description || null,
@@ -141,7 +300,6 @@ router.get('/me', requireAuth, async (req, res) => {
 
 // ── POST /api/auth/logout ────────────────────────────────────
 router.post('/logout', (req, res) => {
-  // JWT is stateless; client clears token. Server-side: could add to blocklist.
   res.json({ success: true });
 });
 

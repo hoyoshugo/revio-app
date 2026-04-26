@@ -61,7 +61,7 @@ export async function sendEmail(to, subject, htmlBody, textBody = '') {
 
   const transporter = createEmailTransporter();
   const info = await transporter.sendMail({
-    from: process.env.EMAIL_FROM || `Mística Hostels <${process.env.SMTP_USER}>`,
+    from: process.env.EMAIL_FROM || `Alzio <${process.env.SMTP_USER}>`,
     to,
     subject,
     html: htmlBody,
@@ -114,12 +114,12 @@ export const templates = {
   confirmation: (booking, paymentUrl, lang = 'es') => {
     const msgs = {
       es: {
-        subject: `¡Reserva confirmada! ${booking.property_name || 'Mística'} 🌊`,
+        subject: `¡Reserva confirmada! ${booking.property_name || 'Tu hotel'} 🌊`,
         message: `¡Hola ${booking.guest_name}! 🎉\n\nTu reserva en *${booking.property_name}* está confirmada.\n\n📅 Check-in: ${booking.checkin_date}\n📅 Check-out: ${booking.checkout_date}\n🏠 Habitación: ${booking.room_name || booking.room_type}\n💰 Total: COP ${Number(booking.total_amount).toLocaleString('es-CO')}\n\nCompleta tu pago aquí:\n${paymentUrl}\n\n¡Te esperamos! 🌴`,
         html: `<h2>¡Reserva Confirmada! 🌊</h2><p>Hola <strong>${booking.guest_name}</strong>,</p><p>Tu reserva en <strong>${booking.property_name}</strong> está confirmada.</p><ul><li>📅 Check-in: <strong>${booking.checkin_date}</strong></li><li>📅 Check-out: <strong>${booking.checkout_date}</strong></li><li>🏠 Habitación: <strong>${booking.room_name || booking.room_type}</strong></li><li>💰 Total: <strong>COP ${Number(booking.total_amount).toLocaleString('es-CO')}</strong></li></ul><p><a href="${paymentUrl}" style="background:#00b4d8;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Completar pago</a></p>`
       },
       en: {
-        subject: `Booking confirmed! ${booking.property_name || 'Mística'} 🌊`,
+        subject: `Booking confirmed! ${booking.property_name || 'Your hotel'} 🌊`,
         message: `Hi ${booking.guest_name}! 🎉\n\nYour booking at *${booking.property_name}* is confirmed.\n\n📅 Check-in: ${booking.checkin_date}\n📅 Check-out: ${booking.checkout_date}\n🏠 Room: ${booking.room_name || booking.room_type}\n💰 Total: COP ${Number(booking.total_amount).toLocaleString('es-CO')}\n\nComplete your payment here:\n${paymentUrl}\n\nSee you soon! 🌴`,
         html: `<h2>Booking Confirmed! 🌊</h2><p>Hi <strong>${booking.guest_name}</strong>,</p><p>Your booking at <strong>${booking.property_name}</strong> is confirmed.</p><ul><li>📅 Check-in: <strong>${booking.checkin_date}</strong></li><li>📅 Check-out: <strong>${booking.checkout_date}</strong></li><li>🏠 Room: <strong>${booking.room_name || booking.room_type}</strong></li><li>💰 Total: <strong>COP ${Number(booking.total_amount).toLocaleString('es-CO')}</strong></li></ul><p><a href="${paymentUrl}" style="background:#00b4d8;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Complete Payment</a></p>`
       }
@@ -210,12 +210,12 @@ export const templates = {
   loyaltyOffer: (booking, lang = 'es') => {
     const msgs = {
       es: {
-        subject: `¡Vuelve a Mística! Oferta exclusiva para ti 🎁`,
+        subject: `¡Vuelve a ${booking.property_name || 'visitarnos'}! Oferta exclusiva para ti 🎁`,
         message: `¡Hola ${booking.guest_name}! 🌊\n\nEchas de menos el paraíso? ¡Vuelve a visitarnos!\n\nComo cliente especial, tienes acceso a nuestra tarifa de fidelidad.\n\nReserva aquí: ${booking.booking_url}\n\n¡Te esperamos! 🌴`,
         html: `<h2>¡Oferta de regreso! 🎁</h2><p>Hola <strong>${booking.guest_name}</strong>,</p><p>¿Listo para volver al paraíso? ¡Tenemos una oferta especial para ti!</p><p><a href="${booking.booking_url}" style="background:#00b4d8;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;">Ver disponibilidad</a></p>`
       },
       en: {
-        subject: `Come back to Mística! Exclusive offer for you 🎁`,
+        subject: `Come back to ${booking.property_name || 'us'}! Exclusive offer for you 🎁`,
         message: `Hi ${booking.guest_name}! 🌊\n\nMissing paradise? Come back for another adventure!\n\nAs a returning guest, you have access to our loyalty rate.\n\nBook here: ${booking.booking_url}\n\nSee you soon! 🌴`,
         html: `<h2>Come back! 🎁</h2><p>Hi <strong>${booking.guest_name}</strong>,</p><p>Ready for another adventure? We have a special offer for you!</p><p><a href="${booking.booking_url}" style="background:#00b4d8;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;">Check availability</a></p>`
       }

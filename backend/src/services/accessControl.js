@@ -2,10 +2,19 @@
  * Control de Acceso por Pago — Verifica cada 24h si los tenants tienen el pago al día.
  * Si vence: desactiva el agente y notifica al cliente.
  * Si se registra pago: reactiva en < 5 minutos (el scheduler corre cada 5min).
+ *
+ * E-AGENT-1 (2026-04-26): notificaciones tenant-aware. Cero referencias literales
+ * a "Mística" en strings hacia el cliente. La marca del producto es "Alzio";
+ * el cliente puede ser cualquier hotel.
  */
 import { supabase } from '../models/supabase.js';
 import { sendWhatsAppMessage } from '../integrations/whatsapp.js';
 import nodemailer from 'nodemailer';
+
+const PRODUCT_NAME = 'Alzio';
+const BILLING_URL = process.env.BILLING_URL || 'https://app.alzio.co/billing';
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'soporte@alzio.co';
+const FROM_DEFAULT = process.env.EMAIL_FROM || `Alzio <noreply@alzio.co>`;
 
 // ============================================================
 // Enviar notificación (WhatsApp + Email)
@@ -25,7 +34,7 @@ async function notifyTenant(tenant, subject, waMsg, emailMsg) {
         auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
       });
       await transporter.sendMail({
-        from: process.env.EMAIL_FROM || 'Mística Tech <noreply@misticatech.co>',
+        from: FROM_DEFAULT,
         to: tenant.contact_email,
         subject,
         text: emailMsg
@@ -56,8 +65,8 @@ export async function runAccessControlCheck() {
         await supabase.from('tenants').update({ status: 'overdue' }).eq('id', tenant.id);
         await notifyTenant(
           tenant,
-          'Tu período de prueba de Mística AI ha terminado',
-          `Hola ${tenant.contact_name || tenant.business_name} 👋\n\nTu período de prueba de *Mística AI* ha terminado.\n\nPara continuar usando el servicio, activa tu suscripción en: https://misticatech.co/billing\n\nEquipo Mística Tech 🌊`,
+          `Tu período de prueba de ${PRODUCT_NAME} ha terminado`,
+          `Hola ${tenant.contact_name || tenant.business_name} 👋\n\nTu período de prueba de *${PRODUCT_NAME}* ha terminado.\n\nPara continuar usando el servicio, activa tu suscripción en: ${BILLING_URL}\n\nEquipo ${PRODUCT_NAME}`,
           `Tu período de prueba ha finalizado. Activa tu suscripción para continuar.`
         );
         results.warned++;
@@ -78,7 +87,7 @@ export async function runAccessControlCheck() {
           await notifyTenant(
             tenant,
             `⚠️ Pago vencido — ${daysLeft} día(s) para suspensión`,
-            `⚠️ *Mística AI — Pago pendiente*\n\nHola ${tenant.contact_name || tenant.business_name}, tu pago venció hace ${graceDays - daysLeft} día(s).\n\nTienes *${daysLeft} día(s)* antes de que el servicio sea suspendido.\n\nPaga ahora: https://misticatech.co/billing\n\nEquipo Mística Tech 🌊`,
+            `⚠️ *${PRODUCT_NAME} — Pago pendiente*\n\nHola ${tenant.contact_name || tenant.business_name}, tu pago venció hace ${graceDays - daysLeft} día(s).\n\nTienes *${daysLeft} día(s)* antes de que el servicio sea suspendido.\n\nPaga ahora: ${BILLING_URL}\n\nEquipo ${PRODUCT_NAME}`,
             `Pago vencido. Tienes ${daysLeft} día(s) antes de la suspensión.`
           );
 
@@ -93,9 +102,9 @@ export async function runAccessControlCheck() {
         await supabase.from('tenants').update({ status: 'suspended' }).eq('id', tenant.id);
         await notifyTenant(
           tenant,
-          '🔴 Mística AI — Servicio suspendido',
-          `🔴 *Mística AI — Servicio suspendido*\n\nHola ${tenant.contact_name || tenant.business_name},\n\nDado que no se registró el pago, hemos suspendido temporalmente el acceso a Mística AI.\n\nPara reactivar: https://misticatech.co/billing\n\nEquipo Mística Tech 🌊`,
-          `Tu servicio de Mística AI ha sido suspendido por falta de pago.`
+          `🔴 ${PRODUCT_NAME} — Servicio suspendido`,
+          `🔴 *${PRODUCT_NAME} — Servicio suspendido*\n\nHola ${tenant.contact_name || tenant.business_name},\n\nDado que no se registró el pago, hemos suspendido temporalmente el acceso a ${PRODUCT_NAME}.\n\nPara reactivar: ${BILLING_URL}\n\nEquipo ${PRODUCT_NAME}`,
+          `Tu servicio de ${PRODUCT_NAME} ha sido suspendido por falta de pago.`
         );
 
         // Registrar error en system_errors
@@ -139,9 +148,9 @@ export async function runAccessControlCheck() {
 
         await notifyTenant(
           tenant,
-          '✅ Mística AI — Servicio reactivado',
-          `✅ *Mística AI — ¡Servicio reactivado!*\n\nHola ${tenant.contact_name || tenant.business_name},\n\n¡Tu servicio ha sido reactivado exitosamente! 🎉\n\nTu próximo pago es el ${newNextPayment.toLocaleDateString('es-CO')}.\n\nEquipo Mística Tech 🌊`,
-          `Tu servicio de Mística AI ha sido reactivado.`
+          `✅ ${PRODUCT_NAME} — Servicio reactivado`,
+          `✅ *${PRODUCT_NAME} — ¡Servicio reactivado!*\n\nHola ${tenant.contact_name || tenant.business_name},\n\n¡Tu servicio ha sido reactivado exitosamente! 🎉\n\nTu próximo pago es el ${newNextPayment.toLocaleDateString('es-CO')}.\n\nEquipo ${PRODUCT_NAME}`,
+          `Tu servicio de ${PRODUCT_NAME} ha sido reactivado.`
         );
 
         results.reactivated++;
