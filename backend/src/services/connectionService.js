@@ -59,6 +59,24 @@ export async function getSetting(propertyId, key) {
   let value = data.value;
   if (typeof value === 'string' && value.includes(':')) {
     value = decrypt(value);
+  } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    // Symmetric with saveSetting: decrypt object fields that were encrypted on save.
+    // saveSetting encrypts fields whose name contains 'token', 'key', 'secret', 'password', 'api_key'.
+    const sensitiveKeys = ['token', 'key', 'secret', 'password', 'api_key'];
+    const decoded = { ...value };
+    for (const [field, fieldVal] of Object.entries(decoded)) {
+      if (typeof fieldVal === 'string'
+          && fieldVal.includes(':')
+          && sensitiveKeys.some(k => field.toLowerCase().includes(k))) {
+        try {
+          const dec = decrypt(fieldVal);
+          if (typeof dec === 'string' && dec.length > 0) decoded[field] = dec;
+        } catch {
+          // leave as-is if decrypt fails
+        }
+      }
+    }
+    value = decoded;
   }
 
   cachePut(propertyId, key, value);
