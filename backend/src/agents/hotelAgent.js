@@ -23,9 +23,36 @@ import {
   formatTransportForAgent,
   createTransportReservation,
 } from '../integrations/transport/caribbeanTreasures.js';
+import { getAIConfig } from '../services/connectionService.js';
+import {
+  trackAnthropicUsage,
+  checkBYOKStatus,
+  checkMonthlyConversationLimit,
+} from '../services/aiUsageTracker.js';
 
+// Cliente fallback con la key plataforma de Alzio (env var). Solo se usa
+// cuando el tenant tiene platform_billing_enabled=true y no configuro su
+// propia key. En BYOK strict mode el agente bloquea antes de llegar aqui.
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const MODEL = 'claude-sonnet-4-6';
+const DEFAULT_MODEL = 'claude-sonnet-4-6';
+const MODEL = DEFAULT_MODEL;
+
+// Resolver Anthropic client + model per-tenant.
+// Devuelve: { client, model, usingPlatformKey }
+async function resolveAnthropicClient(propertyId) {
+  try {
+    const cfg = await getAIConfig(propertyId);
+    const tenantKey = cfg?.api_key && String(cfg.api_key).trim();
+    if (tenantKey && tenantKey.length > 10) {
+      return {
+        client: new Anthropic({ apiKey: tenantKey }),
+        model: cfg.model || DEFAULT_MODEL,
+        usingPlatformKey: false,
+      };
+    }
+  } catch { /* fallback to platform */ }
+  return { client: anthropic, model: DEFAULT_MODEL, usingPlatformKey: true };
+}
 
 // ============================================================
 // Cargar base de conocimiento dinámica desde Supabase
@@ -734,16 +761,46 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
     systemPromptText = buildSystemPrompt(property, dynamicKnowledge, salesIntensity) + knowledgeContext;
   }
 
+  // ── Resolver Anthropic client per-tenant + BYOK enforcement ─────
+  // Si el tenant exige BYOK y no tiene key configurada, devolver mensaje
+  // claro al huesped sin gastar la key plataforma.
+  const tenantIdForBilling = property?.tenant_id || null;
+  let aiClient = anthropic;
+  let aiModel = MODEL;
+  let usingPlatformKey = true;
   try {
-    let response = await anthropic.messages.create({
-      model: MODEL,
+    const byokStatus = await checkBYOKStatus(tenantIdForBilling, propertyId);
+    if (!byokStatus.configured) {
+      finalResponse = '⚠️ El agente IA no esta configurado todavia. ' + (byokStatus.reason || 'Configura tu API key Anthropic en Settings.');
+      console.warn('[Agent] BYOK gate blocked:', byokStatus.reason);
+    } else {
+      const resolved = await resolveAnthropicClient(propertyId);
+      aiClient = resolved.client;
+      aiModel = resolved.model;
+      usingPlatformKey = resolved.usingPlatformKey;
+    }
+  } catch (gateErr) {
+    console.error('[Agent] BYOK gate error:', gateErr.message);
+  }
+
+  // Tokens acumulados (separados in/out para que aiUsageTracker calcule costo correcto)
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+
+  try {
+    if (finalResponse) throw new Error('BYOK gate blocked'); // saltar al catch sin llamar Claude
+
+    let response = await aiClient.messages.create({
+      model: aiModel,
       max_tokens: 2048,
       system: systemPromptText,
       messages: claudeMessages,
       tools: TOOLS
     });
 
-    totalTokens += (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
+    totalInputTokens += response.usage?.input_tokens || 0;
+    totalOutputTokens += response.usage?.output_tokens || 0;
+    totalTokens = totalInputTokens + totalOutputTokens;
 
     // Bucle de herramientas — acumula mensajes correctamente entre iteraciones
     let accumulatedMessages = [...claudeMessages];
@@ -774,15 +831,17 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
         { role: 'user', content: toolResults }
       ];
 
-      response = await anthropic.messages.create({
-        model: MODEL,
+      response = await aiClient.messages.create({
+        model: aiModel,
         max_tokens: 2048,
         system: systemPromptText,
         messages: accumulatedMessages,
         tools: TOOLS
       });
 
-      totalTokens += (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
+      totalInputTokens += response.usage?.input_tokens || 0;
+      totalOutputTokens += response.usage?.output_tokens || 0;
+      totalTokens = totalInputTokens + totalOutputTokens;
     }
 
     // Extraer texto final
@@ -792,8 +851,25 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
       .join('\n');
 
   } catch (err) {
-    console.error('[Agent] Error llamando a Claude:', err.message);
-    finalResponse = getErrorMessage(conversation.guest_language || 'es');
+    if (err.message !== 'BYOK gate blocked') {
+      console.error('[Agent] Error llamando a Claude:', err.message);
+    }
+    if (!finalResponse) {
+      finalResponse = getErrorMessage(conversation.guest_language || 'es');
+    }
+  }
+
+  // Tracking de uso (no bloqueante)
+  if (totalInputTokens > 0 || totalOutputTokens > 0) {
+    trackAnthropicUsage({
+      tenantId: tenantIdForBilling,
+      propertyId,
+      source: 'agent',
+      usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens },
+      model: aiModel,
+      messages: 1,
+      platformPaid: usingPlatformKey,
+    }).catch((e) => console.error('[Agent] usage track failed:', e.message));
   }
 
   // Detectar si el agente expresó incertidumbre → solicitar aprendizaje
