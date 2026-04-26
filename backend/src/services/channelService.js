@@ -212,4 +212,49 @@ export async function pingChannel(propertyId, channelKey) {
             return { status: 'error', error: 'token_refresh_failed' };
           }
           const { access_token } = await tokenRes.json();
-          const accountsRes = await fetch('https://mybusinessaccoun
+          const accountsRes = await fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', {
+            headers: { Authorization: `Bearer ${access_token}` },
+          });
+          if (accountsRes.ok) {
+            const data = await accountsRes.json();
+            const count = Array.isArray(data.accounts) ? data.accounts.length : 0;
+            await updateChannelHealth(propertyId, channelKey, 'connected', null);
+            return { status: 'connected', metadata: { accounts: count, locationId: googleCfg.location_id } };
+          }
+          await updateChannelHealth(propertyId, channelKey, 'error', `HTTP ${accountsRes.status}`);
+          return { status: 'error', error: `HTTP ${accountsRes.status}` };
+        } catch (e) {
+          await updateChannelHealth(propertyId, channelKey, 'error', e.message);
+          return { status: 'error', error: e.message };
+        }
+      }
+
+      default:
+        return { status: 'not_configured' };
+    }
+  } catch (e) {
+    await updateChannelHealth(propertyId, channelKey, 'error', e.message);
+    return { status: 'error', error: e.message };
+  }
+}
+
+// ── INBOX ───────────────────────────────────────────────
+export async function getUnifiedInbox(propertyId, { limit = 50, channelKey = null } = {}) {
+  let q = supabase
+    .from('unified_inbox')
+    .select('*')
+    .eq('property_id', propertyId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (channelKey) q = q.eq('channel_key', channelKey);
+  const { data } = await q;
+  return data || [];
+}
+
+export async function insertInboxMessage(row) {
+  try {
+    await supabase.from('unified_inbox').insert(row);
+  } catch (e) {
+    console.error('[ChannelService] insertInboxMessage error:', e.message);
+  }
+}
