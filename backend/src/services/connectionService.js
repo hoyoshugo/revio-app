@@ -164,10 +164,17 @@ export async function getWhatsAppConfig(propertyId) {
 export async function getAIConfig(propertyId) {
   const setting = await getSetting(propertyId, 'anthropic_config');
   if (setting && typeof setting === 'object') {
+    let key = typeof setting.api_key === 'string' && setting.api_key.includes(':')
+      ? decrypt(setting.api_key) : setting.api_key;
+    // Fall back to env var when per-property api_key is empty/null/whitespace.
+    // saveSetting can persist {api_key: ''} when user clears the field; getAIConfig
+    // must not return that empty string as if it were a configured key.
+    if (typeof key !== 'string' || key.trim().length === 0) {
+      key = process.env.ANTHROPIC_API_KEY || null;
+    }
     return {
       provider: 'anthropic',
-      api_key: typeof setting.api_key === 'string' && setting.api_key.includes(':')
-        ? decrypt(setting.api_key) : setting.api_key,
+      api_key: key,
       model: setting.model || 'claude-sonnet-4-6',
     };
   }
