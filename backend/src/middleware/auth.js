@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { supabase } from '../models/supabase.js';
+import { JWT_SECRET } from '../utils/security.js';
 
 // ============================================================
 // requireAuth — valida JWT y popula req.user con role + tenant_id
@@ -10,7 +11,7 @@ export function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'Token requerido' });
   }
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'revio_dev_secret_2026');
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch {

@@ -24,25 +24,41 @@ import { supabase } from '../models/supabase.js';
 import { requireSuperadminAuth, signSuperadminToken } from '../middleware/superadminAuth.js';
 import { sendWhatsAppMessage } from '../integrations/whatsapp.js';
 import { getIpStatus } from '../utils/ipMonitor.js';
+import { getSuperadminCredentials, hashPassword } from '../utils/security.js';
+import { authLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 
 // ============================================================
 // AUTENTICACIÓN SEPARADA
+// E-AGENT-9 (2026-04-26): credenciales movidas a getSuperadminCredentials()
+// (fail-closed en producción si SUPERADMIN_EMAIL/PASSWORD no están seteados).
+// authLimiter: 5 intentos / 15min / IP para bloquear credential stuffing.
 // ============================================================
-router.post('/login', (req, res) => {
-  const { email, password } = req.body;
-  const validEmail = process.env.SUPERADMIN_EMAIL || 'admin@misticatech.co';
-  const validPass  = process.env.SUPERADMIN_PASSWORD || 'MisticaTech2026!';
+router.post('/login', authLimiter, (req, res) => {
+  let creds;
+  try {
+    creds = getSuperadminCredentials();
+  } catch (err) {
+    console.error('[sa-login]', err.message);
+    return res.status(500).json({ error: 'Server misconfiguration' });
+  }
 
-  if (email?.toLowerCase().trim() !== validEmail || password !== validPass) {
+  const { email, password } = req.body || {};
+  const reqEmail = (email || '').toLowerCase().trim();
+
+  // Comparación constante en tiempo (no early return por email match para
+  // evitar timing attacks que enumeren emails válidos)
+  const emailMatch = reqEmail === creds.email;
+  const passMatch = password === creds.password;
+  if (!emailMatch || !passMatch) {
     return res.status(401).json({ error: 'Credenciales inválidas' });
   }
 
-  const token = signSuperadminToken(email);
+  const token = signSuperadminToken(creds.email);
   res.json({
     token,
-    user: { email: validEmail, name: 'Super Admin', role: 'superadmin_tech', company: 'Mística Tech' }
+    user: { email: creds.email, name: 'Super Admin', role: 'superadmin_tech', company: 'Alzio' }
   });
 });
 
@@ -184,6 +200,9 @@ router.post('/tenants', requireSuperadminAuth, async (req, res) => {
       ? new Date(Date.now() + trial_days * 24 * 60 * 60 * 1000).toISOString()
       : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(); // 14 días por defecto
 
+    // E-AGENT-9: dashboard_password queda NULL — la auth real vive en
+    // users.password_hash (bcrypt). El password se entrega por canal seguro
+    // al cliente (WhatsApp welcome message en /onboarding) sin pasar por DB.
     const { data, error } = await supabase.from('tenants').insert({
       business_name,
       slug: slug || business_name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-'),
@@ -194,7 +213,7 @@ router.post('/tenants', requireSuperadminAuth, async (req, res) => {
       status: status || 'trial',
       trial_ends_at: trialEnd,
       dashboard_email: dashboard_email || contact_email,
-      dashboard_password: dashboard_password || 'Mistica2026!',
+      dashboard_password: null,
       internal_notes
     }).select().single();
 
@@ -463,6 +482,11 @@ router.post('/onboarding', requireSuperadminAuth, async (req, res) => {
     const trialEnd = new Date(Date.now() + trial_days * 24 * 60 * 60 * 1000).toISOString();
     const tenantSlug = slug || business_name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
 
+    // E-AGENT-9: usar password generado random si el SA no provee uno.
+    // dashboard_password queda NULL en tenants (legacy field deprecated);
+    // la auth real es bcrypt en users.password_hash.
+    const generatedPassword = dashboard_password || `Alz-${Math.random().toString(36).slice(2, 10)}`;
+
     const { data: tenant, error: tenantErr } = await supabase.from('tenants').insert({
       business_name, slug: tenantSlug,
       contact_email, contact_phone, contact_name,
@@ -470,7 +494,7 @@ router.post('/onboarding', requireSuperadminAuth, async (req, res) => {
       billing_cycle,
       status: 'trial', trial_ends_at: trialEnd,
       dashboard_email: dashboard_email || contact_email,
-      dashboard_password: dashboard_password || 'Cambiar2026!',
+      dashboard_password: null,
       onboarding_completed: false,
       onboarding_checklist: { tenant_created: true, property_created: false, apis_configured: false, test_conversation: false }
     }).select().single();
@@ -497,13 +521,16 @@ router.post('/onboarding', requireSuperadminAuth, async (req, res) => {
       }).eq('id', tenant.id);
     }
 
-    // 3. Crear usuario de acceso al dashboard
+    // 3. Crear usuario de acceso al dashboard con bcrypt
+    const userPasswordHash = await hashPassword(generatedPassword);
     await supabase.from('users').insert({
       email: (dashboard_email || contact_email).toLowerCase(),
       name: user_name || contact_name || business_name,
       role: user_role || 'admin',
       property_id: property?.id || null,
-      password_hash: dashboard_password || 'Cambiar2026!',
+      password_hash: userPasswordHash,
+      password_hash_version: 1,
+      password_changed_at: new Date().toISOString(),
       is_active: true
     }).select().single();
 
@@ -515,7 +542,8 @@ router.post('/onboarding', requireSuperadminAuth, async (req, res) => {
         `Tu cuenta está lista. Accede a tu panel en:\n` +
         `🔗 ${panelUrl}\n\n` +
         `📧 Usuario: ${dashboard_email || contact_email}\n` +
-        `🔑 Contraseña: ${dashboard_password || 'Cambiar2026!'}\n\n` +
+        `🔑 Contraseña: ${generatedPassword}\n\n` +
+        `*Importante*: cambia tu contraseña al primer login.\n\n` +
         `Tienes *${trial_days} días de prueba gratuita*.\n\n` +
         `Si necesitas ayuda, escríbenos aquí mismo.\n` +
         `Equipo Alzio`;

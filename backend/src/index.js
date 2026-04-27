@@ -66,6 +66,7 @@ import channelSyncRoutes from './routes/channelSync.js';
 import { syncAllProperties } from './services/icalSync.js';
 import cron from 'node-cron';
 import { generalLimiter } from './middleware/rateLimiter.js';
+import { buildCorsOriginChecker, widgetCorsOpen } from './utils/security.js';
 import { startScheduler } from './services/scheduler.js';
 import { runPendingMigrations } from './services/dbMigrations.js';
 import { detectAndStoreIp } from './utils/ipMonitor.js';
@@ -82,26 +83,35 @@ app.use(helmet({
   contentSecurityPolicy: false // El widget necesita embeberse
 }));
 
-app.use(cors({
-  origin: (origin, cb) => {
-    // Permitir: frontend propio, localhost (dev), cualquier origen para el widget
-    const allowed = [
-      process.env.FRONTEND_URL,
-      'http://localhost:5173',
-      'http://localhost:3000',
-      'http://127.0.0.1:5173'
-    ].filter(Boolean);
+// E-AGENT-9 (2026-04-26): CORS por capas. Antes era efectivamente "*" con
+// credentials:true (vulnerabilidad CSRF). Ahora:
+//   - Rutas de widget/chat/embed → CORS abierto (clientes embeben en sus dominios)
+//   - Resto del API → allowlist estricto (FRONTEND_URL, alzio.co, ALLOWED_ORIGINS)
+const widgetCors = cors({
+  origin: widgetCorsOpen,
+  credentials: false, // widget no usa cookies
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'x-api-key'],
+});
 
-    // Permitir sin origin (apps móviles, curl, scripts embebidos)
-    if (!origin || allowed.includes(origin)) return cb(null, true);
-
-    // Permitir si viene del widget embebido (cualquier web de clientes)
-    cb(null, true); // Producción: restringir a dominios cliente registrados
-  },
+const apiCors = cors({
+  origin: buildCorsOriginChecker(),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-event-checksum']
-}));
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-event-checksum'],
+});
+
+// Widget routes — CORS abierto
+app.use('/api/chat', widgetCors);
+app.use('/api/widget', widgetCors);
+app.use('/embed.js', widgetCors);
+app.use('/api/public', widgetCors);
+// Webhook endpoints — sin CORS check (origen es el provider, no browser)
+app.use('/api/webhooks', widgetCors);
+app.use('/api/payments/webhook', widgetCors);
+
+// Resto del API → allowlist estricto
+app.use(apiCors);
 
 // Parsear JSON — el webhook de Wompi necesita el body raw para verificar firma
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }), (req, res, next) => {
@@ -111,8 +121,11 @@ app.use('/api/payments/webhook', express.raw({ type: 'application/json' }), (req
   next();
 });
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+// E-AGENT-9 (2026-04-26 — M3): bajado de 10mb a 1mb (mitiga DoS por payload).
+// Endpoints específicos que necesiten más (image upload, etc.) deben overrider
+// con su propio limit, no globalmente.
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(morgan('combined'));
 app.use(generalLimiter);
 
@@ -380,6 +393,34 @@ app.listen(PORT, () => {
 
   // Detectar y registrar IP actual del servidor (alerta si cambió)
   detectAndStoreIp().catch(err => console.error('[Startup] IP monitor error:', err.message));
+});
+
+// ============================================================
+// Error handler global — sanitiza stack traces en producción.
+// E-AGENT-9 H-SEC-6 (2026-04-26): antes los handlers route-level hacían
+// res.status(500).json({ error: err.message }) filtrando internals
+// (nombre tabla, columna, dialecto Postgres). Ahora cualquier error no
+// catcheado retorna mensaje genérico + requestId; los detalles van solo
+// al log del servidor.
+// ============================================================
+app.use((err, req, res, _next) => {
+  const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  console.error(JSON.stringify({
+    level: 'error',
+    event: 'unhandled_error',
+    request_id: requestId,
+    method: req.method,
+    path: req.path,
+    error: err.message,
+    stack: err.stack,
+  }));
+  if (res.headersSent) return;
+  const isProd = process.env.NODE_ENV === 'production';
+  res.status(err.status || 500).json({
+    error: isProd ? 'Internal server error' : err.message,
+    code: 'INTERNAL_ERROR',
+    request_id: requestId,
+  });
 });
 
 // ============================================================

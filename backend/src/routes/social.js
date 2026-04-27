@@ -43,17 +43,35 @@ router.get('/webhook/meta', (req, res) => {
   res.sendStatus(403);
 });
 
+// E-AGENT-9 H-SEC-1 (2026-04-26): firma Meta obligatoria si el secret está
+// configurado. En producción rechazamos si el secret no está seteado.
 router.post('/webhook/meta', async (req, res) => {
   const signature = req.headers['x-hub-signature-256'];
-  if (signature && process.env.META_APP_SECRET) {
+  const secret = process.env.META_APP_SECRET;
+  const isProd = process.env.NODE_ENV === 'production';
+
+  if (secret) {
+    if (!signature) {
+      console.warn('[Social] Sin firma Meta');
+      return res.sendStatus(401);
+    }
     const expected = 'sha256=' + crypto
-      .createHmac('sha256', process.env.META_APP_SECRET)
+      .createHmac('sha256', secret)
       .update(JSON.stringify(req.body))
       .digest('hex');
-    if (signature !== expected) {
+    let match = false;
+    try {
+      match = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    } catch {
+      match = false;
+    }
+    if (!match) {
       console.warn('[Social] Firma Meta invalida');
       return res.sendStatus(401);
     }
+  } else if (isProd) {
+    console.error('[Social] META_APP_SECRET no configurado en producción');
+    return res.sendStatus(503);
   }
   res.sendStatus(200);
   const payload = req.body;
@@ -81,8 +99,23 @@ router.post('/webhook/meta', async (req, res) => {
   }
 });
 
+// E-AGENT-9 H-SEC-7 (2026-04-26): proteger webhooks de ingestion públicos
+// con shared secret simple en query/header. Si SOCIAL_INGEST_SECRET no
+// está configurado en prod, el endpoint rechaza con 503.
+function requireIngestSecret(req, res, next) {
+  const secret = process.env.SOCIAL_INGEST_SECRET;
+  const isProd = process.env.NODE_ENV === 'production';
+  if (!secret) {
+    if (isProd) return res.status(503).json({ error: 'webhook_misconfigured' });
+    return next(); // dev: pasa libre
+  }
+  const provided = req.headers['x-ingest-secret'] || req.query.secret;
+  if (provided !== secret) return res.status(401).json({ error: 'unauthorized' });
+  next();
+}
+
 // WEBHOOK TIKTOK
-router.post('/webhook/tiktok', async (req, res) => {
+router.post('/webhook/tiktok', requireIngestSecret, async (req, res) => {
   res.sendStatus(200);
   try {
     const properties = await getProperties();
@@ -241,8 +274,8 @@ router.post('/escalations/:id/resolve', requireAuth, async (req, res) => {
   }
 });
 
-// WEBHOOK WHATSAPP LEARNING
-router.post('/webhook/whatsapp-learning', async (req, res) => {
+// WEBHOOK WHATSAPP LEARNING (protegido por SOCIAL_INGEST_SECRET)
+router.post('/webhook/whatsapp-learning', requireIngestSecret, async (req, res) => {
   res.sendStatus(200);
   try {
     const entry = req.body?.entry?.[0];

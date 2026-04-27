@@ -1,52 +1,21 @@
 import { Router } from 'express';
-import jwt from 'jsonwebtoken';
 import { db, supabase } from '../models/supabase.js';
 import { requireAuth, requireSuperAdmin } from '../middleware/auth.js';
 
 const router = Router();
 
 // ============================================================
-// POST /api/dashboard/login
+// POST /api/dashboard/login — DEPRECATED
+// E-AGENT-9 (2026-04-26): eliminado el login legacy que comparaba
+// `password === user.password_hash` (plaintext). Toda autenticación
+// ahora pasa por POST /api/auth/login (bcrypt + auto-rehash).
+// Devolvemos 410 Gone para forzar a clientes legacy a actualizar.
 // ============================================================
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email y contraseña requeridos' });
-  }
-
-  try {
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email.toLowerCase().trim())
-      .single();
-
-    if (error || !user) {
-      return res.status(401).json({ error: 'Credenciales inválidas' });
-    }
-
-    if (password !== user.password_hash) {
-      return res.status(401).json({ error: 'Credenciales inválidas' });
-    }
-
-    await supabase
-      .from('users')
-      .update({ last_login: new Date().toISOString() })
-      .eq('id', user.id);
-
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, property_id: user.property_id },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    res.json({
-      token,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role, property_id: user.property_id }
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+router.post('/login', (_req, res) => {
+  res.status(410).json({
+    error: 'Endpoint deprecated. Usar POST /api/auth/login.',
+    code: 'AUTH_ENDPOINT_DEPRECATED',
+  });
 });
 
 // ============================================================

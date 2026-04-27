@@ -1,30 +1,15 @@
 // /api/auth — Authentication endpoints for Alzio
 // E-AGENT-1 (2026-04-26): bcrypt hashing + auto-rehash de legacy plaintext.
+// E-AGENT-9 (2026-04-26): centralizado JWT_SECRET + verifyPassword/hashPassword
+// en utils/security.js (fail-closed en producción).
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
 import { supabase } from '../models/supabase.js';
 import { requireAuth } from '../middleware/auth.js';
+import { JWT_SECRET, hashPassword, verifyPassword } from '../utils/security.js';
+import { authLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
-const BCRYPT_ROUNDS = 10;
-
-// Verifica password contra hash. Soporta:
-//   - password_hash_version = 0 -> plaintext legacy (compare ===)
-//   - password_hash_version = 1 -> bcrypt
-// Retorna { ok, needsRehash }
-async function verifyPassword(plain, hash, version) {
-  if (version === 1 || (typeof hash === 'string' && hash.startsWith('$2'))) {
-    const ok = await bcrypt.compare(plain, hash);
-    return { ok, needsRehash: false };
-  }
-  // legacy plaintext
-  return { ok: plain === hash, needsRehash: true };
-}
-
-async function hashPassword(plain) {
-  return bcrypt.hash(plain, BCRYPT_ROUNDS);
-}
 
 // Resolver tenant_id principal de un user (vía tenant_members; fallback a property)
 async function resolveTenantId(userId, propertyId) {
@@ -49,7 +34,7 @@ async function resolveTenantId(userId, propertyId) {
 }
 
 // ── POST /api/auth/login ──────────────────────────────────────
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email y contraseña requeridos' });
 
@@ -102,7 +87,7 @@ router.post('/login', async (req, res) => {
         property_id: user.property_id,
         tenant_id: tenantId,
       },
-      process.env.JWT_SECRET || 'revio_dev_secret_2026',
+      JWT_SECRET,
       { expiresIn: '7d' }
     );
 
@@ -132,7 +117,7 @@ router.post('/login', async (req, res) => {
 });
 
 // ── POST /api/auth/register ───────────────────────────────────
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   const { name, email, password, phone, property_name, property_type, city, plan = 'starter' } = req.body;
   if (!name || !email || !password || !property_name) {
     return res.status(400).json({ error: 'name, email, password y property_name son requeridos' });
@@ -207,7 +192,7 @@ router.post('/register', async (req, res) => {
         property_id: property.id,
         tenant_id: tenantId,
       },
-      process.env.JWT_SECRET || 'revio_dev_secret_2026',
+      JWT_SECRET,
       { expiresIn: '7d' }
     );
 

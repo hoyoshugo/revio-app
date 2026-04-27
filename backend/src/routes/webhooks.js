@@ -117,19 +117,38 @@ router.get('/meta', (req, res) => {
 });
 
 // ── POST /api/webhooks/meta — recibir eventos ──────────
-router.post('/meta', express.json(), async (req, res) => {
-  // Validar firma HMAC si está configurada
+// E-AGENT-9 H-SEC-1 (2026-04-26): rechazo si META_APP_SECRET está seteado
+// pero la firma falta o no matchea. Antes la validación era opt-in
+// (cualquiera podía forjar eventos omitiendo el header).
+router.post('/meta', express.json({ limit: '512kb' }), async (req, res) => {
   const sig = req.headers['x-hub-signature-256'];
-  if (sig && process.env.META_APP_SECRET) {
+  const secret = process.env.META_APP_SECRET;
+  const isProd = process.env.NODE_ENV === 'production';
+
+  if (secret) {
+    if (!sig) {
+      return res.status(401).json({ error: 'signature_required' });
+    }
     const expected =
       'sha256=' +
       crypto
-        .createHmac('sha256', process.env.META_APP_SECRET)
+        .createHmac('sha256', secret)
         .update(JSON.stringify(req.body))
         .digest('hex');
-    if (sig !== expected) {
+    // Comparación constant-time para evitar timing attacks
+    let match = false;
+    try {
+      match = crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+    } catch {
+      match = false;
+    }
+    if (!match) {
       return res.status(401).json({ error: 'invalid_signature' });
     }
+  } else if (isProd) {
+    // Fail closed en producción si el secret no está configurado
+    console.error('[webhooks/meta] META_APP_SECRET no configurado en producción');
+    return res.status(503).json({ error: 'webhook_misconfigured' });
   }
 
   // Responder 200 inmediatamente — Meta exige respuesta rápida

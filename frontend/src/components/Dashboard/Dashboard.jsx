@@ -221,7 +221,8 @@ export default function Dashboard() {
   // Whitelist de módulos con UI terminada (los demás existen en DB pero
   // no aparecen en el sidebar hasta que su UI esté lista).
   // Items sin `module` declarado son siempre visibles (core del Agente IA).
-  const RELEASED_MODULES = ['revenue_agent', 'pms'];
+  // PMS oculto hasta que el módulo esté production-ready (E-AGENT-8).
+  const RELEASED_MODULES = ['revenue_agent'];
 
   const canShowModule = (moduleKey) =>
     RELEASED_MODULES.includes(moduleKey) && hasModule?.(moduleKey) !== false;

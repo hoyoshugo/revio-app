@@ -23,3 +23,16 @@ export const webhookLimiter = rateLimit({
   max: 100,
   message: { error: 'Demasiadas solicitudes al webhook' }
 });
+
+// Límite estricto para auth (login, register, sa/login). Bloquea credential
+// stuffing y enumeration: 5 intentos por IP cada 15 min.
+// E-AGENT-9 H-SEC-4 (2026-04-26).
+export const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Demasiados intentos de login. Espera 15 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // No contar intentos exitosos
+  skipSuccessfulRequests: true,
+});

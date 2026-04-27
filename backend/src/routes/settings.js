@@ -170,11 +170,48 @@ router.post('/properties', requireSuperAdmin, async (req, res) => {
   }
 });
 
+// E-AGENT-9 H-SEC-2 (2026-04-26): RBAC + tenant scoping en property update.
+// Antes: cualquier authenticated user podía editar cualquier property con
+// cualquier campo (incluyendo tenant_id, lo cual permitía hijack cross-tenant).
 router.put('/properties/:id', requireAuth, async (req, res) => {
   try {
+    // Solo admin/owner/manager pueden editar propiedades
+    const role = req.user?.role;
+    if (!['admin', 'owner', 'manager', 'super_admin'].includes(role)) {
+      return res.status(403).json({ error: 'Permiso insuficiente' });
+    }
+
+    // Verificar tenant ownership
+    const callerTenantId = req.user?.tenant_id;
+    if (!callerTenantId && role !== 'super_admin') {
+      return res.status(403).json({ error: 'Sin tenant válido' });
+    }
+
+    const { data: target } = await supabase
+      .from('properties')
+      .select('id, tenant_id')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (!target) return res.status(404).json({ error: 'Propiedad no encontrada' });
+    if (role !== 'super_admin' && target.tenant_id !== callerTenantId) {
+      return res.status(403).json({ error: 'No puedes editar propiedades de otro tenant' });
+    }
+
+    // Whitelist de campos (NO permitir cambiar tenant_id ni id)
+    const ALLOWED = new Set([
+      'name', 'brand_name', 'brand_logo_url', 'brand_primary_color',
+      'brand_secondary_color', 'location', 'timezone', 'default_language',
+      'whatsapp_number', 'booking_url', 'plan', 'languages', 'lobby_pms_id',
+      'is_active',
+    ]);
+    const updates = Object.fromEntries(
+      Object.entries(req.body).filter(([k]) => ALLOWED.has(k))
+    );
+    updates.updated_at = new Date().toISOString();
+
     const { data, error } = await supabase
       .from('properties')
-      .update({ ...req.body, updated_at: new Date().toISOString() })
+      .update(updates)
       .eq('id', req.params.id)
       .select().single();
     if (error) throw error;
@@ -196,13 +233,33 @@ router.delete('/properties/:id', requireSuperAdmin, async (req, res) => {
 // ============================================================
 // USUARIOS
 // ============================================================
+// E-AGENT-9 H-SEC-3 (2026-04-26): tenant scoping obligatorio. Antes
+// listaba todos los usuarios de TODOS los tenants si el caller no era
+// super_admin y no pasaba property_id (la mayoría de los casos).
 router.get('/users', requireAuth, async (req, res) => {
   try {
-    let query = supabase.from('users').select('id, email, name, role, property_id, is_active, last_login, created_at').order('created_at');
-    // Staff solo ve usuarios de su propiedad
-    if (req.user?.role !== 'super_admin' && req.query.property_id) {
-      query = query.eq('property_id', req.query.property_id);
+    const role = req.user?.role;
+    const callerTenantId = req.user?.tenant_id;
+    const propertyId = req.user?.property_id;
+
+    let query = supabase.from('users').select('id, email, name, role, property_id, tenant_id, is_active, last_login, created_at').order('created_at');
+
+    if (role === 'super_admin') {
+      // SA puede filtrar libremente
+      if (req.query.property_id) query = query.eq('property_id', req.query.property_id);
+      if (req.query.tenant_id) query = query.eq('tenant_id', req.query.tenant_id);
+    } else {
+      // Resolver tenant si no está en el JWT (compat tokens viejos)
+      let tenantId = callerTenantId;
+      if (!tenantId && propertyId) {
+        const { data: prop } = await supabase
+          .from('properties').select('tenant_id').eq('id', propertyId).maybeSingle();
+        tenantId = prop?.tenant_id || null;
+      }
+      if (!tenantId) return res.json([]);
+      query = query.eq('tenant_id', tenantId);
     }
+
     const { data, error } = await query;
     if (error) throw error;
     res.json(data || []);

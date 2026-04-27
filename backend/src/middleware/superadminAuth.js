@@ -4,8 +4,9 @@
  * Las credenciales vienen de SUPERADMIN_EMAIL / SUPERADMIN_PASSWORD en .env.
  */
 import jwt from 'jsonwebtoken';
+import { JWT_SUPERADMIN_SECRET } from '../utils/security.js';
 
-const SA_SECRET = process.env.JWT_SUPERADMIN_SECRET || process.env.JWT_SECRET + '_superadmin';
+const SA_SECRET = JWT_SUPERADMIN_SECRET;
 
 export function requireSuperadminAuth(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');

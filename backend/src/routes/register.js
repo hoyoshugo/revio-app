@@ -1,15 +1,21 @@
 /**
- * POST /api/register — Registro público de nuevos tenants Revio
- * Crea tenant + property + user en un paso y devuelve token de onboarding
+ * POST /api/register — Registro público de nuevos tenants Alzio
+ * Crea tenant + property + user en un paso y devuelve token de onboarding.
+ *
+ * E-AGENT-9 (2026-04-26): bcrypt en password (antes plaintext en
+ * users.password_hash y tenants.dashboard_password) + JWT_SECRET
+ * centralizado (antes default 'dev-secret').
  */
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import { supabase } from '../models/supabase.js';
+import { JWT_SECRET, hashPassword } from '../utils/security.js';
+import { authLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 
 // POST /api/register
-router.post('/', async (req, res) => {
+router.post('/', authLimiter, async (req, res) => {
   const { email, password, name, business_name, phone, plan = 'pro' } = req.body;
 
   if (!email || !password || !name || !business_name) {
@@ -45,7 +51,8 @@ router.post('/', async (req, res) => {
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 
-    // Create tenant
+    // Create tenant — NO guardar password plaintext en dashboard_password.
+    // El campo legacy queda NULL; la auth real vive en users.password_hash (bcrypt).
     const { data: tenant, error: tenantErr } = await supabase
       .from('tenants')
       .insert({
@@ -59,7 +66,7 @@ router.post('/', async (req, res) => {
         status: 'trial',
         trial_ends_at: trialEnd,
         dashboard_email: email.toLowerCase().trim(),
-        dashboard_password: password,
+        dashboard_password: null,
         onboarding_completed: false,
         onboarding_checklist: { tenant_created: true, property_created: false, apis_configured: false, test_conversation: false }
       })
@@ -68,14 +75,17 @@ router.post('/', async (req, res) => {
 
     if (tenantErr) throw tenantErr;
 
-    // Create admin user
+    // Create admin user con bcrypt
+    const passwordHash = await hashPassword(password);
     const { data: user, error: userErr } = await supabase
       .from('users')
       .insert({
         email: email.toLowerCase().trim(),
         name,
         role: 'admin',
-        password_hash: password,
+        password_hash: passwordHash,
+        password_hash_version: 1,
+        password_changed_at: new Date().toISOString(),
         is_active: true,
         // property_id will be set after onboarding
       })
@@ -87,7 +97,7 @@ router.post('/', async (req, res) => {
     // Issue onboarding JWT
     const token = jwt.sign(
       { id: user.id, email: user.email, role: 'admin', tenant_id: tenant.id },
-      process.env.JWT_SECRET || 'dev-secret',
+      JWT_SECRET,
       { expiresIn: '2h' }
     );
 
@@ -115,7 +125,7 @@ router.post('/onboarding/complete', async (req, res) => {
 
   let decoded;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
+    decoded = jwt.verify(token, JWT_SECRET);
   } catch {
     return res.status(401).json({ error: 'Token inválido o expirado' });
   }
@@ -194,7 +204,7 @@ router.post('/onboarding/complete', async (req, res) => {
     // Issue full dashboard token
     const dashToken = jwt.sign(
       { id: decoded.id, email: decoded.email, role: 'admin', property_id: property?.id },
-      process.env.JWT_SECRET || 'dev-secret',
+      JWT_SECRET,
       { expiresIn: '24h' }
     );
 

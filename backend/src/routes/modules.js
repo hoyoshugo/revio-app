@@ -1,6 +1,13 @@
 import { Router } from 'express';
 import { supabase } from '../models/supabase.js';
-import { requireAuth, requireSuperAdmin } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
+import { requireSuperadminAuth } from '../middleware/superadminAuth.js';
+
+// Compat: el ModulesPanel usa el token de super-admin tech (sa_token), no el
+// JWT regular. requireSuperAdmin del middleware/auth.js valida un role
+// 'super_admin' que NO existe en el flujo actual. Usamos requireSuperadminAuth
+// que valida JWT_SUPERADMIN_SECRET + role 'superadmin_tech'.
+const requireSuperAdmin = requireSuperadminAuth;
 
 const router = Router();
 
