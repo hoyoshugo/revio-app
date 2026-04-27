@@ -8,11 +8,17 @@
 import express from 'express';
 import { supabase } from '../models/supabase.js';
 import { requireAuth } from '../middleware/auth.js';
+import { requireProperty } from '../middleware/requireProperty.js';
 
 const router = express.Router();
 
+// E-AGENT-10 B-AGT-2 (2026-04-26): tenant scoping obligatorio. Antes
+// /api/knowledge/:propertyId solo filtraba por property_id sin verificar
+// que el caller pertenezca al tenant. Cualquier customer logueado podía
+// leer/editar el knowledge base de otro hotel cambiando la URL.
+
 // GET /api/knowledge/:propertyId — listar entradas activas + inactivas
-router.get('/:propertyId', requireAuth, async (req, res) => {
+router.get('/:propertyId', requireAuth, requireProperty(), async (req, res) => {
   try {
     const { propertyId } = req.params;
     const { category } = req.query;
@@ -36,7 +42,7 @@ router.get('/:propertyId', requireAuth, async (req, res) => {
 });
 
 // POST /api/knowledge/:propertyId — crear entrada
-router.post('/:propertyId', requireAuth, async (req, res) => {
+router.post('/:propertyId', requireAuth, requireProperty(), async (req, res) => {
   try {
     const { propertyId } = req.params;
     const { category, key, value, is_active = true, sort_order = 0 } = req.body;
@@ -65,7 +71,7 @@ router.post('/:propertyId', requireAuth, async (req, res) => {
 });
 
 // PUT /api/knowledge/:propertyId/:id — actualizar entrada
-router.put('/:propertyId/:id', requireAuth, async (req, res) => {
+router.put('/:propertyId/:id', requireAuth, requireProperty(), async (req, res) => {
   try {
     const { propertyId, id } = req.params;
     const { value, is_active, sort_order, key } = req.body;
@@ -94,7 +100,7 @@ router.put('/:propertyId/:id', requireAuth, async (req, res) => {
 });
 
 // DELETE /api/knowledge/:propertyId/:id — eliminar entrada
-router.delete('/:propertyId/:id', requireAuth, async (req, res) => {
+router.delete('/:propertyId/:id', requireAuth, requireProperty(), async (req, res) => {
   try {
     const { propertyId, id } = req.params;
 

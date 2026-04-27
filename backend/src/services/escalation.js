@@ -17,10 +17,84 @@ import { sendWhatsAppMessage } from '../integrations/whatsapp.js';
 import { trackAnthropicUsage } from './aiUsageTracker.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const TEAM_NUMBERS = [
-  process.env.ESCALATION_WHATSAPP_1 || '+573057673770',
-  process.env.ESCALATION_WHATSAPP_2 || '+573006526427'
-];
+
+// E-AGENT-10 H-AGT-2 (2026-04-26): números de escalation per-tenant.
+// Antes hardcoded a +573057673770 / +573006526427 (Mística internal). Esos
+// números recibían escalations de TODOS los tenants — leak cross-tenant +
+// notificaciones spam al staff equivocado. Ahora resuelve dinámicamente
+// vía resolveEscalationTargets(propertyId).
+//
+// Fallback global SOLO se usa si no hay config per-tenant Y solo en dev.
+const FALLBACK_TEAM_NUMBERS = [
+  process.env.ESCALATION_WHATSAPP_1,
+  process.env.ESCALATION_WHATSAPP_2,
+].filter(Boolean);
+
+/**
+ * Resuelve {numbers[], brand} para una escalation.
+ * Prioridad:
+ *   1. tenants.escalation_phones (jsonb array)
+ *   2. tenants.contact_phone (single)
+ *   3. settings.escalation_team (per-property override)
+ *   4. fallback env vars (solo dev)
+ */
+async function resolveEscalationTargets(propertyId) {
+  let brand = 'Alzio';
+  let numbers = [];
+
+  try {
+    const { data: prop } = await supabase
+      .from('properties')
+      .select('tenant_id, brand_name, name')
+      .eq('id', propertyId)
+      .maybeSingle();
+
+    if (prop?.tenant_id) {
+      const { data: tenant } = await supabase
+        .from('tenants')
+        .select('business_name, contact_phone, escalation_phones')
+        .eq('id', prop.tenant_id)
+        .maybeSingle();
+
+      brand = prop.brand_name || prop.name || tenant?.business_name || brand;
+
+      // escalation_phones = jsonb array | csv string | null
+      const ep = tenant?.escalation_phones;
+      if (Array.isArray(ep)) numbers = ep.filter(Boolean).map(String);
+      else if (typeof ep === 'string') numbers = ep.split(',').map(s => s.trim()).filter(Boolean);
+
+      if (!numbers.length && tenant?.contact_phone) {
+        numbers = [tenant.contact_phone];
+      }
+    }
+
+    // Per-property override en settings (escalation_team key)
+    if (!numbers.length) {
+      const { data: setting } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('property_id', propertyId)
+        .eq('key', 'escalation_team')
+        .maybeSingle();
+      const cfg = setting?.value;
+      const arr = Array.isArray(cfg?.numbers) ? cfg.numbers : null;
+      if (arr) numbers = arr.filter(Boolean).map(String);
+    }
+  } catch (err) {
+    console.error('[escalation] resolveEscalationTargets error:', err.message);
+  }
+
+  if (!numbers.length) {
+    if (process.env.NODE_ENV !== 'production') {
+      numbers = FALLBACK_TEAM_NUMBERS;
+      console.warn('[escalation] Sin escalation_phones config — usando fallback DEV');
+    } else {
+      console.error('[escalation] Tenant sin escalation_phones configurado en producción');
+    }
+  }
+
+  return { numbers, brand };
+}
 
 // Patrones de frustración o solicitud de humano
 const ESCALATION_PATTERNS = [
@@ -160,6 +234,7 @@ async function generateConversationSummary(conversationHistory, tenantId = null)
 
 // ============================================================
 // Notificar al equipo por WhatsApp
+// E-AGENT-10 H-AGT-2: brand y team numbers per-tenant.
 // ============================================================
 async function notifyTeam(escalation, summary, conversationHistory) {
   const lastMessage = conversationHistory?.slice(-1)[0];
@@ -168,7 +243,9 @@ async function notifyTeam(escalation, summary, conversationHistory) {
     long_conversation: '⏰ Conversación sin resolver (>15 mensajes)'
   };
 
-  const msg = `🚨 *ESCALACIÓN — Mística AI*\n\n` +
+  const { numbers, brand } = await resolveEscalationTargets(escalation.property_id);
+
+  const msg = `🚨 *ESCALACIÓN — ${brand}*\n\n` +
     `*Motivo:* ${reasonLabels[escalation.reason] || escalation.reason}\n` +
     `*ID:* ${escalation.id}\n\n` +
     `📋 *Resumen:*\n${summary}\n\n` +
@@ -178,7 +255,12 @@ async function notifyTeam(escalation, summary, conversationHistory) {
     `Para que la IA retome, envía:\n` +
     `*REANUDAR ${escalation.id}*`;
 
-  for (const number of TEAM_NUMBERS) {
+  if (!numbers.length) {
+    console.warn('[Escalation] Sin números configurados para tenant — escalation registrada solo en BD');
+    return;
+  }
+
+  for (const number of numbers) {
     try {
       await sendWhatsAppMessage(number, msg);
     } catch (err) {
@@ -207,15 +289,31 @@ export async function isAiPaused(conversationId) {
 // Reanudar IA (comando del equipo: "REANUDAR {id}")
 // ============================================================
 export async function resumeFromMessage(text, fromNumber) {
-  // Solo el equipo puede reanudar
-  if (!TEAM_NUMBERS.some(n => text.includes(n.replace('+', '')) || fromNumber === n)) {
-    return false;
-  }
-
   const match = text.match(/REANUDAR\s+([a-f0-9-]{36})/i);
   if (!match) return false;
 
   const escalationId = match[1];
+
+  // E-AGENT-10 H-AGT-2: validar que el sender pertenezca al team del tenant
+  // de ESA escalation, no a un global hardcoded.
+  try {
+    const { data: esc } = await supabase
+      .from('escalations')
+      .select('property_id')
+      .eq('id', escalationId)
+      .maybeSingle();
+    if (!esc) return false;
+    const { numbers } = await resolveEscalationTargets(esc.property_id);
+    const allowed = numbers.some(n => fromNumber === n || text.includes(String(n).replace('+', '')));
+    if (!allowed) {
+      console.warn(`[Escalation] REANUDAR rechazado: ${fromNumber} no es team del tenant de ${escalationId}`);
+      return false;
+    }
+  } catch (err) {
+    console.error('[Escalation] resumeFromMessage validation error:', err.message);
+    return false;
+  }
+
   return await resolveEscalation(escalationId, 'team_resumed');
 }
 
@@ -228,7 +326,7 @@ export async function resolveEscalation(escalationId, resolvedBy = 'manual') {
       .from('escalations')
       .update({ status: 'resolved', resolved_at: new Date().toISOString(), resolved_by: resolvedBy })
       .eq('id', escalationId)
-      .select('conversation_id')
+      .select('conversation_id, property_id')
       .single();
 
     if (!escalation) return false;
@@ -241,11 +339,14 @@ export async function resolveEscalation(escalationId, resolvedBy = 'manual') {
 
     console.log(`[Escalation] Resuelta: ${escalationId} por ${resolvedBy}`);
 
-    // Notificar al equipo que la IA fue reanudada
-    const msg = `✅ *Mística AI reanudada*\n\nLa IA ha retomado la conversación ${escalationId}.`;
-    for (const number of TEAM_NUMBERS) {
-      try { await sendWhatsAppMessage(number, msg); } catch { /* silencioso */ }
-    }
+    // E-AGENT-10 H-AGT-2: notificar al team del tenant correcto, no global
+    try {
+      const { numbers, brand } = await resolveEscalationTargets(escalation.property_id);
+      const msg = `✅ *${brand} AI reanudada*\n\nLa IA ha retomado la conversación ${escalationId}.`;
+      for (const number of numbers) {
+        try { await sendWhatsAppMessage(number, msg); } catch { /* silencioso */ }
+      }
+    } catch { /* silent */ }
 
     return true;
   } catch (err) {

@@ -92,12 +92,52 @@ async function resolvePropertyForEvent(event, allProperties) {
     }
   }
 
-  // Fallback: primera propiedad
+  // E-AGENT-10 H-AGT-3 (2026-04-26): NO fallback ciego a properties[0].
+  // Antes routeaba mensajes al primer tenant del DB cuando no había match,
+  // causando cross-tenant leak de mensajes. Ahora retorna null y el caller
+  // descarta el evento con log de warning.
   return {
-    property: allProperties[0],
-    isShared: allProperties.length > 1,
-    matchedBy: 'fallback',
+    property: null,
+    isShared: false,
+    matchedBy: 'no_match',
   };
+}
+
+// E-AGENT-10 B-AGT-1 (2026-04-26): deduplicación de webhook events.
+// Meta reintenta cualquier webhook que no responda 2xx en 20s, además de su
+// propio backoff. Antes processMetaEvents podía crear reservas duplicadas
+// (confirm_booking llamado N veces para el mismo messageId). Ahora insertamos
+// el messageId en webhook_events con UNIQUE constraint; si ya existe, skip.
+//
+// Tabla esperada (DDL):
+//   CREATE TABLE webhook_events (
+//     id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+//     provider        text NOT NULL,    -- 'meta' | 'wompi' | 'lobbypms'
+//     external_id     text NOT NULL,    -- messageId / transactionId
+//     received_at     timestamptz NOT NULL DEFAULT now(),
+//     payload         jsonb,
+//     UNIQUE(provider, external_id)
+//   );
+async function isDuplicateEvent(provider, externalId, payload) {
+  if (!externalId) return false;
+  try {
+    const { error } = await supabase
+      .from('webhook_events')
+      .insert({ provider, external_id: externalId, payload: payload || null });
+    if (error) {
+      // Postgres unique violation = 23505 (Supabase los expone como code "23505")
+      if (error.code === '23505' || /duplicate key/i.test(error.message || '')) {
+        return true;
+      }
+      // Tabla puede no existir todavía — log y continuar (NO bloquear)
+      console.warn('[webhooks] dedupe insert failed (continuing):', error.message);
+      return false;
+    }
+    return false;
+  } catch (err) {
+    console.warn('[webhooks] dedupe check error (continuing):', err.message);
+    return false;
+  }
 }
 
 // ── GET /api/webhooks/meta — verificación ──────────────
@@ -175,8 +215,32 @@ async function processMetaEvents(body) {
 
   for (const event of events) {
     try {
+      // ── Deduplicación: skip si ya procesamos este messageId ──
+      const externalId = event.messageId || event.commentId || null;
+      if (externalId && await isDuplicateEvent('meta', externalId, event)) {
+        console.log(JSON.stringify({
+          level: 'info',
+          event: 'meta_event_dedup_skip',
+          messageId: externalId,
+          channel: event.channel,
+        }));
+        continue;
+      }
+
       // ── Ruteo automático por page_id ──
       const { property, isShared, matchedBy } = await resolvePropertyForEvent(event, properties);
+
+      // E-AGENT-10 H-AGT-3: rechazar si no hay match (antes routeaba a properties[0])
+      if (!property) {
+        console.warn(JSON.stringify({
+          level: 'warn',
+          event: 'meta_event_no_property_match',
+          channel: event.channel,
+          pageId: event.pageId,
+          message: 'Mensaje descartado: ningún property mapeado para este page_id/phone_number_id. Configurar en channel_property_map.',
+        }));
+        continue;
+      }
 
       console.log(JSON.stringify({
         level: 'info',

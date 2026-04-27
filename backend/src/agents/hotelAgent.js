@@ -33,7 +33,17 @@ import {
 // Cliente fallback con la key plataforma de Alzio (env var). Solo se usa
 // cuando el tenant tiene platform_billing_enabled=true y no configuro su
 // propia key. En BYOK strict mode el agente bloquea antes de llegar aqui.
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+//
+// E-AGENT-10 (2026-04-26 — B-AGT-5):
+//   - timeout 25s en cada call (antes default 10min — webhook expiraba)
+//   - maxRetries 2 con backoff manejado por el SDK
+//   - signal: opcional desde el caller para cortar antes
+const ANTHROPIC_TIMEOUT_MS = 25_000;
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  timeout: ANTHROPIC_TIMEOUT_MS,
+  maxRetries: 2,
+});
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const MODEL = DEFAULT_MODEL;
 
@@ -45,13 +55,39 @@ async function resolveAnthropicClient(propertyId) {
     const tenantKey = cfg?.api_key && String(cfg.api_key).trim();
     if (tenantKey && tenantKey.length > 10) {
       return {
-        client: new Anthropic({ apiKey: tenantKey }),
+        client: new Anthropic({
+          apiKey: tenantKey,
+          timeout: ANTHROPIC_TIMEOUT_MS,
+          maxRetries: 2,
+        }),
         model: cfg.model || DEFAULT_MODEL,
         usingPlatformKey: false,
       };
     }
   } catch { /* fallback to platform */ }
   return { client: anthropic, model: DEFAULT_MODEL, usingPlatformKey: true };
+}
+
+// Helper: localized error messages (B-AGT-5)
+function localizedRateLimitMessage(lang = 'es') {
+  const map = {
+    es: 'Tengo alta demanda en este momento, dame 30 segundos y vuelvo a intentar.',
+    en: 'I am experiencing high demand right now. Please give me 30 seconds and I will try again.',
+    pt: 'Estou com alta demanda agora. Por favor, me dê 30 segundos para tentar novamente.',
+    fr: 'Je suis très sollicité en ce moment. Donnez-moi 30 secondes et je réessaie.',
+    de: 'Hohes Anfrageaufkommen. Bitte gib mir 30 Sekunden, dann versuche ich es erneut.',
+  };
+  return map[lang] || map.es;
+}
+function localizedQuotaMessage(lang = 'es') {
+  const map = {
+    es: 'El equipo del hotel te contactará en breve. Tu mensaje fue recibido.',
+    en: 'The hotel team will contact you shortly. Your message was received.',
+    pt: 'A equipe do hotel entrará em contato em breve. Sua mensagem foi recebida.',
+    fr: "L'équipe de l'hôtel vous contactera sous peu. Votre message a été reçu.",
+    de: 'Das Hotel-Team meldet sich bald bei dir. Deine Nachricht wurde empfangen.',
+  };
+  return map[lang] || map.es;
 }
 
 // ============================================================
@@ -764,7 +800,14 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
   // ── Resolver Anthropic client per-tenant + BYOK enforcement ─────
   // Si el tenant exige BYOK y no tiene key configurada, devolver mensaje
   // claro al huesped sin gastar la key plataforma.
+  //
+  // E-AGENT-10 (2026-04-26 — B-AGT-4): hard limit max_conversations_month.
+  // Antes checkMonthlyConversationLimit era DEAD CODE — tenants con plataforma
+  // key quemaban Anthropic credits sin tope. Ahora si superaron el cupo Y
+  // están usando key plataforma, bloqueamos con mensaje localizado y NO
+  // llamamos Claude.
   const tenantIdForBilling = property?.tenant_id || null;
+  const guestLanguage = conversation?.guest_language || 'es';
   let aiClient = anthropic;
   let aiModel = MODEL;
   let usingPlatformKey = true;
@@ -778,6 +821,33 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
       aiClient = resolved.client;
       aiModel = resolved.model;
       usingPlatformKey = resolved.usingPlatformKey;
+
+      // Enforcement del límite mensual SOLO si usa key plataforma
+      // (BYOK paga el cliente, sin límite en Alzio).
+      if (usingPlatformKey && tenantIdForBilling) {
+        const limitStatus = await checkMonthlyConversationLimit(tenantIdForBilling);
+        if (!limitStatus.allowed) {
+          finalResponse = localizedQuotaMessage(guestLanguage);
+          console.warn(JSON.stringify({
+            level: 'warn',
+            event: 'monthly_quota_exceeded',
+            tenant_id: tenantIdForBilling,
+            used: limitStatus.used,
+            limit: limitStatus.limit,
+          }));
+          // Auto-escalate al staff para que extiendan el plan o cobren al cliente
+          try {
+            const { createEscalation: ce } = await import('../services/escalation.js');
+            await ce({
+              property_id: propertyId,
+              session_id: sessionId,
+              reason: `Tenant superó cupo mensual: ${limitStatus.used}/${limitStatus.limit} mensajes`,
+              guest_message: userMessage,
+              guest_phone: conversation?.guest_phone || null,
+            }).catch(() => {});
+          } catch { /* ignore */ }
+        }
+      }
     }
   } catch (gateErr) {
     console.error('[Agent] BYOK gate error:', gateErr.message);
@@ -851,11 +921,44 @@ export async function processMessage(sessionId, userMessage, propertyId, convers
       .join('\n');
 
   } catch (err) {
-    if (err.message !== 'BYOK gate blocked') {
-      console.error('[Agent] Error llamando a Claude:', err.message);
-    }
-    if (!finalResponse) {
-      finalResponse = getErrorMessage(conversation.guest_language || 'es');
+    if (err.message === 'BYOK gate blocked') {
+      // finalResponse ya fue seteado por el gate
+    } else {
+      // E-AGENT-10 (B-AGT-5): catch específico para errores tipados de Anthropic.
+      // Status 429: rate limit / overloaded. Status 401: bad API key.
+      // Status 5xx: provider issue. Network/timeout: ETIMEDOUT/ECONNRESET.
+      const status = err?.status || err?.response?.status;
+      const code = err?.code || err?.cause?.code;
+      console.error(JSON.stringify({
+        level: 'error',
+        event: 'anthropic_call_failed',
+        status: status || null,
+        code: code || null,
+        error: err.message,
+        property_id: propertyId,
+        tenant_id: tenantIdForBilling,
+      }));
+
+      if (!finalResponse) {
+        if (status === 429 || status === 529 /* overloaded */) {
+          finalResponse = localizedRateLimitMessage(guestLanguage);
+        } else if (status === 401 || status === 403) {
+          // Key inválida / suspendida — alerta a staff
+          finalResponse = '⚠️ El agente IA tiene un problema de configuración. El equipo del hotel te contactará en breve.';
+          try {
+            const { createEscalation: ce2 } = await import('../services/escalation.js');
+            await ce2({
+              property_id: propertyId,
+              session_id: sessionId,
+              reason: `API key Anthropic inválida o suspendida (status ${status})`,
+              guest_message: userMessage,
+              guest_phone: conversation?.guest_phone || null,
+            }).catch(() => {});
+          } catch { /* ignore */ }
+        } else {
+          finalResponse = getErrorMessage(guestLanguage);
+        }
+      }
     }
   }
 

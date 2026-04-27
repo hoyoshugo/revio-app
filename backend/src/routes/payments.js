@@ -8,38 +8,64 @@ import { webhookLimiter } from '../middleware/rateLimiter.js';
 const router = Router();
 
 // POST /api/payments/webhook — Webhook de Wompi
+//
+// E-AGENT-10 B-AGT-3 (2026-04-26): firma Wompi verificada contra UNA SOLA
+// clave per-tenant. Antes iteraba TODAS las claves; un payload firmado con
+// la clave del tenant A se aceptaba como tenant B. Ahora resolvemos la
+// propiedad por `transaction.reference` (que tiene prefijo MST-{shortBookingId})
+// y solo verificamos contra la clave de ESE tenant.
+//
+// Idempotencia (M4): si transaction.id ya fue procesado (UNIQUE en payments),
+// retornamos 200 sin reprocesar. Wompi reintenta APPROVED múltiples veces.
 router.post('/webhook', webhookLimiter, async (req, res) => {
-  // Wompi envía la firma en el header
   const signature = req.headers['x-event-checksum'];
+  const { supabase } = await import('../models/supabase.js');
 
-  // Verificar firma (intentar con todas las propiedades activas)
-  let verified = false;
   try {
-    // Obtener slugs activos desde BD
-    const { supabase } = await import('../models/supabase.js');
-    const { data: props } = await supabase.from('properties').select('id, slug').eq('is_active', true);
-    const slugs = props?.map(p => ({ slug: p.slug, id: p.id })) || [
-      { slug: 'isla-palma', id: null }, { slug: 'tayrona', id: null }
-    ];
-
-    for (const { slug, id } of slugs) {
-      if (await wompi.verifyWebhookSignature(req.body, signature, slug, id)) {
-        verified = true;
-        break;
-      }
+    // 1. Extraer reference del payload para resolver tenant
+    const reference = req.body?.data?.transaction?.reference;
+    const transactionId = req.body?.data?.transaction?.id;
+    if (!reference) {
+      return res.status(400).json({ error: 'Falta transaction.reference' });
     }
-  } catch { /* noop */ }
 
-  if (!verified) {
-    console.warn('[Webhook] Firma Wompi inválida');
-    return res.status(400).json({ error: 'Firma inválida' });
-  }
+    // 2. Lookup booking → property → slug. La reference es MST-{8chars}-{timestamp}
+    //    y el booking.id corto coincide con esos 8 chars.
+    const shortId = reference.replace(/^[A-Z]+-/, '').split('-')[0];
+    const { data: payment } = await supabase
+      .from('payments')
+      .select('id, wompi_reference, wompi_transaction_id, status, bookings(property_id, properties(slug, tenant_id))')
+      .eq('wompi_reference', reference)
+      .maybeSingle();
 
-  try {
+    if (!payment?.bookings?.properties?.slug) {
+      console.warn('[Wompi-webhook] No se encontró payment para reference:', reference, 'short:', shortId);
+      return res.status(404).json({ error: 'Payment no encontrado' });
+    }
+
+    const slug = payment.bookings.properties.slug;
+    const propertyId = payment.bookings.property_id;
+
+    // 3. Verificar firma SOLO contra la clave del tenant correcto
+    const ok = await wompi.verifyWebhookSignature(req.body, signature, slug, propertyId);
+    if (!ok) {
+      console.warn('[Wompi-webhook] Firma inválida para slug:', slug);
+      return res.status(400).json({ error: 'Firma inválida' });
+    }
+
+    // 4. Idempotencia: si ya procesamos este transaction.id como APPROVED, ignorar
+    if (
+      transactionId &&
+      payment.wompi_transaction_id === transactionId &&
+      payment.status === 'approved'
+    ) {
+      return res.json({ received: true, ignored: 'duplicate_approved' });
+    }
+
     const result = await processWebhook(req.body);
     res.json({ received: true, ...result });
   } catch (err) {
-    console.error('[Webhook] Error procesando:', err.message);
+    console.error('[Wompi-webhook] Error procesando:', err.message);
     res.status(500).json({ error: 'Error procesando webhook' });
   }
 });
@@ -150,7 +176,7 @@ router.post('/subscription/create', requireAuth, async (req, res) => {
       reference,
       guest_name: tenant.name,
       guest_email: tenant.email,
-      description: `Suscripción Revio Plan ${planKey} (${billing_cycle === 'annual' ? 'anual' : 'mensual'})`,
+      description: `Suscripción Alzio Plan ${planKey} (${billing_cycle === 'annual' ? 'anual' : 'mensual'})`,
       redirect_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/panel?subscription=activated`,
     });
 
@@ -193,13 +219,55 @@ router.post('/subscription/cancel', requireAuth, async (req, res) => {
 });
 
 // GET /api/payments/success — Página de éxito post-pago (redireccionada por Wompi)
-router.get('/success', (req, res) => {
+//
+// E-AGENT-10 M4 (2026-04-26): verificar el pago contra Wompi antes de
+// confirmar. Antes mostraba "¡Pago recibido!" sin importar si era real;
+// un usuario podía spoofear la URL `?id=anything` y aparentar pago exitoso.
+router.get('/success', async (req, res) => {
   const { id: transactionId } = req.query;
-  res.json({
-    success: true,
-    message: '¡Pago recibido! Tu reserva está confirmada. Recibirás un email con los detalles.',
-    transaction_id: transactionId
-  });
+  if (!transactionId) {
+    return res.status(400).json({ error: 'transaction id requerido', success: false });
+  }
+
+  try {
+    // Buscar el payment local por wompi_transaction_id
+    const { supabase } = await import('../models/supabase.js');
+    const { data: payment } = await supabase
+      .from('payments')
+      .select('status, wompi_transaction_id, paid_at, bookings(property_id, properties(slug))')
+      .eq('wompi_transaction_id', transactionId)
+      .maybeSingle();
+
+    if (!payment) {
+      return res.status(202).json({
+        success: false,
+        pending_webhook: true,
+        message: 'Estamos confirmando tu pago. Recibirás un email cuando se procese.',
+      });
+    }
+
+    if (payment.status === 'approved') {
+      return res.json({
+        success: true,
+        message: '¡Pago confirmado! Tu reserva está aprobada. Recibirás un email con los detalles.',
+        transaction_id: transactionId,
+        paid_at: payment.paid_at,
+      });
+    }
+
+    // Pendiente / declinado
+    res.json({
+      success: false,
+      status: payment.status,
+      message: payment.status === 'declined'
+        ? 'Tu pago fue rechazado. Intenta con otro método o contacta al hotel.'
+        : 'Estamos confirmando tu pago. Recibirás un email cuando se procese.',
+      transaction_id: transactionId,
+    });
+  } catch (err) {
+    console.error('[Wompi-success] Error:', err.message);
+    res.status(500).json({ success: false, error: 'Error verificando pago' });
+  }
 });
 
 export default router;
