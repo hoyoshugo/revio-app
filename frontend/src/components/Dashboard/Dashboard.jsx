@@ -415,8 +415,12 @@ export default function Dashboard() {
                   Agente de ventas IA
                 </div>
               </div>
-              <button className="ml-auto text-white/80" onClick={() => setMobileOpen(false)}>
-                <X className="w-5 h-5" />
+              <button
+                className="ml-auto text-white/80"
+                onClick={() => setMobileOpen(false)}
+                aria-label="Cerrar menú"
+              >
+                <X className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
             <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">

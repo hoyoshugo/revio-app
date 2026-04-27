@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { CreditCard, AlertCircle, CheckCircle, XCircle, RefreshCw, ExternalLink } from 'lucide-react';
+import {
+  CreditCard,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  ExternalLink,
+} from 'lucide-react';
 import axios from 'axios';
 
 const STATUS_CONFIG = {
@@ -7,7 +14,7 @@ const STATUS_CONFIG = {
   approved: { label: 'Aprobado', icon: CheckCircle, color: 'text-green-400' },
   declined: { label: 'Rechazado', icon: XCircle, color: 'text-red-400' },
   voided: { label: 'Anulado', icon: XCircle, color: 'text-gray-400' },
-  error: { label: 'Error', icon: XCircle, color: 'text-red-400' }
+  error: { label: 'Error', icon: XCircle, color: 'text-red-400' },
 };
 
 export default function PaymentsPanel({ property }) {
@@ -24,28 +31,37 @@ export default function PaymentsPanel({ property }) {
       if (property !== 'all') params.property_slug = property;
       const { data } = await axios.get('/api/payments', {
         headers: { Authorization: `Bearer ${token}` },
-        params
+        params,
       });
       setPayments(data.payments || []);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  useEffect(() => { load(); }, [property, filter]);
+  useEffect(() => {
+    load();
+  }, [property, filter]);
 
   async function resendPaymentLink(bookingId) {
     const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
     try {
-      const { data } = await axios.post(`/api/bookings/${bookingId}/resend-payment`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const { data } = await axios.post(
+        `/api/bookings/${bookingId}/resend-payment`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       alert(`Link enviado: ${data.payment_link_url}`);
     } catch (err) {
       alert('Error generando link: ' + err.message);
     }
   }
 
-  const pending = payments.filter(p => p.status === 'pending');
+  const pending = payments.filter((p) => p.status === 'pending');
   const pendingTotal = pending.reduce((s, p) => s + (p.amount || 0), 0);
 
   return (
@@ -62,7 +78,7 @@ export default function PaymentsPanel({ property }) {
         <div className="flex gap-2">
           <select
             value={filter}
-            onChange={e => setFilter(e.target.value)}
+            onChange={(e) => setFilter(e.target.value)}
             className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-300 focus:outline-none"
           >
             <option value="">Todos</option>
@@ -70,12 +86,18 @@ export default function PaymentsPanel({ property }) {
             <option value="approved">Aprobados</option>
             <option value="declined">Rechazados</option>
           </select>
-          <button onClick={load} className="btn-ghost"><RefreshCw className="w-4 h-4" /></button>
+          <button onClick={load} aria-label="Actualizar pagos" className="btn-ghost">
+            <RefreshCw className="w-4 h-4" aria-hidden="true" />
+          </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="space-y-2">{[...Array(4)].map((_, i) => <div key={i} className="card h-16 animate-pulse" />)}</div>
+        <div className="space-y-2">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="card h-16 animate-pulse" />
+          ))}
+        </div>
       ) : payments.length === 0 ? (
         <div className="card text-center py-12">
           <CreditCard className="w-10 h-10 text-gray-700 mx-auto mb-3" />
@@ -83,7 +105,7 @@ export default function PaymentsPanel({ property }) {
         </div>
       ) : (
         <div className="space-y-2">
-          {payments.map(p => {
+          {payments.map((p) => {
             const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.error;
             const Icon = sc.icon;
             return (
@@ -117,10 +139,11 @@ export default function PaymentsPanel({ property }) {
                     {p.booking_id && (
                       <button
                         onClick={() => resendPaymentLink(p.booking_id)}
+                        aria-label="Generar nuevo link de pago"
                         className="btn-ghost p-1.5 text-xs"
                         title="Generar nuevo link"
                       >
-                        <RefreshCw className="w-3.5 h-3.5" />
+                        <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
                     )}
                   </div>

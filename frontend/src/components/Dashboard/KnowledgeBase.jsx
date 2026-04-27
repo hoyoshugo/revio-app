@@ -11,11 +11,11 @@ const CATEGORIES = [
   { value: 'transport', label: 'Transporte' },
   { value: 'food', label: 'Comida y bebidas' },
   { value: 'rooms', label: 'Habitaciones' },
-  { value: 'general', label: 'General' }
+  { value: 'general', label: 'General' },
 ];
 
 function EntryCard({ entry, onEdit, onDelete }) {
-  const cat = CATEGORIES.find(c => c.value === entry.category);
+  const cat = CATEGORIES.find((c) => c.value === entry.category);
   return (
     <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 hover:border-gray-700 transition-colors">
       <div className="flex items-start justify-between gap-3 mb-2">
@@ -27,15 +27,17 @@ function EntryCard({ entry, onEdit, onDelete }) {
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => onEdit(entry)}
+            aria-label="Editar entrada"
             className="p-1.5 text-gray-500 hover:text-blue-400 rounded-lg hover:bg-gray-800 transition-colors"
           >
-            <Edit2 className="w-3.5 h-3.5" />
+            <Edit2 className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
           <button
             onClick={() => onDelete(entry.id)}
+            aria-label="Eliminar entrada"
             className="p-1.5 text-gray-500 hover:text-red-400 rounded-lg hover:bg-gray-800 transition-colors"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -59,7 +61,7 @@ function EntryForm({ initial, onSave, onCancel, propertyId }) {
     answer: initial?.answer || '',
     category: initial?.category || 'general',
     property_id: initial?.property_id || propertyId || null,
-    active: true
+    active: true,
   });
 
   return (
@@ -69,7 +71,7 @@ function EntryForm({ initial, onSave, onCancel, propertyId }) {
         <input
           type="text"
           value={form.question}
-          onChange={e => setForm(f => ({ ...f, question: e.target.value }))}
+          onChange={(e) => setForm((f) => ({ ...f, question: e.target.value }))}
           placeholder="¿Cuánto cuesta el tour en lancha?"
           className="w-full bg-gray-800 text-white rounded-lg px-3 py-2 text-sm border border-gray-700 focus:outline-none focus:border-mystica-blue"
         />
@@ -78,7 +80,7 @@ function EntryForm({ initial, onSave, onCancel, propertyId }) {
         <label className="text-xs text-gray-400 mb-1 block">Respuesta correcta</label>
         <textarea
           value={form.answer}
-          onChange={e => setForm(f => ({ ...f, answer: e.target.value }))}
+          onChange={(e) => setForm((f) => ({ ...f, answer: e.target.value }))}
           placeholder="El tour en lancha tiene un costo de $50.000 COP por persona y sale todos los días a las 9am..."
           rows={3}
           className="w-full bg-gray-800 text-white rounded-lg px-3 py-2 text-sm border border-gray-700 focus:outline-none focus:border-mystica-blue resize-none"
@@ -88,10 +90,14 @@ function EntryForm({ initial, onSave, onCancel, propertyId }) {
         <label className="text-xs text-gray-400 mb-1 block">Categoría</label>
         <select
           value={form.category}
-          onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+          onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
           className="bg-gray-800 text-gray-300 text-sm rounded-lg px-3 py-2 border border-gray-700 focus:outline-none"
         >
-          {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          {CATEGORIES.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
         </select>
       </div>
       <div className="flex gap-2 pt-1">
@@ -131,7 +137,7 @@ export default function KnowledgeBase({ property }) {
       const params = new URLSearchParams();
       if (propertyId) params.set('property_id', propertyId);
       const res = await fetch(`${API}/api/social/knowledge?${params}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       setEntries(Array.isArray(data) ? data : []);
@@ -142,16 +148,20 @@ export default function KnowledgeBase({ property }) {
     }
   }, [token, propertyId]);
 
-  useEffect(() => { fetchEntries(); }, [fetchEntries]);
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
 
   async function handleSave(entry) {
     try {
       const method = entry.id ? 'PUT' : 'POST';
-      const url = entry.id ? `${API}/api/social/knowledge/${entry.id}` : `${API}/api/social/knowledge`;
+      const url = entry.id
+        ? `${API}/api/social/knowledge/${entry.id}`
+        : `${API}/api/social/knowledge`;
       const res = await fetch(url, {
         method,
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(entry)
+        body: JSON.stringify(entry),
       });
       if (!res.ok) throw new Error('Error guardando');
       setAdding(false);
@@ -167,7 +177,7 @@ export default function KnowledgeBase({ property }) {
     try {
       await fetch(`${API}/api/social/knowledge/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       fetchEntries();
     } catch (err) {
@@ -175,8 +185,11 @@ export default function KnowledgeBase({ property }) {
     }
   }
 
-  const filtered = entries.filter(e => {
-    const matchSearch = !search || e.question.toLowerCase().includes(search.toLowerCase()) || e.answer.toLowerCase().includes(search.toLowerCase());
+  const filtered = entries.filter((e) => {
+    const matchSearch =
+      !search ||
+      e.question.toLowerCase().includes(search.toLowerCase()) ||
+      e.answer.toLowerCase().includes(search.toLowerCase());
     const matchCat = !filterCat || e.category === filterCat;
     return matchSearch && matchCat;
   });
@@ -195,7 +208,10 @@ export default function KnowledgeBase({ property }) {
           </p>
         </div>
         <button
-          onClick={() => { setAdding(true); setEditing(null); }}
+          onClick={() => {
+            setAdding(true);
+            setEditing(null);
+          }}
           className="flex items-center gap-2 px-3 py-1.5 bg-mystica-blue hover:bg-mystica-blue/80 text-white rounded-lg text-sm transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -205,11 +221,7 @@ export default function KnowledgeBase({ property }) {
 
       {/* Formulario nueva entrada */}
       {adding && (
-        <EntryForm
-          propertyId={propertyId}
-          onSave={handleSave}
-          onCancel={() => setAdding(false)}
-        />
+        <EntryForm propertyId={propertyId} onSave={handleSave} onCancel={() => setAdding(false)} />
       )}
 
       {/* Filtros */}
@@ -219,18 +231,22 @@ export default function KnowledgeBase({ property }) {
           <input
             type="text"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por pregunta o respuesta..."
             className="w-full bg-gray-900 text-white rounded-lg pl-9 pr-3 py-2 text-sm border border-gray-800 focus:outline-none focus:border-gray-600"
           />
         </div>
         <select
           value={filterCat}
-          onChange={e => setFilterCat(e.target.value)}
+          onChange={(e) => setFilterCat(e.target.value)}
           className="bg-gray-900 text-gray-300 text-sm rounded-lg px-3 py-2 border border-gray-800 focus:outline-none"
         >
           <option value="">Todas las categorías</option>
-          {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          {CATEGORIES.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -241,12 +257,14 @@ export default function KnowledgeBase({ property }) {
         <div className="text-center py-12">
           <BookOpen className="w-10 h-10 text-gray-700 mx-auto mb-3" />
           <p className="text-gray-500 text-sm">
-            {search || filterCat ? 'No hay entradas que coincidan con tu búsqueda' : 'Aún no hay conocimiento guardado. La IA aprenderá automáticamente cuando no pueda responder preguntas.'}
+            {search || filterCat
+              ? 'No hay entradas que coincidan con tu búsqueda'
+              : 'Aún no hay conocimiento guardado. La IA aprenderá automáticamente cuando no pueda responder preguntas.'}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filtered.map(entry => (
+          {filtered.map((entry) =>
             editing?.id === entry.id ? (
               <EntryForm
                 key={entry.id}
@@ -258,11 +276,14 @@ export default function KnowledgeBase({ property }) {
               <EntryCard
                 key={entry.id}
                 entry={entry}
-                onEdit={e => { setEditing(e); setAdding(false); }}
+                onEdit={(e) => {
+                  setEditing(e);
+                  setAdding(false);
+                }}
                 onDelete={handleDelete}
               />
-            )
-          ))}
+            ),
+          )}
         </div>
       )}
     </div>

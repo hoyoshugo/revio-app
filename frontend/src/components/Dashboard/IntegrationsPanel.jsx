@@ -289,10 +289,11 @@ function SecretField({ label, value, onChange, placeholder, secret = true }) {
           <button
             type="button"
             onClick={() => setVisible((v) => !v)}
+            aria-label={visible ? 'Ocultar valor' : 'Mostrar valor'}
             className="absolute top-1/2 right-2 -translate-y-1/2 p-1 rounded hover:bg-white/5"
             style={{ color: 'var(--text-2)' }}
           >
-            {visible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            {visible ? <EyeOff className="w-3.5 h-3.5" aria-hidden="true" /> : <Eye className="w-3.5 h-3.5" aria-hidden="true" />}
           </button>
         )}
       </div>

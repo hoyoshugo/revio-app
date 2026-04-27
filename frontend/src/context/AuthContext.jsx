@@ -1,25 +1,32 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { Navigate } from 'react-router-dom';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-const TOKEN_KEY   = 'revio_token';
-const USER_KEY    = 'revio_user';
-const TENANT_KEY  = 'revio_tenant';
-const PROPS_KEY   = 'revio_properties';
+const TOKEN_KEY = 'revio_token';
+const USER_KEY = 'revio_user';
+const TENANT_KEY = 'revio_tenant';
+const PROPS_KEY = 'revio_properties';
 const CURPROP_KEY = 'revio_current_property';
 
 const AuthContext = createContext(null);
 
 function safeParse(key) {
-  try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
+  try {
+    return JSON.parse(localStorage.getItem(key));
+  } catch {
+    return null;
+  }
 }
 
 export function AuthProvider({ children }) {
-  const [token, setToken]           = useState(() => localStorage.getItem(TOKEN_KEY) || localStorage.getItem('mystica_token'));
-  const [user, setUser]             = useState(() => safeParse(USER_KEY) || safeParse('mystica_user'));
-  const [tenant, setTenant]         = useState(() => safeParse(TENANT_KEY));
+  const [token, setToken] = useState(
+    () => localStorage.getItem(TOKEN_KEY) || localStorage.getItem('mystica_token'),
+  );
+  const [user, setUser] = useState(() => safeParse(USER_KEY) || safeParse('mystica_user'));
+  const [tenant, setTenant] = useState(() => safeParse(TENANT_KEY));
   const [properties, setProperties] = useState(() => safeParse(PROPS_KEY) || []);
   const [currentProperty, setCurrentProperty] = useState(() => safeParse(CURPROP_KEY));
-  const [isLoading, setIsLoading]   = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   function login(newToken, userData, tenantData, propertiesData) {
     setToken(newToken);
@@ -47,8 +54,15 @@ export function AuthProvider({ children }) {
     setTenant(null);
     setProperties([]);
     setCurrentProperty(null);
-    [TOKEN_KEY, USER_KEY, TENANT_KEY, PROPS_KEY, CURPROP_KEY,
-     'mystica_token', 'mystica_user'].forEach(k => localStorage.removeItem(k));
+    [
+      TOKEN_KEY,
+      USER_KEY,
+      TENANT_KEY,
+      PROPS_KEY,
+      CURPROP_KEY,
+      'mystica_token',
+      'mystica_user',
+    ].forEach((k) => localStorage.removeItem(k));
   }
 
   function switchProperty(prop) {
@@ -61,12 +75,18 @@ export function AuthProvider({ children }) {
     if (!t) return;
     try {
       const res = await fetch(`${API}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${t}` }
+        headers: { Authorization: `Bearer ${t}` },
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.user)        { setUser(data.user);        localStorage.setItem(USER_KEY, JSON.stringify(data.user)); }
-        if (data.tenant)      { setTenant(data.tenant);    localStorage.setItem(TENANT_KEY, JSON.stringify(data.tenant)); }
+        if (data.user) {
+          setUser(data.user);
+          localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+        }
+        if (data.tenant) {
+          setTenant(data.tenant);
+          localStorage.setItem(TENANT_KEY, JSON.stringify(data.tenant));
+        }
         if (data.properties?.length) {
           setProperties(data.properties);
           localStorage.setItem(PROPS_KEY, JSON.stringify(data.properties));
@@ -80,13 +100,25 @@ export function AuthProvider({ children }) {
   }, []);
 
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
-  const propertyId  = currentProperty?.id || user?.property_id;
+  const propertyId = currentProperty?.id || user?.property_id;
 
   return (
-    <AuthContext.Provider value={{
-      token, user, tenant, properties, currentProperty, isLoading,
-      login, logout, switchProperty, refreshUser, authHeaders, propertyId
-    }}>
+    <AuthContext.Provider
+      value={{
+        token,
+        user,
+        tenant,
+        properties,
+        currentProperty,
+        isLoading,
+        login,
+        logout,
+        switchProperty,
+        refreshUser,
+        authHeaders,
+        propertyId,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -99,11 +131,12 @@ export function useAuth() {
 }
 
 export function PrivateRoute({ children, requiredRole }) {
+  // E-AGENT-11 M11 (2026-04-26): Navigate idiomático en lugar de
+  // window.location.href durante render (anti-pattern que causaba un
+  // re-render extra antes de la navegación).
   const { token, user } = useAuth();
-  if (!token) {
-    window.location.href = '/login';
-    return null;
-  }
+  if (!token) return <Navigate to="/login" replace />;
+
   if (requiredRole && user?.role !== requiredRole && user?.role !== 'super_admin') {
     return (
       <div className="flex items-center justify-center h-64" style={{ color: 'var(--text-3)' }}>

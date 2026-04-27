@@ -1,10 +1,12 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { SuperAdminProvider, useSuperAdmin } from './context/SuperAdminContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { ModulesProvider } from './hooks/useModules.jsx';
 import ToastContainer from './components/Toast.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
+import { installGlobalErrorHandlers } from './lib/notify.js';
 
 // Lazy imports for code splitting
 const LoginPage = React.lazy(() => import('./components/Admin/LoginPage.jsx'));
@@ -50,12 +52,19 @@ function PublicOnlyRoute({ children }) {
 }
 
 export default function App() {
+  // E-AGENT-11 H-FE-1: capturar unhandled rejections / errors globales
+  // y mostrar toast al user en lugar de console.error silencioso.
+  useEffect(() => {
+    installGlobalErrorHandlers();
+  }, []);
+
   return (
     <ThemeProvider>
       <ToastContainer />
       <BrowserRouter>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
             {/* ── Root: redirect to /login (marketing vive en alzio.co, no aqui) ── */}
             <Route path="/" element={<Navigate to="/login" replace />} />
 
@@ -162,8 +171,9 @@ export default function App() {
                 </AuthProvider>
               }
             />
-          </Routes>
-        </Suspense>
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </BrowserRouter>
     </ThemeProvider>
   );

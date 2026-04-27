@@ -8,11 +8,15 @@ const STATUS_COLORS = {
   paid: 'badge-paid',
   checked_in: 'badge-checked_in',
   checked_out: 'badge-checked_out',
-  cancelled: 'badge-cancelled'
+  cancelled: 'badge-cancelled',
 };
 const STATUS_LABELS = {
-  pending: 'Pendiente', confirmed: 'Confirmado', paid: 'Pagado',
-  checked_in: 'Hospedado', checked_out: 'Check-out', cancelled: 'Cancelado'
+  pending: 'Pendiente',
+  confirmed: 'Confirmado',
+  paid: 'Pagado',
+  checked_in: 'Hospedado',
+  checked_out: 'Check-out',
+  cancelled: 'Cancelado',
 };
 
 export default function BookingsList({ property }) {
@@ -29,23 +33,32 @@ export default function BookingsList({ property }) {
       if (property !== 'all') params.property_slug = property;
       const { data } = await axios.get('/api/bookings', {
         headers: { Authorization: `Bearer ${token}` },
-        params
+        params,
       });
       setBookings(data.bookings || []);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  useEffect(() => { load(); }, [property, statusFilter]);
+  useEffect(() => {
+    load();
+  }, [property, statusFilter]);
 
   async function updateStatus(id, status) {
     const token = localStorage.getItem('revio_token') || localStorage.getItem('mystica_token');
-    await axios.patch(`/api/bookings/${id}/status`, { status }, { headers: { Authorization: `Bearer ${token}` } });
+    await axios.patch(
+      `/api/bookings/${id}/status`,
+      { status },
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
     load();
   }
 
   const totalRevenue = bookings
-    .filter(b => !['cancelled'].includes(b.status))
+    .filter((b) => !['cancelled'].includes(b.status))
     .reduce((s, b) => s + (b.total_amount || 0), 0);
 
   return (
@@ -63,20 +76,28 @@ export default function BookingsList({ property }) {
         <div className="flex gap-2">
           <select
             value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
+            onChange={(e) => setStatusFilter(e.target.value)}
             className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-mystica-blue"
           >
             <option value="">Todos</option>
             {Object.entries(STATUS_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
+              <option key={k} value={k}>
+                {v}
+              </option>
             ))}
           </select>
-          <button onClick={load} className="btn-ghost"><RefreshCw className="w-4 h-4" /></button>
+          <button onClick={load} aria-label="Actualizar reservas" className="btn-ghost">
+            <RefreshCw className="w-4 h-4" aria-hidden="true" />
+          </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="card h-20 animate-pulse" />)}</div>
+        <div className="space-y-2">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="card h-20 animate-pulse" />
+          ))}
+        </div>
       ) : bookings.length === 0 ? (
         <div className="card text-center py-12">
           <Calendar className="w-10 h-10 text-gray-700 mx-auto mb-3" />
@@ -84,7 +105,7 @@ export default function BookingsList({ property }) {
         </div>
       ) : (
         <div className="space-y-2">
-          {bookings.map(b => (
+          {bookings.map((b) => (
             <div key={b.id} className="card">
               <div className="flex items-start gap-3 flex-wrap">
                 <div className="flex-1 min-w-0">
@@ -115,11 +136,13 @@ export default function BookingsList({ property }) {
                   {b.status !== 'cancelled' && b.status !== 'checked_out' && (
                     <select
                       value={b.status}
-                      onChange={e => updateStatus(b.id, e.target.value)}
+                      onChange={(e) => updateStatus(b.id, e.target.value)}
                       className="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-300"
                     >
                       {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                        <option key={k} value={k}>{v}</option>
+                        <option key={k} value={k}>
+                          {v}
+                        </option>
                       ))}
                     </select>
                   )}
