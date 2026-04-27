@@ -24,6 +24,11 @@ import { processMessage } from '../agents/hotelAgent.js';
 import { isTenantEnabled } from '../services/tenantAccess.js';
 import { insertInboxMessage } from '../services/channelService.js';
 import { supabase } from '../models/supabase.js';
+import {
+  transcribeWhatsAppAudio,
+  replyWithVoice,
+  isVoiceConfigured,
+} from '../services/voiceService.js';
 
 const router = express.Router();
 
@@ -287,11 +292,65 @@ async function processMetaEvents(body) {
         continue;
       }
 
+      // E-AGENT-14 (2026-04-26): transcripción de audio entrante via Whisper.
+      // Si el huésped envió una nota de voz Y OpenAI está configurado, la
+      // transcribimos y mandamos el TEXTO al agente (en lugar del placeholder
+      // "[el huésped envió una nota de voz...]"). Marcamos también que la
+      // respuesta debe ir en voz cuando sea posible.
+      let messageForAgent = event.message;
+      let respondWithVoice = false;
+      const replyOpts = getReplyTokenForProperty(property, event.channel);
+
+      if (
+        event.channel === 'whatsapp' &&
+        (event.mediaType === 'audio' || event.mediaType === 'voice') &&
+        event.mediaId &&
+        isVoiceConfigured()
+      ) {
+        try {
+          const transcription = await transcribeWhatsAppAudio(event.mediaId, {
+            token: replyOpts.token,
+            languageHint: 'es', // detectLanguage del agente refina luego
+          });
+          if (transcription.text && transcription.text.trim().length > 0) {
+            messageForAgent = transcription.text;
+            respondWithVoice = true;
+            console.log(JSON.stringify({
+              level: 'info',
+              event: 'voice_transcribed',
+              durationSec: transcription.durationSec,
+              detectedLang: transcription.language,
+              chars: transcription.text.length,
+              propertyId: property.id,
+            }));
+            // Re-registrar en inbox con el texto transcrito (para que el agente
+            // del dashboard vea el contenido real, no [VOZ])
+            try {
+              await insertInboxMessage({
+                property_id: property.id,
+                channel_key: 'whatsapp',
+                external_thread_id: event.messageId,
+                sender_name: event.senderName || null,
+                sender_id: event.senderId || null,
+                message_text: `🎙️ ${transcription.text}`,
+                direction: 'inbound',
+                status: 'unread',
+                raw_payload: { ...event, transcription: transcription.text },
+              });
+            } catch { /* ignore double-insert */ }
+          }
+        } catch (transcribeErr) {
+          console.error('[Webhook] Whisper falló, usando placeholder original:', transcribeErr.message);
+          // Fallback: dejar el placeholder original "[NOTA DE VOZ...]" para
+          // que el agente al menos no quede mudo.
+        }
+      }
+
       // Procesar con el agente IA
       const sessionId = event.channel + '_' + event.senderId;
       const response = await processMessage(
         sessionId,
-        event.message,
+        messageForAgent,
         property.id,
         {
           channel: event.channel,
@@ -301,29 +360,51 @@ async function processMetaEvents(body) {
           isSharedChannel: isShared,
           allProperties: properties,
           resolvedProperty: property.slug,
+          incomingWasVoice: respondWithVoice,
         }
       );
 
       if (!response?.message) continue;
 
-      // Responder por el mismo canal — usar token de la propiedad correcta
-      const replyOptions = getReplyTokenForProperty(property, event.channel);
-
+      // Responder por el mismo canal
       switch (event.channel) {
-        case 'whatsapp':
-          await sendMessage('whatsapp', event.senderId, response.message, replyOptions);
+        case 'whatsapp': {
+          // E-AGENT-14: si el huésped envió audio, responder con audio.
+          // replyWithVoice maneja internamente:
+          //   - skip si OPENAI_API_KEY falta → fallback a texto
+          //   - skip si la respuesta excede VOICE_REPLY_MAX_CHARS → texto
+          //   - skip si la síntesis falla → texto
+          let voiceSent = false;
+          if (respondWithVoice) {
+            const voiceRes = await replyWithVoice(event.senderId, response.message, {
+              phoneNumberId: event.phoneNumberId || replyOpts.phoneId,
+              token: replyOpts.token,
+            });
+            voiceSent = voiceRes && voiceRes.success === true;
+            if (!voiceSent) {
+              console.log(JSON.stringify({
+                level: 'info',
+                event: 'voice_reply_fallback_to_text',
+                reason: voiceRes?.reason || voiceRes?.error || 'unknown',
+              }));
+            }
+          }
+          if (!voiceSent) {
+            await sendMessage('whatsapp', event.senderId, response.message, replyOpts);
+          }
           break;
+        }
         case 'instagram':
-          await sendMessage('instagram', event.senderId, response.message, replyOptions);
+          await sendMessage('instagram', event.senderId, response.message, replyOpts);
           break;
         case 'facebook':
-          await sendMessage('facebook', event.senderId, response.message, replyOptions);
+          await sendMessage('facebook', event.senderId, response.message, replyOpts);
           break;
         case 'instagram_comment':
-          await replyToInstagramComment(event.commentId, response.message, replyOptions.token);
+          await replyToInstagramComment(event.commentId, response.message, replyOpts.token);
           break;
         case 'facebook_comment':
-          await replyToFacebookComment(event.commentId, response.message, replyOptions.token);
+          await replyToFacebookComment(event.commentId, response.message, replyOpts.token);
           break;
       }
     } catch (e) {

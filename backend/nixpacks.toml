@@ -2,7 +2,9 @@
 nixPkgs = ["nodejs_22"]
 
 [phases.install]
-cmds = ["npm ci --omit=dev"]
+# npm install (no `npm ci`) para tolerar drift entre package.json y package-lock.json
+# E-AGENT-14: agregamos `form-data` para Whisper upload sin regenerar lock localmente.
+cmds = ["npm install --omit=dev --no-audit --no-fund"]
 
 [phases.build]
 cmds = []

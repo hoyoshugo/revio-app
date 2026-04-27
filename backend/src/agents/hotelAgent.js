@@ -214,6 +214,33 @@ Soportas: es, en, fr, de, pt. Si el idioma del cliente no es ninguno de estos, r
 - Una vez con todos los datos, usa confirm_booking para crear la reserva.
 - Siempre confirma los detalles antes de crear la reserva.
 
+## QUÉ HACER CUANDO NO HAY DISPONIBILIDAD COMPLETA (IMPORTANTE)
+Si check_availability devuelve 0 cuartos del tipo pedido para todas las fechas
+del rango — pero el huésped quiere armar una opción aunque sea con cambios —,
+usa **check_availability_combined** pasando:
+  - property: el slug
+  - checkin / checkout
+  - people_count: TOTAL de personas en el grupo (suma adultos + niños)
+  - preferred_type: 'private_bath' si pidió privada con baño,
+                    'shared_bath' si dijo "privada baño compartido",
+                    'dorm' si dijo "dormitorio", "compartido" o "barato"
+
+El tool va a devolver \`formatted_text\` con 2-3 opciones armadas:
+  - Opción A: lo más cercano a su pedido (cambia de habitación entre tramos)
+  - Opción B: la más económica (todos en dorm si hace falta)
+  - Opción C: sin cambiar de habitación (mismo tipo todos los días)
+
+**NO inventes esas opciones tú** — usá EXACTAMENTE el texto que devuelve el
+tool. El huésped elige cuál le gusta y vos seguís con confirm_booking
+mencionando el split de habitaciones que eligió en el campo special_requests.
+
+Ejemplo del flujo: "Pepe quiere del 1 al 10 abril, 2 parejas, privada con baño"
+  1. check_availability(1-10, 4 personas, privada) → no hay full-stay
+  2. check_availability_combined(1-10, 4, 'private_bath') → devuelve texto con
+     opciones que mezclan privada/dorm en distintos tramos
+  3. Le pasás ese texto al huésped y le preguntás cuál prefiere
+  4. confirm_booking con special_requests describiendo el plan elegido
+
 ## FLUJO DE CONVERSACIÓN IDEAL
 1. Saludo cálido + pregunta sobre su viaje ideal
 2. Entender necesidades (fechas, grupo, preferencias)
@@ -260,6 +287,29 @@ const TOOLS = [
       },
       required: ['property', 'checkin', 'checkout']
     }
+  },
+  {
+    // E-AGENT-15 (2026-04-26): combinaciones por tramos cuando la stay
+    // completa no se puede dar en un solo tipo de habitación. Ej: 4 personas
+    // del 1-10 abril preferían privada, pero el 5-7 solo hay dorm — el agente
+    // arma 2-3 opciones (cambiando habitación, todos en dorm, mix por pareja)
+    // y se las propone al huésped.
+    name: 'check_availability_combined',
+    description: 'Cuando check_availability no devuelve disponibilidad full-stay del tipo pedido, usar este tool para armar opciones combinatorias (cambios de habitación entre tramos, redistribución del grupo). Devuelve un texto formateado listo para responder al huésped con 2-3 alternativas y sus trade-offs.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        property: { type: 'string', description: 'slug de la propiedad' },
+        checkin: { type: 'string', description: 'YYYY-MM-DD' },
+        checkout: { type: 'string', description: 'YYYY-MM-DD (no inclusivo)' },
+        people_count: { type: 'number', description: 'Total de personas en el grupo' },
+        preferred_type: {
+          type: 'string',
+          description: 'Tipo de habitación preferido por el huésped (private_bath | shared_bath | dorm). Si pidió "privada con baño" usar private_bath. Si dijo "barato" o "compartido" usar dorm.',
+        },
+      },
+      required: ['property', 'checkin', 'checkout', 'people_count'],
+    },
   },
   {
     name: 'check_discount_eligibility',
@@ -443,6 +493,71 @@ async function executeTool(toolName, toolInput, conversation, propertyId) {
         }
       }
       break;
+    }
+
+    case 'check_availability_combined': {
+      // E-AGENT-15: armar opciones combinatorias por tramos.
+      try {
+        const { planStayOptions, formatOptionsForAgent } = await import('../services/availabilityPlanner.js');
+        const checkin = toolInput.checkin;
+        const checkout = toolInput.checkout;
+        const people = Number(toolInput.people_count) || 1;
+        const preferred = toolInput.preferred_type || 'private_bath';
+
+        // Iterar día por día llamando getAvailableRooms con stay de 1 noche.
+        // Es ineficiente pero LobbyPMS no tiene un endpoint "calendario" — la
+        // alternativa sería 1 sola llamada al checkout completo que ya devuelve
+        // 0 cuartos cuando alguno está sold-out de un día. Hacemos hasta 30
+        // noches cap para no abusar.
+        const start = new Date(checkin + 'T12:00:00Z');
+        const end = new Date(checkout + 'T12:00:00Z');
+        const totalDays = Math.min(
+          30,
+          Math.round((end - start) / (24 * 60 * 60 * 1000))
+        );
+        if (totalDays <= 0) {
+          return { success: false, error: 'checkout debe ser posterior a checkin' };
+        }
+
+        const dayAvailability = [];
+        for (let i = 0; i < totalDays; i++) {
+          const d = new Date(start);
+          d.setUTCDate(d.getUTCDate() + i);
+          const next = new Date(d);
+          next.setUTCDate(next.getUTCDate() + 1);
+          const dStr = d.toISOString().slice(0, 10);
+          const nextStr = next.toISOString().slice(0, 10);
+          try {
+            const data = await lobby.getAvailableRooms(
+              propertySlug,
+              { checkin: dStr, checkout: nextStr, adults: people, children: 0 },
+              { conversationId: conversation.id, propertyId }
+            );
+            dayAvailability.push({
+              date: dStr,
+              rooms: normalizeLobbyRooms(data),
+            });
+          } catch {
+            dayAvailability.push({ date: dStr, rooms: [] });
+          }
+        }
+
+        const plan = planStayOptions({
+          dayAvailability,
+          peopleCount: people,
+          preferredType: preferred,
+          checkin,
+          checkout,
+        });
+
+        return {
+          success: true,
+          formatted_text: formatOptionsForAgent(plan, conversation.guest_language || 'es'),
+          plan, // raw para que el agente pueda referenciar en confirm_booking
+        };
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
     }
 
     case 'check_discount_eligibility': {
@@ -1149,6 +1264,37 @@ function getErrorMessage(lang) {
     pt: 'Desculpe, tive um problema técnico momentâneo. Poderia repetir sua pergunta? Estou aqui para ajudar! 🌊'
   };
   return msgs[lang] || msgs.es;
+}
+
+// E-AGENT-15 (2026-04-26): normalizar la respuesta de LobbyPMS al formato
+// que espera availabilityPlanner.js. LobbyPMS varía mucho en el shape
+// según versión de la API; aquí cubrimos los formatos más comunes
+// (available-rooms v1, v2). Devuelve []RoomInventory.
+function normalizeLobbyRooms(lobbyData) {
+  if (!lobbyData) return [];
+  // v2 API usa data.rooms[]; v1 a veces lo manda en data.data[]
+  const rawRooms = lobbyData.rooms || lobbyData.data || lobbyData.available_rooms || [];
+  if (!Array.isArray(rawRooms)) return [];
+
+  return rawRooms.map((r) => {
+    const name = r.name || r.room_type_name || r.type_name || r.label || 'Habitación';
+    const lowerName = String(name).toLowerCase();
+
+    // Heurística: detectar private_bath / shared_bath / dorm desde el nombre
+    let type = 'private_bath';
+    if (/dorm|compartid|shared|hostel/.test(lowerName)) type = 'dorm';
+    else if (/baño compartido|shared\s*bath/.test(lowerName)) type = 'shared_bath';
+    else if (/privad|private/.test(lowerName)) type = 'private_bath';
+
+    return {
+      type,
+      label: name,
+      capacity: Number(r.capacity || r.max_guests || r.beds || 2),
+      unitsAvailable: Number(r.available_units || r.availability || r.quantity_available || r.units || 1),
+      pricePerNight: Number(r.price_per_night || r.price || r.rate || r.nightly_rate || 0),
+      roomId: r.id || r.room_id || r.room_type_id || null,
+    };
+  }).filter((r) => r.unitsAvailable > 0 && r.pricePerNight > 0);
 }
 
 export default { processMessage };
