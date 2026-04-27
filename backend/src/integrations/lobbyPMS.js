@@ -8,15 +8,29 @@ const LOBBY_API_URL = process.env.LOBBYPMS_PROXY_URL
   : (process.env.LOBBY_API_URL || 'https://api.lobbypms.com');
 const MAX_RETRIES = 3;
 
+// E-AGENT-12 H-AGT-4 (2026-04-26): TTL diferenciado per endpoint.
+// Antes 10min uniforme: la availability cacheada podía mostrar un cuarto
+// libre que ya estaba sold-out → confirm_booking fallaba o duplicaba.
+// Endpoints booking-bound usan TTL corto; endpoints estáticos quedan largos.
+const CACHE_TTL_AVAILABILITY = 60 * 1000;        // 1 min para availability
+const CACHE_TTL_OCCUPANCY    = 5 * 60 * 1000;    // 5 min para occupancy
+const CACHE_TTL_DEFAULT      = 10 * 60 * 1000;   // 10 min para rate plans, configs
+
+function ttlFor(endpoint) {
+  if (!endpoint) return CACHE_TTL_DEFAULT;
+  if (endpoint.includes('available-rooms')) return CACHE_TTL_AVAILABILITY;
+  if (endpoint.includes('daily-occupancy')) return CACHE_TTL_OCCUPANCY;
+  return CACHE_TTL_DEFAULT;
+}
+
 // In-memory cache: { [slug_endpoint]: { data, ts } }
 const _cache = new Map();
-const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 function cacheKey(slug, endpoint) { return `${slug}:${endpoint}`; }
 
 function fromCache(slug, endpoint) {
   const hit = _cache.get(cacheKey(slug, endpoint));
-  if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.data;
+  if (hit && Date.now() - hit.ts < ttlFor(endpoint)) return hit.data;
   return null;
 }
 
@@ -92,20 +106,37 @@ async function withRetry(fn, propertySlug, context = {}) {
         error_message: err.message
       });
 
-      // No reintentar en errores de cliente (4xx)
-      if (status >= 400 && status < 500) break;
+      // No reintentar en errores de cliente (4xx) salvo 408/429
+      if (status >= 400 && status < 500 && status !== 408 && status !== 429) break;
 
       if (attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, 1000 * attempt));
+        // E-AGENT-12 H-AGT-4: exponential backoff con jitter.
+        // Antes era linear (1s, 2s, 3s) sin jitter → thundering herd
+        // si N requests fallan al mismo tiempo, reintentan al unísono.
+        // Ahora 1s * 2^(attempt-1) ± 30% jitter: 1s±300ms, 2s±600ms, 4s±1200ms.
+        const base = 1000 * Math.pow(2, attempt - 1);
+        const jitter = base * (Math.random() * 0.6 - 0.3); // -30% a +30%
+        const delay = Math.max(200, Math.round(base + jitter));
+        await new Promise(r => setTimeout(r, delay));
       }
     }
   }
 
-  // Return cached data as fallback when all retries fail
-  const cached = fromCache(propertySlug, context.endpoint || 'unknown');
-  if (cached) {
-    console.warn(`[LobbyPMS] Using cached data for ${propertySlug}:${context.endpoint} (IP whitelist issue?)`);
-    return cached;
+  // E-AGENT-12 H-AGT-4: NO servir cache para flows booking-bound.
+  // Antes retornaba cached data en cualquier endpoint cuando todos los
+  // retries fallaban — incluyendo availability cacheada → confirm_booking
+  // sobre stock stale. Ahora solo cache fallback en endpoints "seguros"
+  // (rate plans, configs); availability falla loud.
+  const endpoint = context.endpoint || 'unknown';
+  const isBookingBound = endpoint.includes('available-rooms') ||
+                         endpoint.includes('reservations') ||
+                         endpoint.includes('payment');
+  if (!isBookingBound) {
+    const cached = fromCache(propertySlug, endpoint);
+    if (cached) {
+      console.warn(`[LobbyPMS] Using cached data for ${propertySlug}:${endpoint} (IP whitelist issue?)`);
+      return cached;
+    }
   }
 
   throw lastError;
@@ -122,25 +153,19 @@ export async function getAvailableRooms(propertySlug, { checkin, checkout, adult
   const params = { start_date: checkin, end_date: checkout, adults };
   if (children > 0) params.children = children;
 
-  try {
-    const result = await withRetry(
-      async () => {
-        const { data } = await client.get(endpoint, { params });
-        return data;
-      },
-      propertySlug,
-      { ...context, method: 'GET', endpoint, requestData: params }
-    );
-    toCache(propertySlug, endpoint, result);
-    return result;
-  } catch (err) {
-    const cached = fromCache(propertySlug, endpoint);
-    if (cached) {
-      console.warn(`[LobbyPMS] getAvailableRooms fallback to cache for ${propertySlug}`);
-      return cached;
-    }
-    throw err;
-  }
+  // E-AGENT-12 H-AGT-4: NO cache fallback en availability — el agente debe
+  // saber explícitamente que no pudo verificar disponibilidad en lugar de
+  // confirmar sobre stock stale.
+  const result = await withRetry(
+    async () => {
+      const { data } = await client.get(endpoint, { params });
+      return data;
+    },
+    propertySlug,
+    { ...context, method: 'GET', endpoint, requestData: params }
+  );
+  toCache(propertySlug, endpoint, result);
+  return result;
 }
 
 // ============================================================

@@ -135,7 +135,10 @@ async function sendAlert(service, error) {
   if (alertState[service] && (now - alertState[service]) < 30 * 60 * 1000) return;
   alertState[service] = now;
 
-  const msg = `🚨 *ALERTA SISTEMA* — Mística AI\n\n` +
+  // E-AGENT-10 H-AGT-5 (2026-04-26): brand "Alzio" para alertas internas.
+  // Estas notificaciones van al equipo Alzio (no a tenants), por eso mantiene
+  // brand fija de la plataforma — no es customer-facing.
+  const msg = `🚨 *ALERTA SISTEMA* — Alzio Platform\n\n` +
     `❌ Servicio caído: *${service.toUpperCase()}*\n` +
     `⏰ ${new Date().toLocaleString('es-CO')}\n` +
     `🔴 Error: ${error || 'No responde'}\n\n` +

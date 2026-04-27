@@ -119,8 +119,24 @@ export async function requestLearning(question, propertyId, propertySlug, conver
     console.error('[Learning] Error guardando sesión:', err.message);
   }
 
-  const propertyLabel = propertySlug === 'isla-palma' ? 'Isla Palma' : propertySlug === 'tayrona' ? 'Tayrona' : propertySlug;
-  const msg = `🤖 *Mística AI — Aprendizaje*\n\n` +
+  // E-AGENT-10 H-AGT-5 (2026-04-26): brand y propertyLabel dinámicos.
+  // Antes hardcoded "Mística AI" + lookup por slug en el agente. Ahora
+  // resolver desde tenants.business_name o properties.brand_name/name.
+  let propertyLabel = propertySlug;
+  let brand = 'Alzio';
+  try {
+    const { data: prop } = await supabase
+      .from('properties')
+      .select('name, brand_name, tenants(business_name)')
+      .eq('id', propertyId)
+      .maybeSingle();
+    if (prop) {
+      propertyLabel = prop.brand_name || prop.name || propertySlug;
+      brand = prop.tenants?.business_name || prop.brand_name || brand;
+    }
+  } catch { /* fallback al slug */ }
+
+  const msg = `🤖 *${brand} AI — Aprendizaje*\n\n` +
     `La IA no pudo responder correctamente esta pregunta de un huésped en *${propertyLabel}*:\n\n` +
     `❓ "${question}"\n\n` +
     `Por favor responde este mensaje con la respuesta correcta y la guardaré en mi base de conocimiento para futuras consultas.\n\n` +

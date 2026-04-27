@@ -62,38 +62,58 @@ export async function trackAnthropicUsage({
 
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
+  // E-AGENT-13 M5 (2026-04-26): atomic increment via Postgres function.
+  // Antes era SELECT-then-UPDATE sin transaction → race condition con
+  // calls concurrentes (dos respuestas en paralelo del mismo tenant
+  // leían la misma row, calculaban totals, el segundo write pisaba al
+  // primer → undercounting → undercharging).
+  //
+  // La función `increment_tenant_usage` (creada en migration_012) hace
+  // INSERT ... ON CONFLICT DO UPDATE atómicamente.
   try {
-    // UPSERT: si existe row para (tenant, date), suma; sino crea.
-    // Postgres no tiene UPSERT-with-increment built-in, así que hacemos
-    // SELECT actual + INSERT con valores combinados via ON CONFLICT DO UPDATE.
-    const { data: existing } = await supabase
-      .from('tenant_usage')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('date', today)
-      .maybeSingle();
+    const { error: rpcErr } = await supabase.rpc('increment_tenant_usage', {
+      p_tenant_id: tenantId,
+      p_date: today,
+      p_messages: messages,
+      p_input_tokens: inputTokens,
+      p_output_tokens: outputTokens,
+      p_cost_usd: Number(costUsd.toFixed(4)),
+    });
 
-    if (existing) {
-      await supabase
+    // Fallback: si la función todavía no existe (migration pendiente),
+    // usar el patrón viejo SELECT/UPDATE con warning. Esto evita que
+    // el upgrade rompa producción mientras la migration aplica.
+    if (rpcErr) {
+      console.warn('[aiUsageTracker] RPC increment_tenant_usage falló, fallback a SELECT/UPDATE:', rpcErr.message);
+      const { data: existing } = await supabase
         .from('tenant_usage')
-        .update({
-          messages_count: (existing.messages_count || 0) + messages,
-          api_calls_claude: (existing.api_calls_claude || 0) + 1,
-          claude_input_tokens: (existing.claude_input_tokens || 0) + inputTokens,
-          claude_output_tokens: (existing.claude_output_tokens || 0) + outputTokens,
-          estimated_cost_usd: Number((Number(existing.estimated_cost_usd || 0) + costUsd).toFixed(4)),
-        })
-        .eq('id', existing.id);
-    } else {
-      await supabase.from('tenant_usage').insert({
-        tenant_id: tenantId,
-        date: today,
-        messages_count: messages,
-        api_calls_claude: 1,
-        claude_input_tokens: inputTokens,
-        claude_output_tokens: outputTokens,
-        estimated_cost_usd: Number(costUsd.toFixed(4)),
-      });
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('date', today)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from('tenant_usage')
+          .update({
+            messages_count: (existing.messages_count || 0) + messages,
+            api_calls_claude: (existing.api_calls_claude || 0) + 1,
+            claude_input_tokens: (existing.claude_input_tokens || 0) + inputTokens,
+            claude_output_tokens: (existing.claude_output_tokens || 0) + outputTokens,
+            estimated_cost_usd: Number((Number(existing.estimated_cost_usd || 0) + costUsd).toFixed(4)),
+          })
+          .eq('id', existing.id);
+      } else {
+        await supabase.from('tenant_usage').insert({
+          tenant_id: tenantId,
+          date: today,
+          messages_count: messages,
+          api_calls_claude: 1,
+          claude_input_tokens: inputTokens,
+          claude_output_tokens: outputTokens,
+          estimated_cost_usd: Number(costUsd.toFixed(4)),
+        });
+      }
     }
   } catch (err) {
     console.error('[aiUsageTracker] Failed to log usage:', err.message);

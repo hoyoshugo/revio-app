@@ -165,6 +165,41 @@ export function parseMetaWebhook(body) {
             phoneNumberId,
           });
         }
+        // E-AGENT-12 H-AGT-1 (2026-04-26): handling de mensajes media.
+        // Antes los audios/imágenes se descartaban silenciosamente — el
+        // huésped no recibía respuesta y se iba pensando que la marca
+        // ignoró su mensaje. Ahora pasamos un placeholder textual al
+        // agente que indica el tipo de media, para que responda algo
+        // razonable ("recibí tu audio pero todavía no puedo escucharlo,
+        // ¿podés escribirlo?"). Transcripción real vía Whisper queda
+        // como mejora incremental (requiere descargar el media via
+        // Graph API + llamar OpenAI Whisper / Anthropic Claude vision).
+        if (msg && ['audio', 'voice', 'image', 'video', 'document', 'sticker', 'location'].includes(msg.type)) {
+          const placeholder = {
+            audio: '[El huésped envió una NOTA DE VOZ. Aclará que todavía no podés transcribir audios y pedile que escriba el mensaje.]',
+            voice: '[El huésped envió una NOTA DE VOZ. Aclará que todavía no podés transcribir audios y pedile que escriba el mensaje.]',
+            image: '[El huésped envió una IMAGEN. Indicale que todavía no podés ver imágenes y pedile que describa lo que necesita.]',
+            video: '[El huésped envió un VIDEO. Indicale que todavía no podés ver videos y pedile que describa su pregunta.]',
+            document: '[El huésped envió un DOCUMENTO. Indicale que todavía no podés abrir documentos en este chat y pedile que copie el texto importante.]',
+            sticker: '[El huésped envió un sticker. Respondé naturalmente preguntando en qué podés ayudar.]',
+            location: msg.location
+              ? `[El huésped compartió su UBICACIÓN actual (lat ${msg.location.latitude}, lng ${msg.location.longitude}). Podés usarla para sugerir cómo llegar al alojamiento.]`
+              : '[El huésped compartió una ubicación.]',
+          }[msg.type] || `[Mensaje de tipo ${msg.type} no soportado todavía.]`;
+
+          events.push({
+            channel: 'whatsapp',
+            senderId: msg.from,
+            senderName: change.value.contacts?.[0]?.profile?.name || msg.from,
+            message: placeholder,
+            messageId: msg.id,
+            mediaType: msg.type,
+            mediaId: msg[msg.type]?.id || null,
+            timestamp: parseInt(msg.timestamp) * 1000,
+            pageId: phoneNumberId || pageId,
+            phoneNumberId,
+          });
+        }
       }
 
       // Comentarios IG

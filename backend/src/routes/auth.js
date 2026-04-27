@@ -8,8 +8,25 @@ import { supabase } from '../models/supabase.js';
 import { requireAuth } from '../middleware/auth.js';
 import { JWT_SECRET, hashPassword, verifyPassword } from '../utils/security.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
+import { v, validate } from '../utils/validate.js';
 
 const router = Router();
+
+// Schemas (E-AGENT-13 M1)
+const loginSchema = {
+  email: v.string().email().required(),
+  password: v.string().min(1).required(),
+};
+const registerSchema = {
+  name: v.string().min(2).max(100).required(),
+  email: v.string().email().required(),
+  password: v.string().min(8).max(100).required(),
+  property_name: v.string().min(2).max(100).required(),
+  phone: v.string().max(30),
+  property_type: v.string().max(50),
+  city: v.string().max(100),
+  plan: v.string().max(50),
+};
 
 // Resolver tenant_id principal de un user (vía tenant_members; fallback a property)
 async function resolveTenantId(userId, propertyId) {
@@ -34,9 +51,8 @@ async function resolveTenantId(userId, propertyId) {
 }
 
 // ── POST /api/auth/login ──────────────────────────────────────
-router.post('/login', authLimiter, async (req, res) => {
+router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: 'Email y contraseña requeridos' });
 
   try {
     const { data: user, error } = await supabase
@@ -117,14 +133,8 @@ router.post('/login', authLimiter, async (req, res) => {
 });
 
 // ── POST /api/auth/register ───────────────────────────────────
-router.post('/register', authLimiter, async (req, res) => {
+router.post('/register', authLimiter, validate(registerSchema), async (req, res) => {
   const { name, email, password, phone, property_name, property_type, city, plan = 'starter' } = req.body;
-  if (!name || !email || !password || !property_name) {
-    return res.status(400).json({ error: 'name, email, password y property_name son requeridos' });
-  }
-  if (password.length < 8) {
-    return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
-  }
 
   try {
     const { data: existing } = await supabase
